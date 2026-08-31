@@ -27,6 +27,13 @@ from src.models.event import (
 )
 from src.models.organization import Organization
 from src.models.payment import Payment, PaymentStatus
+from src.models.task import (
+    Task,
+    TaskAssignment,
+    TaskAssignmentStatus,
+    TaskPriority,
+    TaskSubmission,
+)
 from src.models.ticket import (
     Order,
     OrderStatus,
@@ -60,6 +67,11 @@ __all__ = [
     "PlatformRole",
     "Profile",
     "ProfileVisibility",
+    "Task",
+    "TaskAssignment",
+    "TaskAssignmentStatus",
+    "TaskPriority",
+    "TaskSubmission",
     "Ticket",
     "TicketStatus",
     "TicketType",

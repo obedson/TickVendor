@@ -86,6 +86,7 @@
 - [ ] Explanation messaging for location requests
 
 ### Activities / Tasks Subsystem
+- [x] Task/TaskAssignment/TaskSubmission schema (priority, lifecycle, evidence, verification, assignment uniqueness)
 - [ ] Task creation (title, description, assignee, due date, priority, impact point reward, attachments, verification requirement)
 - [ ] Task assignment to participants
 - [ ] Task states: assigned, accepted, in progress, submitted, verified, rejected, overdue

@@ -112,3 +112,17 @@ def test_attendance_verification_models_map_with_duplicate_prevention():
         for constraint in peer.constraints
         if constraint.__class__.__name__ == "UniqueConstraint"
     )
+
+
+def test_task_assignment_submission_models_map_with_uniqueness():
+    import src.models  # noqa: F401
+    from src.database import Base
+
+    configure_mappers()
+    assert {"tasks", "task_assignments", "task_submissions"}.issubset(Base.metadata.tables)
+    assignments = Base.metadata.tables["task_assignments"]
+    assert any(
+        tuple(column.name for column in constraint.columns) == ("task_id", "assignee_id")
+        for constraint in assignments.constraints
+        if constraint.__class__.__name__ == "UniqueConstraint"
+    )
