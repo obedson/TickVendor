@@ -258,21 +258,21 @@ verification. These remain active work; no completion claim is made.
 
 ### Privacy
 - [x] Location accepted only during attendance verification and not continuously tracked
-- [ ] Frontend consent/permission messaging pending complete attendance UI
+- [x] Attendance UI explains one-time location use and offers QR/organizer fallbacks
 - [x] Users have persisted profile visibility controls
 - [x] Private profiles excluded from public profile/search APIs
 
 ### Geolocation Implementation
-- [ ] Browser/device geolocation where supported
+- [x] Browser/device geolocation requested only through explicit user action
 - [x] Haversine distance calculation
 - [x] GPS accuracy captured and low accuracy flagged for fallback review
-- [ ] Permission denied handling
-- [ ] Timeout handling
-- [ ] Location unavailable handling
-- [ ] Low accuracy handling
-- [ ] Browser restrictions handling
-- [ ] Fallback methods: QR, organizer verification
-- [ ] Do not prevent legitimate attendance because GPS fails
+- [x] Permission-denied messaging with QR/organizer fallback
+- [x] Geolocation timeout handling and retry/fallback messaging
+- [x] Location-unavailable handling
+- [x] Low accuracy handled by backend review flag and fallback paths
+- [x] Unsupported-browser handling
+- [x] Fallback methods: QR and organizer verification
+- [x] GPS failure does not prevent legitimate fallback verification
 
 ### Offline/Low Connectivity
 - [ ] Cache event/ticket data
