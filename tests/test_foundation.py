@@ -48,3 +48,18 @@ def test_user_profile_models_map_and_enforce_identity_constraints():
     assert Base.metadata.tables["users"].c.email.unique
     assert Base.metadata.tables["profiles"].c.user_id.unique
     assert Base.metadata.tables["profiles"].c.username.unique
+
+
+def test_organization_community_membership_models_map_with_tenant_constraints():
+    import src.models  # noqa: F401
+    from src.database import Base
+
+    configure_mappers()
+    assert {"organizations", "communities", "memberships"}.issubset(Base.metadata.tables)
+    membership = Base.metadata.tables["memberships"]
+    unique_columns = {
+        tuple(column.name for column in constraint.columns)
+        for constraint in membership.constraints
+        if constraint.__class__.__name__ == "UniqueConstraint"
+    }
+    assert ("community_id", "user_id") in unique_columns

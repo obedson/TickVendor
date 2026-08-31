@@ -31,8 +31,8 @@
 - [ ] Authentication architecture (User identity schema exists; password hashing, verification, reset, and sessions pending)
 - [ ] Authorization architecture (RBAC: Guest, Participant/Member, Organizer, Community Admin, Super Admin)
 - [x] User/Profile schema: UUIDs, email/password hash, platform role, verification/activity state, name, username, photo, bio, location, interests, skills, privacy
-- [ ] Organizations/companies support
-- [ ] Communities support
+- [x] Organization schema (owner, identity, verification, active state)
+- [x] Community/Membership schema (organization tenancy, multi-community users, scoped roles/status, uniqueness)
 - [x] Configuration/environment files (`Settings`, `.env.example`, deployment-secret guard)
 - [x] Error handling architecture (stable validation/internal-error envelopes)
 - [x] Logging architecture (central standard-library configuration; sensitive data policy pending security pass)
