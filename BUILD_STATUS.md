@@ -24,7 +24,7 @@
   constraints, and the initial authentication API are verified. Business services, complete
   RBAC, remaining APIs, payment adapters/webhooks, frontend/PWA, and end-to-end product
   journeys remain incomplete and must not be represented as finished.
-- Latest verification: 38 backend tests, Ruff, Alembic drift check, and frontend production build pass.
+- Latest verification: clean four-revision migration, 38 backend tests, Ruff, Alembic drift check, and frontend production build pass.
 - Production deployment artifacts now include Dockerfile, PostgreSQL Compose topology, README,
   production database driver, and environment guidance; live infrastructure remains unverified.
 
@@ -233,7 +233,7 @@
 - [ ] Output encoding
 - [ ] Authorization checks
 - [ ] RBAC implementation
-- [ ] Rate limiting
+- [x] In-process rate limiting foundation (distributed production backend still required for horizontal scale)
 - [ ] CSRF protection where applicable
 - [ ] Secure authentication
 - [ ] Password hashing (BCRYPT_ROUNDS: 12 default)
@@ -241,7 +241,7 @@
 - [ ] File upload validation
 - [ ] Image validation
 - [ ] Payment webhook validation
-- [ ] API validation
+- [x] API validation and secure response headers foundation
 - [ ] Audit logging
 - [ ] Abuse prevention
 - [ ] Never rely exclusively on frontend validation
