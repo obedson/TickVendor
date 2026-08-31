@@ -1,6 +1,7 @@
 """Administrator-configurable recognition schemas."""
 
 from typing import Any, Literal
+from uuid import UUID
 
 from pydantic import BaseModel, Field
 
@@ -27,6 +28,16 @@ class RankCreateInput(BaseModel):
     icon_url: str | None = Field(default=None, max_length=2048)
     minimum_points: int = Field(ge=0)
     sort_order: int = Field(ge=0)
+    requirements: list["RankRequirementInput"] = Field(default_factory=list, max_length=20)
+
+
+class RankRequirementInput(BaseModel):
+    requirement_type: Literal[
+        "attendance_count", "task_count", "contribution_count", "service_activities",
+        "leadership_activities", "peer_confirmations", "milestone", "badge",
+    ]
+    reference_id: UUID | None = None
+    threshold: int = Field(default=1, ge=1)
 
 
 class BadgeCreateInput(BaseModel):

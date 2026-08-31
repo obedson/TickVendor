@@ -23,6 +23,7 @@ from src.models import (
     PeerConfirmation,
     PeerConfirmationDecision,
     Rank,
+    RankRequirement,
     Task,
     TaskAssignment,
     TaskAssignmentStatus,
@@ -101,10 +102,33 @@ def qualified_milestones(db: Session, user_id, community_id) -> list[Milestone]:
 
 
 def current_rank(db: Session, user_id, community_id) -> Rank | None:
-    points = user_metrics(db, user_id, community_id)["impact_points"]
-    return db.scalar(select(Rank).where(
-        Rank.community_id == community_id, Rank.is_active.is_(True), Rank.minimum_points <= points
+    metrics = user_metrics(db, user_id, community_id)
+    candidates = db.scalars(select(Rank).where(
+        Rank.community_id == community_id, Rank.is_active.is_(True),
+        Rank.minimum_points <= metrics["impact_points"],
     ).order_by(Rank.minimum_points.desc()))
+    for rank in candidates:
+        requirements = list(db.scalars(select(RankRequirement).where(RankRequirement.rank_id == rank.id)))
+        qualified = True
+        for requirement in requirements:
+            if requirement.requirement_type == "milestone":
+                actual = db.scalar(select(func.count()).select_from(MilestoneAward).where(
+                    MilestoneAward.user_id == user_id,
+                    MilestoneAward.milestone_id == requirement.reference_id,
+                ))
+            elif requirement.requirement_type == "badge":
+                actual = db.scalar(select(func.count()).select_from(BadgeAward).where(
+                    BadgeAward.user_id == user_id, BadgeAward.badge_id == requirement.reference_id,
+                    BadgeAward.revoked_at.is_(None),
+                ))
+            else:
+                actual = metrics.get(requirement.requirement_type, 0)
+            if actual < requirement.threshold:
+                qualified = False
+                break
+        if qualified:
+            return rank
+    return None
 
 
 def award_badge(db: Session, badge: Badge, user_id, idempotency_key: str) -> BadgeAward:

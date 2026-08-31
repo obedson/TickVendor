@@ -11,6 +11,7 @@ from src.models import (
     Milestone,
     MilestoneRequirement,
     Rank,
+    RankRequirement,
 )
 from src.services.recognition import current_rank, qualified_milestones
 from tests.test_database import create_event_context
@@ -32,4 +33,8 @@ def test_milestone_and_rank_qualification_are_database_configured(tmp_path):
         ]); db.commit()
         assert [item.slug for item in qualified_milestones(db, user.id, community.id)] == ["builder"]
         assert current_rank(db, user.id, community.id).slug == "rank-builder"
+        requirement = RankRequirement(rank_id=db.query(Rank).filter_by(slug="rank-builder").one().id,
+                                      requirement_type="task_count", threshold=1)
+        db.add(requirement); db.commit()
+        assert current_rank(db, user.id, community.id).slug == "starter"
     engine.dispose()

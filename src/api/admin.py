@@ -22,6 +22,7 @@ from src.models import (
     MilestoneRequirement,
     PlatformRole,
     Rank,
+    RankRequirement,
     User,
 )
 from src.schemas.admin import (
@@ -130,8 +131,12 @@ def create_rank(
     user: Annotated[User, Depends(get_current_user)],
 ):
     require_admin(db, community_id, user)
-    rank = Rank(community_id=community_id, **payload.model_dump())
+    values = payload.model_dump(exclude={"requirements"})
+    rank = Rank(community_id=community_id, **values)
     db.add(rank)
+    db.flush()
+    db.add_all(RankRequirement(rank_id=rank.id, **requirement.model_dump())
+               for requirement in payload.requirements)
     commit_or_conflict(db)
     audit(
         db,
