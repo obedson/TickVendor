@@ -278,7 +278,7 @@ verification. These remain active work; no completion claim is made.
 - [x] Cache public event discovery data for offline reuse
 - [x] Ticket wallet renders QR codes from an encrypted device-local offline copy and clears it on sign-out
 - [x] Support PWA installation with valid manifest icons and a browser install prompt
-- [ ] Queue non-sensitive actions where appropriate
+- [x] Queue and deduplicate non-sensitive notification-read actions locally, then sync on reconnect
 - [x] Retry idempotent GET/HEAD requests with bounded exponential backoff for network and transient server failures
 - [x] Lazy-load QR generation and enforce a 210 kB maximum production JavaScript chunk
 - [x] Service worker excludes authenticated/private API data from its shared cache
