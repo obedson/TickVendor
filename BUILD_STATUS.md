@@ -119,6 +119,7 @@
 - [ ] Member profile shows all four dimensions
 
 ### Milestone Engine
+- [x] Milestone/MilestoneRequirement schema (community-scoped configurable metrics, operators, thresholds, rewards)
 - [ ] Configurable milestones
 - [ ] Milestone requirements: impact points, attendance count, task count, contribution count, service activities, leadership activities, peer confirmations, event participation, consecutive activities
 - [ ] Example: Community Builder — 300 Impact Points, 10 verified attendances, 5 completed tasks, 1 community contribution
@@ -126,6 +127,7 @@
 - [ ] Milestone requirements should be configurable via admin (not hard-coded)
 
 ### Rank System
+- [x] Rank/RankRequirement schema (community-scoped points, ordered progression, activity/milestone/badge references)
 - [ ] Configurable ranks with name, description, icon, minimum points, required activities, required milestones, required badges
 - [ ] Example rank thresholds: Starter (0–49), Active Member (50–149), Contributor (150–299), Community Builder (300–499), Community Leader (500–799), Impact Champion (800+)
 - [ ] Rank qualification requirements (not just minimum points — may require specific activities/milestones/badges)
@@ -133,6 +135,7 @@
 - [ ] Progress toward next rank display on profile
 
 ### Badge System
+- [x] Badge/BadgeAward schema (configurable JSON requirements, visibility/rewards, idempotent award and revocation history)
 - [ ] Flexible badge engine
 - [ ] Badge properties: name, description, icon, category, requirements, reward, visibility
 - [ ] Example badges: First Step (first verified event attendance), Regular (attend 5 events), Consistent (attend 10 events), Task Starter (complete first task), Doer (complete 10 tasks), Community Helper (help 5 members), Facilitator (organize first event), Community Builder (complete defined community requirements)
@@ -140,6 +143,7 @@
 - [ ] Admin-definable badge rules (achievement rule builder)
 
 ### Achievement Rule Builder
+- [x] AchievementRule schema (versioned condition tree and reward definition for extensible operators)
 - [ ] Admin interface for defining achievement logic without modifying code
 - [ ] Supported logical operators: AND, OR, >=, <=, =, Count, Sum, Streak, Unique event count
 - [ ] Example achievement: Community Champion — attendance >= 20, tasks >= 10, peer confirmations >= 10, leadership activities >= 3, Impact Points >= 500, reward: badge + 50 Impact Points
@@ -170,6 +174,7 @@
 - [ ] Total members, active members, events, attendance, tasks, contributions, engagement, rank distribution, badge distribution, participation trends, member retention/engagement
 
 ### Notifications
+- [x] Notification schema (in-app payload and read state)
 - [ ] In-app notifications only (no external delivery required initially)
 - [ ] Notification preferences per user
 - [ ] Example notifications: "Your event starts tomorrow", "Attendance is now open", "Your ticket has been confirmed", "Your task was verified", "You earned a new badge", "You're 20 Impact Points away from your next milestone", "You have attendance confirmations waiting", "Congratulations! You reached Community Builder"
@@ -193,6 +198,7 @@
 - [ ] Organizer pages showing: name, logo/profile, description, events (past and upcoming), basic credibility/verification status
 
 ### Admin Audit Log
+- [x] AuditLog schema (actor/community/action/target/timestamp/metadata; append-only design)
 - [ ] Audit log tracking: event creation/changes, ticket changes, attendance override, task verification, contribution verification, point adjustments, badge awards/revocations, rank changes, user role changes
 - [ ] Each entry: actor, action, target, timestamp, relevant metadata
 

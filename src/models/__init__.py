@@ -3,6 +3,7 @@
 Import every SQLAlchemy model module here so metadata and Alembic discover it.
 """
 
+from src.models.achievement import AchievementRule
 from src.models.attendance import (
     Attendance,
     AttendanceStatus,
@@ -11,6 +12,7 @@ from src.models.attendance import (
     PeerConfirmationDecision,
     VerificationMethod,
 )
+from src.models.badge import Badge, BadgeAward
 from src.models.community import (
     Community,
     Membership,
@@ -33,8 +35,11 @@ from src.models.event import (
     Venue,
 )
 from src.models.impact import ImpactTransaction, ImpactTransactionStatus
+from src.models.milestone import Milestone, MilestoneRequirement
+from src.models.notification import AuditLog, Leaderboard, Notification
 from src.models.organization import Organization
 from src.models.payment import Payment, PaymentStatus
+from src.models.rank import Rank, RankRequirement
 from src.models.task import (
     Task,
     TaskAssignment,
@@ -53,11 +58,15 @@ from src.models.ticket import (
 from src.models.user import PlatformRole, Profile, ProfileVisibility, User
 
 __all__ = [
+    "AchievementRule",
     "Activity",
     "ActivityStatus",
     "Attendance",
     "AttendanceStatus",
     "AttendanceVerification",
+    "AuditLog",
+    "Badge",
+    "BadgeAward",
     "Community",
     "Contribution",
     "ContributionType",
@@ -68,10 +77,14 @@ __all__ = [
     "EventStatus",
     "ImpactTransaction",
     "ImpactTransactionStatus",
+    "Leaderboard",
     "LocationType",
     "Membership",
     "MembershipRole",
     "MembershipStatus",
+    "Milestone",
+    "MilestoneRequirement",
+    "Notification",
     "Order",
     "OrderStatus",
     "Organization",
@@ -82,6 +95,8 @@ __all__ = [
     "PlatformRole",
     "Profile",
     "ProfileVisibility",
+    "Rank",
+    "RankRequirement",
     "Task",
     "TaskAssignment",
     "TaskAssignmentStatus",

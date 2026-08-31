@@ -135,3 +135,24 @@ def test_activity_contribution_and_impact_models_map_with_idempotency():
     configure_mappers()
     assert {"activities", "contributions", "impact_transactions"}.issubset(Base.metadata.tables)
     assert Base.metadata.tables["impact_transactions"].c.idempotency_key.unique
+
+
+def test_recognition_and_platform_models_map():
+    import src.models  # noqa: F401
+    from src.database import Base
+
+    configure_mappers()
+    required = {
+        "milestones",
+        "milestone_requirements",
+        "ranks",
+        "rank_requirements",
+        "badges",
+        "badge_awards",
+        "achievement_rules",
+        "notifications",
+        "audit_logs",
+        "leaderboards",
+    }
+    assert required.issubset(Base.metadata.tables)
+    assert Base.metadata.tables["badge_awards"].c.idempotency_key.unique
