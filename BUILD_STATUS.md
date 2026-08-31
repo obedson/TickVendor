@@ -56,11 +56,11 @@
 - [x] Event editing with owner/community-admin/super-admin authorization
 - [x] Event publishing/unpublishing lifecycle
 - [x] Event discovery/detail APIs (published-only browse, search, category, upcoming, pagination)
-- [ ] Event filtering by category, location, price, etc.
-- [ ] Event sorting
+- [x] Event filtering by category, city, free/paid and upcoming status
+- [x] Event chronological/reverse-chronological sorting
 - [ ] Nearby events support
-- [ ] Upcoming events view
-- [ ] Free vs paid events filtering
+- [x] Upcoming events view
+- [x] Free vs paid events filtering
 - [ ] Event categories (configurable: technology, education, business, community, agriculture, entertainment, sports, training, conference, workshop, networking, volunteer, fundraising)
 - [x] Event tags
 - [ ] Organizer profiles
