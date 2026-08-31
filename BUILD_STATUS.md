@@ -275,13 +275,15 @@ verification. These remain active work; no completion claim is made.
 - [x] GPS failure does not prevent legitimate fallback verification
 
 ### Offline/Low Connectivity
-- [ ] Cache event/ticket data
+- [x] Cache public event discovery data for offline reuse
 - [ ] Allow ticket QR to load from cached data
 - [ ] Support PWA installation
 - [ ] Queue non-sensitive actions where appropriate
 - [ ] Retry failed requests safely
 - [ ] Avoid large bundles
-- [ ] Do not cache sensitive information insecurely
+- [x] Service worker excludes authenticated/private API data from its shared cache
 
 ### PWA
-- [ ] React/Vite responsive API-connected event discovery shell, manifest and service-worker offline shell build successfully; icons/install UX and complete application screens pending
+- [x] Manifest, service worker, and cached offline application shell build successfully
+- [ ] App icons and install-prompt UX
+- [ ] Complete responsive application screens
