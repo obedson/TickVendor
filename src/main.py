@@ -18,6 +18,7 @@ from src.api.payments import router as payments_router
 from src.api.tickets import router as tickets_router
 from src.config import settings
 from src.logging_config import configure_logging, request_id_context
+from src.security_middleware import rate_limiter, request_key
 
 
 def create_app() -> FastAPI:
@@ -44,8 +45,13 @@ def create_app() -> FastAPI:
         token = request_id_context.set(request_id)
         request.state.request_id = request_id
         try:
+            rate_limiter.check(request_key(request))
             response = await call_next(request)
             response.headers["X-Request-ID"] = request_id
+            response.headers["X-Content-Type-Options"] = "nosniff"
+            response.headers["X-Frame-Options"] = "DENY"
+            response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+            response.headers["Permissions-Policy"] = "geolocation=(self), camera=(self)"
             return response
         finally:
             request_id_context.reset(token)

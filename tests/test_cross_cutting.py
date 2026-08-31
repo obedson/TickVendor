@@ -25,6 +25,8 @@ def test_request_id_is_generated_when_absent():
     response = TestClient(create_app()).get("/health")
 
     assert response.headers["X-Request-ID"]
+    assert response.headers["X-Content-Type-Options"] == "nosniff"
+    assert response.headers["X-Frame-Options"] == "DENY"
 
 
 def test_sensitive_data_filter_redacts_nested_secrets():
