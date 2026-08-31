@@ -22,10 +22,13 @@ def list_events(
     search: str | None = Query(default=None, max_length=200),
     category: str | None = Query(default=None, max_length=80),
     upcoming: bool = True,
+    city: str | None = Query(default=None, max_length=120),
+    price: str | None = Query(default=None, pattern="^(free|paid)$"),
+    sort: str = Query(default="soonest", pattern="^(soonest|latest)$"),
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
 ) -> list[Event]:
-    return discover_events(db, search, category, upcoming, limit, offset)
+    return discover_events(db, search, category, upcoming, limit, offset, city, price, sort)
 
 
 @router.get("/{event_id}", response_model=EventResponse)

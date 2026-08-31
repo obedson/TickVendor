@@ -16,6 +16,7 @@ from src.models import (
     LocationType,
     MembershipRole,
     PlatformRole,
+    TicketType,
     User,
     Venue,
 )
@@ -129,7 +130,8 @@ def publish_event(db: Session, event_id: UUID, user: User, publish: bool) -> Eve
 
 
 def discover_events(
-    db: Session, search: str | None, category: str | None, upcoming: bool, limit: int, offset: int
+    db: Session, search: str | None, category: str | None, upcoming: bool, limit: int, offset: int,
+    city: str | None = None, price: str | None = None, sort: str = "soonest",
 ) -> list[Event]:
     query = select(Event).options(selectinload(Event.venue)).where(Event.status == EventStatus.PUBLISHED)
     if search:
@@ -141,4 +143,15 @@ def discover_events(
         query = query.where(Event.category == make_slug(category))
     if upcoming:
         query = query.where(Event.ends_at >= datetime.now(UTC))
-    return list(db.scalars(query.order_by(Event.starts_at).offset(offset).limit(limit)))
+    if city:
+        query = query.join(Event.venue).where(func.lower(Venue.city) == city.lower())
+    if price == "free":
+        query = query.where(~select(TicketType.id).where(
+            TicketType.event_id == Event.id, TicketType.price > 0
+        ).exists())
+    elif price == "paid":
+        query = query.where(select(TicketType.id).where(
+            TicketType.event_id == Event.id, TicketType.price > 0
+        ).exists())
+    ordering = Event.starts_at.desc() if sort == "latest" else Event.starts_at.asc()
+    return list(db.scalars(query.order_by(ordering).offset(offset).limit(limit)))
