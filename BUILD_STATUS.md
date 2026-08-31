@@ -16,7 +16,7 @@
   minimal SQLAlchemy foundation. `src/database.py` is now restricted to engine, session,
   Base, foreign-key enforcement, and initialization helpers; models are modular under
   `src/models/`.
-- Verification: automated tests pass (35), Ruff passes, source compilation passes,
+- Verification: automated tests pass (36), Ruff passes, source compilation passes,
   SQLite foreign keys are enabled, and `/health` plus standardized validation errors work.
 - Remaining warning: FastAPI's current TestClient emits an upstream Starlette/httpx
   deprecation warning; it does not fail tests.
@@ -104,8 +104,8 @@
 - [x] Idempotent Impact Points awarded only after configured verification
 - [ ] Community activities beyond attendance/tasks: volunteer work, mentoring, community service, speaking, training, organizing, content contribution, resource donation, leadership activities
 - [ ] Activity types: monetary, equipment, materials, volunteer time, services, resources
-- [ ] Contribution tracking with: amount, currency, purpose, date, payment/reference ID, verification status
-- [ ] Configurable contribution bands (₦1-999 → 2pts, ₦1000-4999 → 5pts, ₦5000-9999 → 10pts, ₦10000+ → 15pts)
+- [x] Contribution recording/verification service with amount, currency, purpose, date/reference and tenant authorization
+- [x] Configurable database contribution bands drive idempotent rewards
 - [ ] Caps to prevent financial contributions from overwhelming participation-based achievements
 
 ### Impact Point / Reward Engine
