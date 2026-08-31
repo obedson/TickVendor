@@ -16,7 +16,7 @@
   minimal SQLAlchemy foundation. `src/database.py` is now restricted to engine, session,
   Base, foreign-key enforcement, and initialization helpers; models are modular under
   `src/models/`.
-- Verification: automated tests pass (31), Ruff passes, source compilation passes,
+- Verification: automated tests pass (32), Ruff passes, source compilation passes,
   SQLite foreign keys are enabled, and `/health` plus standardized validation errors work.
 - Remaining warning: FastAPI's current TestClient emits an upstream Starlette/httpx
   deprecation warning; it does not fail tests.
@@ -71,9 +71,9 @@
 - [ ] Ticket statuses: reserved, pending payment, paid, active, used, cancelled, expired
 - [x] Duplicate ticket use prevention and staff/tenant-authorized validation
 - [x] Idempotent order creation, free-ticket activation, inventory/max-per-user enforcement
-- [ ] Payment integration architecture (paystack, flutterwave, stripe — server-side verification, webhooks)
-- [ ] Payment states: pending, successful, failed, cancelled, refunded
-- [ ] Ticket issuance upon payment confirmation
+- [x] Payment provider contract, deterministic test adapter, initialization/verification APIs, signed idempotent webhook path (live Paystack/Flutterwave/Stripe adapters pending credentials)
+- [x] Payment state enforcement and server-side amount/currency/provider verification
+- [x] Ticket activation upon verified payment confirmation
 - [ ] Ticket activation flow
 - [ ] Refund processing
 - [ ] Ticket cancellation
