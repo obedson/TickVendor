@@ -169,7 +169,7 @@
 ### Member Journey / Profile
 - [ ] Visual milestone timeline: joined community → first event → first badge → completed 5 tasks → contributor → helped 10 members → community builder → community leader
 - [ ] Member profile contains: profile photo, name, username, rank, impact points, progress toward next rank, badges, milestones, events attended, tasks completed, contributions, service activities, leadership activities, engagement dimensions, achievement timeline
-- [ ] Privacy controls: users control what parts of profile are publicly visible
+- [x] Privacy-aware public/private profile API and authenticated Impact Point summary foundation
 
 ### Leaderboards (Optional)
 - [ ] Optional leaderboard types: overall, attendance, tasks, community service, leadership, organization, event
