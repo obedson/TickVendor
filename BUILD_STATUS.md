@@ -272,4 +272,4 @@
 - [ ] Do not cache sensitive information insecurely
 
 ### PWA
-- [ ] Progressive Web App: manifest, service worker, offline shell, app icons, install prompt, responsive mobile experience
+- [ ] React/Vite responsive API-connected event discovery shell, manifest and service-worker offline shell build successfully; icons/install UX and complete application screens pending
