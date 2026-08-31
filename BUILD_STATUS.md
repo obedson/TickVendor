@@ -28,6 +28,15 @@
 - Production deployment artifacts now include Dockerfile, PostgreSQL Compose topology, README,
   production database driver, and environment guidance; live infrastructure remains unverified.
 
+## Current Completion Audit
+
+The repository is not yet specification-complete. Verified backend foundations and core
+business services are substantial, but 100+ checklist requirements remain open, primarily:
+complete recognition aggregation/automatic awards, full admin configuration APIs, richer
+dashboards, complete frontend journeys/screens, full PWA offline/install behavior, upload/image
+handling, distributed rate limiting, comprehensive fraud analysis, and live external-provider
+verification. These remain active work; no completion claim is made.
+
 ## Implementation Checklist — Grouped by Dependency-Aware Subsystem
 
 ### Foundation / Architecture
