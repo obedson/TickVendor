@@ -1,0 +1,48 @@
+"""Administrator-configurable recognition schemas."""
+
+from typing import Any, Literal
+
+from pydantic import BaseModel, Field
+
+
+class MetricRequirementInput(BaseModel):
+    metric: str = Field(min_length=2, max_length=80)
+    operator: Literal[">=", "<=", "="]
+    threshold: int = Field(ge=0)
+
+
+class MilestoneCreateInput(BaseModel):
+    name: str = Field(min_length=2, max_length=160)
+    slug: str = Field(min_length=2, max_length=100, pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+    description: str | None = Field(default=None, max_length=5000)
+    icon_url: str | None = Field(default=None, max_length=2048)
+    reward_points: int = Field(default=0, ge=0, le=100000)
+    requirements: list[MetricRequirementInput] = Field(min_length=1, max_length=20)
+
+
+class RankCreateInput(BaseModel):
+    name: str = Field(min_length=2, max_length=120)
+    slug: str = Field(min_length=2, max_length=100, pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+    description: str | None = Field(default=None, max_length=5000)
+    icon_url: str | None = Field(default=None, max_length=2048)
+    minimum_points: int = Field(ge=0)
+    sort_order: int = Field(ge=0)
+
+
+class BadgeCreateInput(BaseModel):
+    name: str = Field(min_length=2, max_length=160)
+    slug: str = Field(min_length=2, max_length=100, pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+    description: str | None = Field(default=None, max_length=5000)
+    icon_url: str | None = Field(default=None, max_length=2048)
+    category: str = Field(min_length=2, max_length=64)
+    requirements: dict[str, Any]
+    reward_points: int = Field(default=0, ge=0, le=100000)
+    is_visible: bool = True
+
+
+class AchievementRuleCreateInput(BaseModel):
+    name: str = Field(min_length=2, max_length=160)
+    slug: str = Field(min_length=2, max_length=100, pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+    description: str | None = Field(default=None, max_length=5000)
+    condition_tree: dict[str, Any]
+    reward_definition: dict[str, Any]

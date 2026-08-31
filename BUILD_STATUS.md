@@ -24,7 +24,7 @@
   constraints, and the initial authentication API are verified. Business services, complete
   RBAC, remaining APIs, payment adapters/webhooks, frontend/PWA, and end-to-end product
   journeys remain incomplete and must not be represented as finished.
-- Latest verification: clean five-revision migration, 43 backend tests, Ruff, Alembic drift check, and frontend production build pass.
+- Latest verification: clean five-revision migration, 44 backend tests, Ruff, Alembic drift check, and frontend production build pass.
 - Production deployment artifacts now include Dockerfile, PostgreSQL Compose topology, README,
   production database driver, and environment guidance; live infrastructure remains unverified.
 
@@ -145,14 +145,14 @@ verification. These remain active work; no completion claim is made.
 - [ ] Milestone requirements: impact points, attendance count, task count, contribution count, service activities, leadership activities, peer confirmations, event participation, consecutive activities
 - [ ] Example: Community Builder — 300 Impact Points, 10 verified attendances, 5 completed tasks, 1 community contribution
 - [x] Idempotent automatic milestone awards, reward transactions, and notifications
-- [ ] Milestone requirements should be configurable via admin (not hard-coded)
+- [x] Milestone definitions and requirements are configurable through tenant-admin API
 
 ### Rank System
 - [x] Rank/RankRequirement schema (community-scoped points, ordered progression, activity/milestone/badge references)
 - [x] Database-configured point-based current-rank evaluation foundation
 - [ ] Example rank thresholds: Starter (0–49), Active Member (50–149), Contributor (150–299), Community Builder (300–499), Community Leader (500–799), Impact Champion (800+)
 - [ ] Rank qualification requirements (not just minimum points — may require specific activities/milestones/badges)
-- [ ] Administrators define rank configuration without code changes
+- [x] Tenant admins define ranks through validated, audited API without code changes
 - [ ] Progress toward next rank display on profile
 
 ### Badge System
@@ -161,11 +161,11 @@ verification. These remain active work; no completion claim is made.
 - [ ] Badge properties: name, description, icon, category, requirements, reward, visibility
 - [ ] Example badges: First Step (first verified event attendance), Regular (attend 5 events), Consistent (attend 10 events), Task Starter (complete first task), Doer (complete 10 tasks), Community Helper (help 5 members), Facilitator (organize first event), Community Builder (complete defined community requirements)
 - [x] Idempotent automatic badge awards from configured condition trees with rewards/notifications
-- [ ] Admin-definable badge rules (achievement rule builder)
+- [x] Tenant-admin badge configuration API validates safe rule trees and audits changes
 
 ### Achievement Rule Builder
 - [x] AchievementRule schema (versioned condition tree and reward definition for extensible operators)
-- [ ] Admin interface for defining achievement logic without modifying code
+- [x] Tenant-admin achievement rule API supports validated condition/reward definitions
 - [ ] Safe evaluator supports AND, OR, >=, <=, =; Count/Sum/Streak/Unique event aggregation pending
 - [ ] Example achievement: Community Champion — attendance >= 20, tasks >= 10, peer confirmations >= 10, leadership activities >= 3, Impact Points >= 500, reward: badge + 50 Impact Points
 - [ ] Additional rule types designed for future extensibility
