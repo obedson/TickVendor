@@ -87,6 +87,7 @@
 
 ### Activities / Tasks Subsystem
 - [x] Task/TaskAssignment/TaskSubmission schema (priority, lifecycle, evidence, verification, assignment uniqueness)
+- [x] Activity/Contribution schema (five engagement dimensions, monetary/non-monetary types, verification state)
 - [ ] Task creation (title, description, assignee, due date, priority, impact point reward, attachments, verification requirement)
 - [ ] Task assignment to participants
 - [ ] Task states: assigned, accepted, in progress, submitted, verified, rejected, overdue
@@ -100,6 +101,7 @@
 - [ ] Caps to prevent financial contributions from overwhelming participation-based achievements
 
 ### Impact Point / Reward Engine
+- [x] ImpactTransaction schema (auditable status, source references, reversals, unique idempotency key)
 - [ ] Centralized rules engine for Impact Points
 - [ ] Point values: attendance → +10, task completion → +20, volunteer activity → +15, peer verification → +2, leadership activity → +30, contribution → configurable, special achievement → configurable
 - [ ] Never hard-code point values into individual components

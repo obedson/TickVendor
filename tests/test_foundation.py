@@ -126,3 +126,12 @@ def test_task_assignment_submission_models_map_with_uniqueness():
         for constraint in assignments.constraints
         if constraint.__class__.__name__ == "UniqueConstraint"
     )
+
+
+def test_activity_contribution_and_impact_models_map_with_idempotency():
+    import src.models  # noqa: F401
+    from src.database import Base
+
+    configure_mappers()
+    assert {"activities", "contributions", "impact_transactions"}.issubset(Base.metadata.tables)
+    assert Base.metadata.tables["impact_transactions"].c.idempotency_key.unique

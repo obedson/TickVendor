@@ -17,6 +17,13 @@ from src.models.community import (
     MembershipRole,
     MembershipStatus,
 )
+from src.models.contribution import (
+    Activity,
+    ActivityStatus,
+    Contribution,
+    ContributionType,
+    EngagementDimension,
+)
 from src.models.event import (
     Event,
     EventStaff,
@@ -25,6 +32,7 @@ from src.models.event import (
     LocationType,
     Venue,
 )
+from src.models.impact import ImpactTransaction, ImpactTransactionStatus
 from src.models.organization import Organization
 from src.models.payment import Payment, PaymentStatus
 from src.models.task import (
@@ -45,14 +53,21 @@ from src.models.ticket import (
 from src.models.user import PlatformRole, Profile, ProfileVisibility, User
 
 __all__ = [
+    "Activity",
+    "ActivityStatus",
     "Attendance",
     "AttendanceStatus",
     "AttendanceVerification",
     "Community",
+    "Contribution",
+    "ContributionType",
+    "EngagementDimension",
     "Event",
     "EventStaff",
     "EventStaffRole",
     "EventStatus",
+    "ImpactTransaction",
+    "ImpactTransactionStatus",
     "LocationType",
     "Membership",
     "MembershipRole",
