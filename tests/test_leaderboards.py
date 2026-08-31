@@ -6,6 +6,8 @@ from sqlalchemy.orm import Session
 import src.models  # noqa: F401
 from src.database import Base
 from src.models import (
+    Attendance,
+    AttendanceStatus,
     ImpactTransaction,
     ImpactTransactionStatus,
     Leaderboard,
@@ -48,6 +50,13 @@ def test_enabled_overall_leaderboard_excludes_money_specific_metric(tmp_path):
         )
         db.commit()
         assert leaderboard_entries(db, board, owner)[0]["score"] == 50
+        attendance_board = Leaderboard(community_id=community.id, name="Attendance",
+                                       slug="attendance", metric="attendance", period="all_time",
+                                       is_enabled=True)
+        db.add_all([attendance_board, Attendance(event_id=_event.id, user_id=owner.id,
+                                                 status=AttendanceStatus.GPS_VERIFIED)])
+        db.commit()
+        assert leaderboard_entries(db, attendance_board, owner)[0]["score"] == 1
         board.is_enabled = False
         db.commit()
         assert leaderboard_entries(db, board, owner) == []
