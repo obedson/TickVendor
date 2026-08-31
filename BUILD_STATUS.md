@@ -80,7 +80,7 @@ verification. These remain active work; no completion claim is made.
 - [x] Ticket type creation API with tenant ownership and inventory/sales validation
 - [x] Ticket type properties: name, description, price, quantity, sales start/end, visibility, max per user
 - [x] Ticket generation: secure public ID and opaque QR token linked to attendee/event/type/order
-- [ ] Ticket statuses: reserved, pending payment, paid, active, used, cancelled, expired
+- [x] Ticket lifecycle states implemented: reserved, pending payment, paid, active, used, cancelled, refunded, expired
 - [x] Duplicate ticket use prevention and staff/tenant-authorized validation
 - [x] Idempotent order creation, free-ticket activation, inventory/max-per-user enforcement
 - [x] Payment provider contract, test adapter, Paystack/Flutterwave HTTP adapters, initialization/verification APIs and signed idempotent webhook path (live verification externally blocked; Stripe adapter pending)
@@ -93,7 +93,7 @@ verification. These remain active work; no completion claim is made.
 ### Attendance Subsystem
 - [x] Attendance/Verification/PeerConfirmation schema (independent attendance, layered signals, confidence/review fields, duplicate prevention)
 - [x] Idempotent attendance record/check-in API independent from ticket purchase
-- [ ] Attendance states: not checked in, checked in, GPS verified, QR verified, peer verified, organizer verified, rejected
+- [x] Attendance lifecycle states implemented: not checked in, checked in, GPS/QR/peer/organizer verified, rejected
 - [x] Geofenced attendance with coordinates, radius, opening/closing windows
 - [x] GPS verification with Haversine distance, accuracy capture, and review flag fallback
 - [x] QR attendance verification API with event/attendee/ticket matching and idempotent signal
@@ -124,20 +124,20 @@ verification. These remain active work; no completion claim is made.
 - [x] ImpactTransaction schema (auditable status, source references, reversals, unique idempotency key)
 - [x] Centralized database-backed Impact Point award service
 - [x] Database-backed PointRule defaults and community override structure
-- [ ] Point values: attendance → +10, task completion → +20, volunteer activity → +15, peer verification → +2, leadership activity → +30, contribution → configurable, special achievement → configurable
-- [ ] Never hard-code point values into individual components
-- [ ] Activity/reward engine: user, source activity, points, timestamp, organization/community, event/task reference, reason, status
-- [ ] Immutable-ish transaction history for auditability
-- [ ] Duplicate reward prevention (idempotency keys / unique reward references)
-- [ ] Prevention: duplicate attendance rewards, duplicate task rewards, duplicate contribution rewards, repeated exploitation
+- [x] Default point values are database seeds and community-overridable; contribution/special rewards remain configurable
+- [x] Point values are resolved centrally from PointRule/ContributionBand, not embedded in feature components
+- [x] Impact transactions record user, source, points, timestamp, community, optional event/task, reason and status
+- [x] Append-only ImpactTransaction history with explicit reversal references
+- [x] Database-unique idempotency keys prevent duplicate rewards
+- [x] Attendance/task/contribution/activity/recognition rewards use stable unique references
 
 ### Multi-Dimensional Engagement
-- [ ] Participation dimension: attendance/events tracking
-- [ ] Execution dimension: tasks completed tracking
-- [ ] Contribution dimension: financial and non-financial contributions tracking
-- [ ] Service dimension: helping/community activities tracking
-- [ ] Leadership dimension: organizing/facilitating/leading tracking
-- [ ] Member profile shows all four dimensions
+- [x] Participation dimension tracked through attendance/events
+- [x] Execution dimension tracked through verified tasks
+- [x] Contribution dimension tracks financial and non-financial contributions
+- [x] Service dimension tracked through verified activities
+- [x] Leadership dimension tracked through verified activities
+- [ ] Member profile API still needs complete dimension presentation
 
 ### Milestone Engine
 - [x] Milestone/MilestoneRequirement schema (community-scoped configurable metrics, operators, thresholds, rewards)
@@ -158,7 +158,7 @@ verification. These remain active work; no completion claim is made.
 ### Badge System
 - [x] Badge/BadgeAward schema (configurable JSON requirements, visibility/rewards, idempotent award and revocation history)
 - [x] Idempotent badge award primitive; full automatic rule evaluation remains pending
-- [ ] Badge properties: name, description, icon, category, requirements, reward, visibility
+- [x] Badge properties include name, description, icon, category, requirements, reward points and visibility
 - [ ] Example badges: First Step (first verified event attendance), Regular (attend 5 events), Consistent (attend 10 events), Task Starter (complete first task), Doer (complete 10 tasks), Community Helper (help 5 members), Facilitator (organize first event), Community Builder (complete defined community requirements)
 - [x] Idempotent automatic badge awards from configured condition trees with rewards/notifications
 - [x] Tenant-admin badge configuration API validates safe rule trees and audits changes
@@ -183,7 +183,7 @@ verification. These remain active work; no completion claim is made.
 ### Leaderboards (Optional)
 - [ ] Tenant-isolated overall Impact Point leaderboard implemented; attendance/tasks/service/leadership/event variants pending
 - [x] Administrators can disable leaderboards through configuration state
-- [ ] Avoid making monetary contributions the primary public leaderboard metric
+- [x] Overall leaderboard uses auditable Impact Points rather than raw monetary contribution amounts
 
 ### Event Engagement
 - [ ] Tenant-authorized event summary covers tickets, check-ins, verified attendance, tasks and Impact Points; contribution amount/badges pending
@@ -203,18 +203,18 @@ verification. These remain active work; no completion claim is made.
 - [ ] Push notification architecture (framework ready)
 
 ### Search
-- [ ] Global search supporting: events, organizers, communities, members (where privacy permits), tasks (where authorized)
+- [ ] Global search covers events, public communities and privacy-permitted members; organizers/tasks pending
 - [ ] Appropriate database indexes
 
 ### Event Categories
 - [x] Database-backed EventCategory configuration and idempotent default seeds
-- [ ] Configurable categories (technology, education, business, community, agriculture, entertainment, sports, training, conference, workshop, networking, volunteer, fundraising)
+- [x] All specified default categories are database-backed and seeded idempotently
 - [ ] Administrators can add/edit categories
 
 ### Community System
 - [ ] Communities/organizations with: name, logo, description, members, administrators, events, tasks, activities, contribution records, rank configuration, badge configuration, milestones
-- [ ] Users can belong to multiple communities
-- [ ] Logical isolation of community data
+- [x] Users can belong to multiple communities through unique community/user memberships
+- [x] Community data isolation enforced in authorization/services with cross-tenant negative tests
 
 ### Event Organizer Profile
 - [ ] Organizer pages showing: name, logo/profile, description, events (past and upcoming), basic credibility/verification status
