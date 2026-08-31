@@ -46,3 +46,16 @@ class AchievementRuleCreateInput(BaseModel):
     description: str | None = Field(default=None, max_length=5000)
     condition_tree: dict[str, Any]
     reward_definition: dict[str, Any]
+
+
+class EventCategoryCreateInput(BaseModel):
+    slug: str = Field(min_length=2, max_length=80, pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+    name: str = Field(min_length=2, max_length=120)
+    description: str | None = Field(default=None, max_length=5000)
+    is_active: bool = True
+
+
+class EventCategoryUpdateInput(BaseModel):
+    name: str | None = Field(default=None, min_length=2, max_length=120)
+    description: str | None = Field(default=None, max_length=5000)
+    is_active: bool | None = None

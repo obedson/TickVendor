@@ -8,20 +8,24 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from src.api.auth import get_current_user
-from src.authorization import require_community_role
+from src.authorization import require_community_role, require_platform_roles
 from src.database import get_db
 from src.models import (
     AchievementRule,
     Badge,
+    EventCategory,
     MembershipRole,
     Milestone,
     MilestoneRequirement,
+    PlatformRole,
     Rank,
     User,
 )
 from src.schemas.admin import (
     AchievementRuleCreateInput,
     BadgeCreateInput,
+    EventCategoryCreateInput,
+    EventCategoryUpdateInput,
     MilestoneCreateInput,
     RankCreateInput,
 )
@@ -29,6 +33,35 @@ from src.services.achievement import evaluate_condition
 from src.services.notification import audit
 
 router = APIRouter(prefix="/admin/communities/{community_id}", tags=["admin"])
+category_router = APIRouter(prefix="/admin/categories", tags=["admin"])
+
+
+@category_router.post("", status_code=status.HTTP_201_CREATED)
+def create_category(
+    payload: EventCategoryCreateInput,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[User, Depends(require_platform_roles(PlatformRole.SUPER_ADMIN))],
+):
+    category = EventCategory(**payload.model_dump())
+    db.add(category)
+    commit_or_conflict(db)
+    return {"id": str(category.id), "slug": category.slug}
+
+
+@category_router.patch("/{category_id}")
+def update_category(
+    category_id: UUID,
+    payload: EventCategoryUpdateInput,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[User, Depends(require_platform_roles(PlatformRole.SUPER_ADMIN))],
+):
+    category = db.get(EventCategory, category_id)
+    if category is None:
+        raise HTTPException(status_code=404, detail="Event category not found")
+    for field, value in payload.model_dump(exclude_unset=True).items():
+        setattr(category, field, value)
+    db.commit()
+    return {"id": str(category.id), "slug": category.slug}
 
 
 def require_admin(db: Session, community_id: UUID, user: User) -> None:

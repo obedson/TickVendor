@@ -209,7 +209,7 @@ verification. These remain active work; no completion claim is made.
 ### Event Categories
 - [x] Database-backed EventCategory configuration and idempotent default seeds
 - [x] All specified default categories are database-backed and seeded idempotently
-- [ ] Administrators can add/edit categories
+- [x] Platform administrators can add/edit categories through validated, role-protected APIs
 
 ### Community System
 - [ ] Communities/organizations with: name, logo, description, members, administrators, events, tasks, activities, contribution records, rank configuration, badge configuration, milestones
