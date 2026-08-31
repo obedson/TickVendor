@@ -180,7 +180,7 @@
 - [ ] Upcoming events, total events, ticket sales, revenue, registrations, attendance, verification status, pending tasks, contributions, engagement, top participants, achievement distribution
 
 ### Community Dashboard
-- [ ] Total members, active members, events, attendance, tasks, contributions, engagement, rank distribution, badge distribution, participation trends, member retention/engagement
+- [ ] Tenant-scoped analytics API now covers members, events, tickets, attendance, tasks, contributions, revenue and Impact Points; distributions/trends/retention pending
 
 ### Notifications
 - [x] Notification schema (in-app payload and read state)
