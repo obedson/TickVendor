@@ -29,6 +29,7 @@ class Notification(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     message: Mapped[str] = mapped_column(Text, nullable=False)
     payload: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, nullable=False)
+    deduplication_key: Mapped[str | None] = mapped_column(String(200), unique=True, index=True)
     read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 

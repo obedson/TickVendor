@@ -198,7 +198,7 @@ verification. These remain active work; no completion claim is made.
 - [x] Notification schema (in-app payload and read state)
 - [x] In-app notification creation/list/read APIs with per-user ownership
 - [x] Per-user in-app/email/push preferences and muted notification types
-- [ ] Ticket confirmation, task verification, badge and milestone notifications are wired; scheduled event/attendance reminders, milestone proximity and pending peer-confirmation prompts remain
+- [ ] Ticket/task/badge/milestone notifications plus idempotent scheduled event and attendance-opening reminders are wired; milestone proximity and pending peer-confirmation prompts remain
 - [x] Email notification provider abstraction and deterministic in-memory adapter honor user preferences
 - [x] Push notification provider abstraction and deterministic in-memory adapter honor user preferences
 

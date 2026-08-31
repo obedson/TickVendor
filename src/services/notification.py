@@ -19,14 +19,19 @@ def notify(
     *,
     email_sender: EmailSender | None = None,
     push_sender: PushSender | None = None,
+    deduplication_key: str | None = None,
 ):
+    if deduplication_key:
+        existing = db.query(Notification).filter_by(deduplication_key=deduplication_key).one_or_none()
+        if existing:
+            return existing
     preference = db.query(NotificationPreference).filter_by(user_id=user_id).one_or_none()
     if preference and notification_type in preference.muted_types:
         return None
     item = None
     if preference is None or preference.in_app_enabled:
         item = Notification(user_id=user_id, notification_type=notification_type, title=title,
-                            message=message, payload=payload or {})
+                            message=message, payload=payload or {}, deduplication_key=deduplication_key)
         db.add(item)
     if preference and preference.email_enabled:
         user = db.get(User, user_id)
