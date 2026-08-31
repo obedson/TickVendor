@@ -17,6 +17,8 @@ from src.models import (
     MembershipRole,
     Order,
     OrderStatus,
+    Payment,
+    PaymentStatus,
     PlatformRole,
     Ticket,
     TicketStatus,
@@ -120,3 +122,30 @@ def validate_ticket(db: Session, event_id: UUID, qr_token: str, staff: User) -> 
     ticket.validated_by_id = staff.id
     db.commit()
     return "valid", ticket
+
+
+def cancel_ticket(db: Session, ticket: Ticket, user: User) -> Ticket:
+    if ticket.attendee_id != user.id and user.role != PlatformRole.SUPER_ADMIN:
+        raise HTTPException(status_code=403, detail="Ticket ownership required")
+    if ticket.status not in {TicketStatus.RESERVED, TicketStatus.PENDING_PAYMENT, TicketStatus.ACTIVE}:
+        raise HTTPException(status_code=409, detail="Ticket cannot be cancelled")
+    ticket.status = TicketStatus.CANCELLED
+    db.commit()
+    return ticket
+
+
+def refund_order(db: Session, order: Order, user: User) -> Order:
+    if order.user_id != user.id and user.role != PlatformRole.SUPER_ADMIN:
+        raise HTTPException(status_code=403, detail="Order ownership required")
+    if order.status not in {OrderStatus.CONFIRMED, OrderStatus.PENDING}:
+        raise HTTPException(status_code=409, detail="Order cannot be refunded")
+    order.status = OrderStatus.REFUNDED
+    for payment in db.scalars(select(Payment).where(Payment.order_id == order.id)):
+        if payment.status == PaymentStatus.SUCCESSFUL:
+            payment.status = PaymentStatus.REFUNDED
+            payment.refunded_at = datetime.now(UTC)
+    for ticket in db.scalars(select(Ticket).where(Ticket.order_id == order.id)):
+        if ticket.status != TicketStatus.USED:
+            ticket.status = TicketStatus.REFUNDED
+    db.commit()
+    return order

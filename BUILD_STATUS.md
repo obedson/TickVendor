@@ -24,7 +24,7 @@
   constraints, and the initial authentication API are verified. Business services, complete
   RBAC, remaining APIs, payment adapters/webhooks, frontend/PWA, and end-to-end product
   journeys remain incomplete and must not be represented as finished.
-- Latest verification: clean four-revision migration, 40 backend tests, Ruff, Alembic drift check, and frontend production build pass.
+- Latest verification: clean four-revision migration, 41 backend tests, Ruff, Alembic drift check, and frontend production build pass.
 - Production deployment artifacts now include Dockerfile, PostgreSQL Compose topology, README,
   production database driver, and environment guidance; live infrastructure remains unverified.
 
@@ -77,9 +77,9 @@
 - [x] Payment provider contract, deterministic test adapter, initialization/verification APIs, signed idempotent webhook path (live Paystack/Flutterwave/Stripe adapters pending credentials)
 - [x] Payment state enforcement and server-side amount/currency/provider verification
 - [x] Ticket activation upon verified payment confirmation
-- [ ] Ticket activation flow
-- [ ] Refund processing
-- [ ] Ticket cancellation
+- [x] Ticket activation flow for free and provider-verified paid orders
+- [x] Owner-authorized order refund transition updates payment and unused tickets
+- [x] Owner-authorized ticket cancellation with state guards
 
 ### Attendance Subsystem
 - [x] Attendance/Verification/PeerConfirmation schema (independent attendance, layered signals, confidence/review fields, duplicate prevention)
