@@ -1,0 +1,18 @@
+services:
+  api:
+    build: .
+    environment:
+      ENVIRONMENT: production
+      DATABASE_URL: postgresql+psycopg://tickeven:tickeven@db/tickeven
+      SECRET_KEY: ${SECRET_KEY}
+    depends_on: [db]
+    ports: ["8000:8000"]
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: tickeven
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: tickeven
+    volumes: ["postgres-data:/var/lib/postgresql/data"]
+volumes:
+  postgres-data:

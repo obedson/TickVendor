@@ -24,6 +24,9 @@
   constraints, and the initial authentication API are verified. Business services, complete
   RBAC, remaining APIs, payment adapters/webhooks, frontend/PWA, and end-to-end product
   journeys remain incomplete and must not be represented as finished.
+- Latest verification: 38 backend tests, Ruff, Alembic drift check, and frontend production build pass.
+- Production deployment artifacts now include Dockerfile, PostgreSQL Compose topology, README,
+  production database driver, and environment guidance; live infrastructure remains unverified.
 
 ## Implementation Checklist — Grouped by Dependency-Aware Subsystem
 
