@@ -279,7 +279,7 @@ verification. These remain active work; no completion claim is made.
 - [x] Ticket wallet renders QR codes from an encrypted device-local offline copy and clears it on sign-out
 - [x] Support PWA installation with valid manifest icons and a browser install prompt
 - [ ] Queue non-sensitive actions where appropriate
-- [ ] Retry failed requests safely
+- [x] Retry idempotent GET/HEAD requests with bounded exponential backoff for network and transient server failures
 - [ ] Avoid large bundles
 - [x] Service worker excludes authenticated/private API data from its shared cache
 
