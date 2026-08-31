@@ -123,3 +123,26 @@ def organizer_verify(db: Session, attendance: Attendance, organizer: User, appro
     attendance.confidence_score = Decimal(100 if approve else 0)
     db.commit()
     return attendance
+
+
+def qr_verify(db: Session, attendance: Attendance, ticket: Ticket, verifier: User) -> Attendance:
+    if ticket.event_id != attendance.event_id or ticket.attendee_id != attendance.user_id:
+        raise HTTPException(status_code=403, detail="Ticket does not match attendance")
+    if ticket.status not in {TicketStatus.ACTIVE, TicketStatus.USED}:
+        raise HTTPException(status_code=409, detail="Ticket is not valid for attendance")
+    existing = db.scalar(select(AttendanceVerification).where(
+        AttendanceVerification.attendance_id == attendance.id,
+        AttendanceVerification.method == VerificationMethod.QR,
+    ))
+    if existing is None:
+        db.add(AttendanceVerification(
+            attendance_id=attendance.id,
+            method=VerificationMethod.QR,
+            is_valid=True,
+            verified_at=datetime.now(UTC),
+            verifier_id=verifier.id,
+        ))
+    attendance.status = AttendanceStatus.QR_VERIFIED
+    attendance.confidence_score = max(attendance.confidence_score, Decimal(80))
+    db.commit()
+    return attendance

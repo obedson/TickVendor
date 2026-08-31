@@ -96,12 +96,12 @@ verification. These remain active work; no completion claim is made.
 - [ ] Attendance states: not checked in, checked in, GPS verified, QR verified, peer verified, organizer verified, rejected
 - [x] Geofenced attendance with coordinates, radius, opening/closing windows
 - [x] GPS verification with Haversine distance, accuracy capture, and review flag fallback
-- [ ] QR code attendance check-in
+- [x] QR attendance verification API with event/attendee/ticket matching and idempotent signal
 - [x] Organizer verification/rejection with authorized verification signal and confidence update
 - [x] Peer confirmation service with eligibility, self/duplicate prevention, and configurable threshold
 - [ ] Attendance verification confidence/status calculation from layered signals
 - [ ] Duplicate scans/check-ins, time windows, geofence and low-accuracy review flags implemented; reciprocal peer/impossible-location analytics pending
-- [ ] GPS fallback methods (QR, organizer verification)
+- [x] GPS fallbacks: QR and organizer verification
 - [ ] Location permission handling (denied, timeout, unavailable, low accuracy)
 - [ ] Explanation messaging for location requests
 

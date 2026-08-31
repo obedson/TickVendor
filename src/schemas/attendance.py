@@ -16,3 +16,8 @@ class AttendanceCheckIn(BaseModel):
 class PeerConfirmationInput(BaseModel):
     subject_id: UUID
     confirmed: bool
+
+
+class QRAttendanceInput(BaseModel):
+    attendance_id: UUID
+    ticket_id: UUID
