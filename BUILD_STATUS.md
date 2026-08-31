@@ -24,7 +24,7 @@
   constraints, and the initial authentication API are verified. Business services, complete
   RBAC, remaining APIs, payment adapters/webhooks, frontend/PWA, and end-to-end product
   journeys remain incomplete and must not be represented as finished.
-- Latest verification: clean four-revision migration, 38 backend tests, Ruff, Alembic drift check, and frontend production build pass.
+- Latest verification: clean four-revision migration, 39 backend tests, Ruff, Alembic drift check, and frontend production build pass.
 - Production deployment artifacts now include Dockerfile, PostgreSQL Compose topology, README,
   production database driver, and environment guidance; live infrastructure remains unverified.
 
@@ -216,9 +216,9 @@
 - [x] Append-only audit helper persists actor, community, action, target, timestamp, metadata
 
 ### Manual Point Adjustments
-- [ ] Authorized administrators adjust Impact Points
-- [ ] Every adjustment requires: amount, reason, administrator, timestamp
-- [ ] Never silently modify a user's score
+- [x] Tenant administrators adjust Impact Points through immutable transactions
+- [x] Every adjustment records amount, reason, administrator, timestamp and transaction ID
+- [x] Adjustments produce append-only audit entries; scores are never silently modified
 
 ### Data Model
 - [ ] Normalized database architecture around entities: User, Profile, Organization, Community, Membership, Event, Venue, TicketType, Ticket, Order, Payment, Attendance, AttendanceVerification, PeerConfirmation, Task, TaskAssignment, TaskSubmission, Contribution, Activity, ImpactTransaction, Milestone, MilestoneRequirement, Badge, BadgeAward, Rank, RankRequirement, AchievementRule, Notification, AuditLog, Leaderboard, EventStaff
