@@ -23,7 +23,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.database import Base
-from src.models.base import GUID, TimestampMixin, UUIDPrimaryKeyMixin
+from src.models.base import GUID, SoftDeleteMixin, TimestampMixin, UUIDPrimaryKeyMixin
 
 
 class EventStatus(str, enum.Enum):
@@ -58,7 +58,7 @@ class Venue(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     longitude: Mapped[Decimal | None] = mapped_column(Numeric(9, 6))
 
 
-class Event(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+class Event(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     __tablename__ = "events"
     __table_args__ = (
         Index("ix_events_discovery", "status", "starts_at"),

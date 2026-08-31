@@ -10,7 +10,7 @@ from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Index, String, Text,
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.database import Base
-from src.models.base import GUID, TimestampMixin, UUIDPrimaryKeyMixin
+from src.models.base import GUID, SoftDeleteMixin, TimestampMixin, UUIDPrimaryKeyMixin
 
 if TYPE_CHECKING:
     from src.models.organization import Organization
@@ -29,7 +29,7 @@ class MembershipStatus(str, enum.Enum):
     LEFT = "left"
 
 
-class Community(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+class Community(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     __tablename__ = "communities"
     __table_args__ = (
         Index("ix_communities_org_active", "organization_id", "is_active"),

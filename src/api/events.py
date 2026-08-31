@@ -11,7 +11,13 @@ from src.api.auth import get_current_user
 from src.database import get_db
 from src.models import Event, EventStatus, User
 from src.schemas.event import EventCreate, EventResponse, EventUpdate
-from src.services.event import create_event, discover_events, publish_event, update_event
+from src.services.event import (
+    create_event,
+    discover_events,
+    publish_event,
+    soft_delete_event,
+    update_event,
+)
 
 router = APIRouter(prefix="/events", tags=["events"])
 
@@ -35,7 +41,7 @@ def list_events(
 def get_event(event_id: UUID, db: Annotated[Session, Depends(get_db)]) -> Event:
     event = db.scalar(
         select(Event).options(selectinload(Event.venue)).where(
-            Event.id == event_id, Event.status == EventStatus.PUBLISHED
+            Event.id == event_id, Event.status == EventStatus.PUBLISHED, Event.deleted_at.is_(None)
         )
     )
     if event is None:
@@ -79,4 +85,13 @@ def unpublish(
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> Response:
     publish_event(db, event_id, current_user, False)
+    return Response(status_code=204)
+
+
+@router.delete("/{event_id}", status_code=204)
+def delete_event(
+    event_id: UUID, db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> Response:
+    soft_delete_event(db, event_id, current_user)
     return Response(status_code=204)

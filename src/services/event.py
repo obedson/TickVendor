@@ -99,6 +99,17 @@ def get_event_for_management(db: Session, event_id: UUID, user: User) -> Event:
     return event
 
 
+def soft_delete_event(db: Session, event_id: UUID, user: User) -> None:
+    event = get_event_for_management(db, event_id, user)
+    if event.deleted_at is not None:
+        raise HTTPException(status_code=409, detail="Event is already deleted")
+    event.deleted_at = datetime.now(UTC)
+    event.status = EventStatus.CANCELLED
+    db.commit()
+    audit(db, actor_id=user.id, community_id=event.community_id, action="event.deleted",
+          target_type="event", target_id=event.id)
+
+
 def update_event(db: Session, event_id: UUID, payload: EventUpdate, user: User) -> Event:
     event = get_event_for_management(db, event_id, user)
     if event.status not in {EventStatus.DRAFT, EventStatus.PUBLISHED}:
@@ -141,7 +152,9 @@ def discover_events(
     db: Session, search: str | None, category: str | None, upcoming: bool, limit: int, offset: int,
     city: str | None = None, price: str | None = None, sort: str = "soonest",
 ) -> list[Event]:
-    query = select(Event).options(selectinload(Event.venue)).where(Event.status == EventStatus.PUBLISHED)
+    query = select(Event).options(selectinload(Event.venue)).where(
+        Event.status == EventStatus.PUBLISHED, Event.deleted_at.is_(None)
+    )
     if search:
         pattern = f"%{search.strip().lower()}%"
         query = query.where(

@@ -233,7 +233,7 @@ verification. These remain active work; no completion claim is made.
 - [x] Normalized modular database architecture covers all named core entities plus auth/config/award/preferences extensions
 - [x] UUID primary keys and secure public/token identities
 - [x] Created/updated timestamps on mutable entities; append-only audit entries carry occurred_at
-- [ ] Soft deletion where appropriate
+- [x] Durable event/community resources support indexed soft-deletion timestamps; event deletion is authorized, audited, idempotency-guarded and excluded from public reads
 - [x] Foreign keys, uniqueness, check constraints, lifecycle indexes and idempotency constraints
 - [x] Secure public ticket identity/QR tokens; internal UUID exposure remains limited to authenticated/resource APIs
 
