@@ -70,10 +70,10 @@ verification. These remain active work; no completion claim is made.
 - [x] Nearby event API validates coordinates/radius, filters upcoming geocoded events by Haversine distance and sorts nearest-first
 - [x] Upcoming events view
 - [x] Free vs paid events filtering
-- [ ] Event categories (configurable: technology, education, business, community, agriculture, entertainment, sports, training, conference, workshop, networking, volunteer, fundraising)
+- [x] Event categories are database-configurable with all specified defaults and role-protected administration
 - [x] Event tags
-- [ ] Organizer profiles
-- [ ] Event images/cover photos
+- [x] Public organizer profiles expose identity, description, verification and published event history
+- [x] Owner/admin-authorized event cover-image upload validates MIME, magic bytes and size, stores safely and audits changes
 
 ### Ticketing Subsystem
 - [x] TicketType/Ticket/Order/Payment schema (inventory constraints, secure public/QR IDs, lifecycle states, provider references, idempotency)

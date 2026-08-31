@@ -1,10 +1,12 @@
 """Event creation, management, publishing, and discovery routes."""
 
+import os
 from decimal import Decimal
+from pathlib import Path
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, Response, status
+from fastapi import APIRouter, Depends, File, Query, Response, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
@@ -20,8 +22,32 @@ from src.services.event import (
     soft_delete_event,
     update_event,
 )
+from src.uploads import safe_upload_name, validate_image_upload
 
 router = APIRouter(prefix="/events", tags=["events"])
+
+
+@router.post("/{event_id}/cover-image")
+async def upload_cover_image(
+    event_id: UUID, db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+    upload: Annotated[UploadFile, File()],
+):
+    from src.services.event import get_event_for_management
+
+    event = get_event_for_management(db, event_id, current_user)
+    data = await validate_image_upload(upload)
+    root = Path(os.environ.get("TICKEVEN_UPLOAD_DIR", "uploads")) / "events"
+    root.mkdir(parents=True, exist_ok=True)
+    filename = safe_upload_name(str(event.id), upload.filename, upload.content_type)
+    (root / filename).write_bytes(data)
+    event.cover_image_url = f"/uploads/events/{filename}"
+    db.commit()
+    from src.services.notification import audit
+    audit(db, actor_id=current_user.id, community_id=event.community_id,
+          action="event.cover_image_updated", target_type="event", target_id=event.id,
+          metadata={"cover_image_url": event.cover_image_url})
+    return {"cover_image_url": event.cover_image_url}
 
 
 @router.get("/nearby")
