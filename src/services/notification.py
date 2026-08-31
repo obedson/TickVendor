@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from src.models import AuditLog, Notification, NotificationPreference, User
 from src.notifications.email import EmailSender, get_email_sender
+from src.notifications.push import PushSender, get_push_sender
 
 
 def notify(
@@ -17,6 +18,7 @@ def notify(
     payload=None,
     *,
     email_sender: EmailSender | None = None,
+    push_sender: PushSender | None = None,
 ):
     preference = db.query(NotificationPreference).filter_by(user_id=user_id).one_or_none()
     if preference and notification_type in preference.muted_types:
@@ -30,6 +32,8 @@ def notify(
         user = db.get(User, user_id)
         if user is not None:
             (email_sender or get_email_sender()).send(user.email, title, message)
+    if preference and preference.push_enabled:
+        (push_sender or get_push_sender()).send(user_id, title, message, payload or {})
     db.commit()
     return item
 
