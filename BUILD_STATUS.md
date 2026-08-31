@@ -56,6 +56,7 @@
 - [ ] Event images/cover photos
 
 ### Ticketing Subsystem
+- [x] TicketType/Ticket/Order/Payment schema (inventory constraints, secure public/QR IDs, lifecycle states, provider references, idempotency)
 - [ ] Ticket types creation (free, regular, VIP, student, early bird, group, sponsor, volunteer)
 - [ ] Ticket type properties: name, description, price, quantity, sales start/end, visibility, max per user
 - [ ] Ticket generation: unique ticket ID, QR code, attendee info, event info, ticket type, status

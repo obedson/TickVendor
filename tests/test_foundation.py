@@ -78,3 +78,15 @@ def test_event_venue_staff_models_map_with_staff_uniqueness():
         if constraint.__class__.__name__ == "UniqueConstraint"
     }
     assert ("event_id", "user_id") in unique_columns
+
+
+def test_ticket_order_payment_models_map_with_idempotency_constraints():
+    import src.models  # noqa: F401
+    from src.database import Base
+
+    configure_mappers()
+    required = {"ticket_types", "tickets", "orders", "payments"}
+    assert required.issubset(Base.metadata.tables)
+    assert Base.metadata.tables["tickets"].c.qr_token.unique
+    assert Base.metadata.tables["orders"].c.reference.unique
+    assert Base.metadata.tables["payments"].c.idempotency_key.unique

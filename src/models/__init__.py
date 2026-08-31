@@ -18,6 +18,15 @@ from src.models.event import (
     Venue,
 )
 from src.models.organization import Organization
+from src.models.payment import Payment, PaymentStatus
+from src.models.ticket import (
+    Order,
+    OrderStatus,
+    Ticket,
+    TicketStatus,
+    TicketType,
+    TicketVisibility,
+)
 from src.models.user import PlatformRole, Profile, ProfileVisibility, User
 
 __all__ = [
@@ -30,10 +39,18 @@ __all__ = [
     "Membership",
     "MembershipRole",
     "MembershipStatus",
+    "Order",
+    "OrderStatus",
     "Organization",
+    "Payment",
+    "PaymentStatus",
     "PlatformRole",
     "Profile",
     "ProfileVisibility",
+    "Ticket",
+    "TicketStatus",
+    "TicketType",
+    "TicketVisibility",
     "User",
     "Venue",
 ]
