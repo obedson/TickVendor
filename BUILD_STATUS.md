@@ -203,7 +203,7 @@ verification. These remain active work; no completion claim is made.
 - [x] Push notification provider abstraction and deterministic in-memory adapter honor user preferences
 
 ### Search
-- [ ] Global search covers events, public communities and privacy-permitted members; organizers/tasks pending
+- [x] Global search covers events, organizers, public communities, privacy-permitted members and membership-authorized tasks
 - [ ] Appropriate database indexes
 
 ### Event Categories
