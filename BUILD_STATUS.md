@@ -16,7 +16,7 @@
   minimal SQLAlchemy foundation. `src/database.py` is now restricted to engine, session,
   Base, foreign-key enforcement, and initialization helpers; models are modular under
   `src/models/`.
-- Verification: automated tests pass (16), Ruff passes, source compilation passes,
+- Verification: automated tests pass (18), Ruff passes, source compilation passes,
   SQLite foreign keys are enabled, and `/health` plus standardized validation errors work.
 - Remaining warning: FastAPI's current TestClient emits an upstream Starlette/httpx
   deprecation warning; it does not fail tests.
@@ -27,8 +27,8 @@
 - [x] Project structure and configuration (venv, validated settings, declared packages)
 - [x] Application structure establishment (FastAPI factory, health endpoint, model registry)
 - [x] Initial 31-table model schema and Alembic migration (clean upgrade/check verified; 60 foreign keys, 88 indexes including SQLite auto-indexes)
-- [ ] API structure definition
-- [ ] Authentication architecture (User identity schema exists; password hashing, verification, reset, and sessions pending)
+- [x] Initial versioned API structure (`/api/v1`, router modules, Pydantic request/response schemas)
+- [ ] Authentication architecture (registration/login/me and bcrypt/JWT access tokens verified; email verification, reset, refresh/session revocation pending)
 - [ ] Authorization architecture (RBAC: Guest, Participant/Member, Organizer, Community Admin, Super Admin)
 - [x] User/Profile schema: UUIDs, email/password hash, platform role, verification/activity state, name, username, photo, bio, location, interests, skills, privacy
 - [x] Organization schema (owner, identity, verification, active state)

@@ -8,6 +8,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from src.api.auth import router as auth_router
 from src.config import settings
 
 
@@ -28,6 +29,7 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    application.include_router(auth_router, prefix=settings.api_v1_prefix)
 
     @application.exception_handler(RequestValidationError)
     async def validation_exception_handler(
