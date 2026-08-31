@@ -8,11 +8,33 @@ from sqlalchemy.orm import Session
 
 from src.api.auth import get_current_user
 from src.database import get_db
-from src.models import Task, TaskAssignment, User
+from src.models import Task, TaskAssignment, TaskAssignmentStatus, User
 from src.schemas.task import AssignmentInput, SubmissionInput, TaskCreateInput, VerificationInput
-from src.services.task import assign_task, create_task, submit_task, verify_task
+from src.services.task import (
+    assign_task,
+    create_task,
+    submit_task,
+    transition_assignment,
+    verify_task,
+)
 
 router = APIRouter(tags=["tasks"])
+
+
+@router.post("/task-assignments/{assignment_id}/accept")
+def accept(assignment_id: UUID, db: Annotated[Session, Depends(get_db)],
+           user: Annotated[User, Depends(get_current_user)]):
+    assignment = db.get(TaskAssignment, assignment_id)
+    if assignment is None: raise HTTPException(status_code=404, detail="Assignment not found")
+    return {"status": transition_assignment(db, assignment, user, TaskAssignmentStatus.ACCEPTED).status.value}
+
+
+@router.post("/task-assignments/{assignment_id}/start")
+def start(assignment_id: UUID, db: Annotated[Session, Depends(get_db)],
+          user: Annotated[User, Depends(get_current_user)]):
+    assignment = db.get(TaskAssignment, assignment_id)
+    if assignment is None: raise HTTPException(status_code=404, detail="Assignment not found")
+    return {"status": transition_assignment(db, assignment, user, TaskAssignmentStatus.IN_PROGRESS).status.value}
 
 
 @router.post("/communities/{community_id}/tasks", status_code=201)

@@ -30,6 +30,23 @@ def assign_task(db: Session, task: Task, assignee_id, assigner: User) -> TaskAss
     db.add(assignment); db.commit(); return assignment
 
 
+def transition_assignment(db: Session, assignment: TaskAssignment, user: User,
+                          target: TaskAssignmentStatus) -> TaskAssignment:
+    if assignment.assignee_id != user.id:
+        raise HTTPException(status_code=403, detail="Task is not assigned to this user")
+    allowed = {
+        TaskAssignmentStatus.ASSIGNED: TaskAssignmentStatus.ACCEPTED,
+        TaskAssignmentStatus.ACCEPTED: TaskAssignmentStatus.IN_PROGRESS,
+    }
+    if allowed.get(assignment.status) != target:
+        raise HTTPException(status_code=409, detail="Invalid task assignment transition")
+    assignment.status = target
+    if target == TaskAssignmentStatus.ACCEPTED:
+        assignment.accepted_at = datetime.now(UTC)
+    db.commit()
+    return assignment
+
+
 def submit_task(db: Session, assignment: TaskAssignment, user: User, evidence_text=None, evidence_url=None):
     if assignment.assignee_id != user.id:
         raise HTTPException(status_code=403, detail="Task is not assigned to this user")

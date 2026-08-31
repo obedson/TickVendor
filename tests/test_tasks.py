@@ -14,7 +14,13 @@ from src.models import (
     TaskAssignmentStatus,
     User,
 )
-from src.services.task import assign_task, create_task, submit_task, verify_task
+from src.services.task import (
+    assign_task,
+    create_task,
+    submit_task,
+    transition_assignment,
+    verify_task,
+)
 from tests.test_database import create_event_context
 
 
@@ -34,6 +40,8 @@ def test_verified_task_awards_points_once(tmp_path):
         task = create_task(db, community.id, organizer, title="Do work", description="Complete work",
                            event_id=event.id, impact_point_reward=20)
         assignment = assign_task(db, task, member.id, organizer)
+        transition_assignment(db, assignment, member, TaskAssignmentStatus.ACCEPTED)
+        transition_assignment(db, assignment, member, TaskAssignmentStatus.IN_PROGRESS)
         submit_task(db, assignment, member, evidence_text="Done")
         verify_task(db, assignment, organizer, True)
         assert assignment.status == TaskAssignmentStatus.VERIFIED
