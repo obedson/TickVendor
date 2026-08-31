@@ -1,0 +1,41 @@
+#!/usr/bin/env python3
+"""TickEven Configuration — wrapper around tickeven_settings.py."""
+
+import os
+from datetime import datetime, timedelta
+from decimal import Decimal
+from src.config.tickeven_settings import *
+
+def get_config():
+    """Return configuration as a dict."""
+    return {
+        "BASE_DIR": BASE_DIR,
+        "ENV_FILE": ENV_FILE,
+        "DATABASE_URL": DATABASE_URL,
+        "DATABASE_POOL_SIZE": DATABASE_POOL_SIZE,
+        "SQLITE_ECHO": SQLITE_ECHO,
+        "PAYMENT_PROVIDER": PAYMENT_PROVIDER,
+        "DEFAULT_GEOFENCE_RADIUS_METERS": DEFAULT_GEOFENCE_RADIUS_METERS,
+        "ATTENDANCE_CHECKIN_WINDOW_MINUTES": ATTENDANCE_CHECKIN_WINDOW_MINUTES,
+        "ATTENDANCE_CHECKOUT_WINDOW_MINUTES": ATTENDANCE_CHECKOUT_WINDOW_MINUTES,
+        "DEFAULT_TIMEZONE": DEFAULT_TIMEZONE,
+        "DEFAULT_CURRENCY": DEFAULT_CURRENCY,
+        "CURRENCY_SYMBOL": CURRENCY_SYMBOL,
+        "SECRET_KEY": SECRET_KEY,
+        "ACCESS_TOKEN_EXPIRE_MINUTES": ACCESS_TOKEN_EXPIRE_MINUTES,
+        "REFRESH_TOKEN_EXPIRE_DAYS": REFRESH_TOKEN_EXPIRE_DAYS,
+        "BCRYPT_ROUNDS": BCRYPT_ROUNDS,
+        "LOG_LEVEL": LOG_LEVEL,
+        "PWA_NAME": PWA_NAME,
+        "FEATURE_FLAGS": {
+            "PEER_VERIFICATION": FEATURE_PEER_VERIFICATION,
+            "GEOFENCED_ATTENDANCE": FEATURE_GEOFENCED_ATTENDANCE,
+            "TASKS": FEATURE_TASKS,
+            "CONTRIBUTIONS": FEATURE_CONTRIBUTIONS,
+            "RANKS": FEATURE_RANKS,
+            "BADGES": FEATURE_BADGES,
+            "MILESTONES": FEATURE_MILESTONES,
+            "NOTIFICATIONS": FEATURE_NOTIFICATIONS,
+            "LEADERBOARDS": FEATURE_LEADERBOARDS,
+        },
+    }
