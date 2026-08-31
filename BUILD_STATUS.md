@@ -277,7 +277,7 @@ verification. These remain active work; no completion claim is made.
 ### Offline/Low Connectivity
 - [x] Cache public event discovery data for offline reuse
 - [ ] Allow ticket QR to load from cached data
-- [ ] Support PWA installation
+- [x] Support PWA installation with valid manifest icons and a browser install prompt
 - [ ] Queue non-sensitive actions where appropriate
 - [ ] Retry failed requests safely
 - [ ] Avoid large bundles
@@ -285,5 +285,5 @@ verification. These remain active work; no completion claim is made.
 
 ### PWA
 - [x] Manifest, service worker, and cached offline application shell build successfully
-- [ ] App icons and install-prompt UX
+- [x] App icons and install-prompt UX
 - [ ] Complete responsive application screens
