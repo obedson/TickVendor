@@ -35,6 +35,30 @@ def haversine_meters(lat1: Decimal, lon1: Decimal, lat2: Decimal, lon2: Decimal)
     return 6_371_000 * 2 * asin(sqrt(a))
 
 
+def calculate_attendance_confidence(db: Session, attendance: Attendance) -> Attendance:
+    signals = list(db.scalars(select(AttendanceVerification).where(
+        AttendanceVerification.attendance_id == attendance.id
+    )))
+    organizer = next((signal for signal in signals if signal.method == VerificationMethod.ORGANIZER), None)
+    if organizer and not organizer.is_valid:
+        attendance.status = AttendanceStatus.REJECTED
+        attendance.confidence_score = Decimal(0)
+        db.commit()
+        return attendance
+    valid = {signal.method for signal in signals if signal.is_valid}
+    weights = {VerificationMethod.GPS: Decimal(40), VerificationMethod.QR: Decimal(50),
+               VerificationMethod.PEER: Decimal(30), VerificationMethod.ORGANIZER: Decimal(100)}
+    attendance.confidence_score = min(Decimal(100), sum((weights[item] for item in valid), Decimal(0)))
+    precedence = ((VerificationMethod.ORGANIZER, AttendanceStatus.ORGANIZER_VERIFIED),
+                  (VerificationMethod.QR, AttendanceStatus.QR_VERIFIED),
+                  (VerificationMethod.GPS, AttendanceStatus.GPS_VERIFIED),
+                  (VerificationMethod.PEER, AttendanceStatus.PEER_VERIFIED))
+    attendance.status = next((status for method, status in precedence if method in valid),
+                             AttendanceStatus.CHECKED_IN)
+    db.commit()
+    return attendance
+
+
 def check_in(db: Session, event: Event, user: User, payload: AttendanceCheckIn) -> Attendance:
     now = datetime.now(UTC)
     if event.check_in_opens_at and now < as_utc(event.check_in_opens_at):
@@ -68,7 +92,6 @@ def check_in(db: Session, event: Event, user: User, payload: AttendanceCheckIn) 
         ))
         if valid:
             attendance.status = AttendanceStatus.GPS_VERIFIED
-            attendance.confidence_score = Decimal(70)
         else:
             attendance.flagged_for_review = True
             attendance.review_reason = (
@@ -77,6 +100,8 @@ def check_in(db: Session, event: Event, user: User, payload: AttendanceCheckIn) 
                 else "Location outside event geofence"
             )
     db.commit()
+    if event.geofence_enabled:
+        calculate_attendance_confidence(db, attendance)
     return attendance
 
 
@@ -95,6 +120,16 @@ def confirm_peer(db: Session, event: Event, confirmer: User, subject_id, confirm
         decision=PeerConfirmationDecision.CONFIRMED if confirmed else PeerConfirmationDecision.CANNOT_CONFIRM,
         submitted_at=datetime.now(UTC),
     )
+    reciprocal = db.scalar(select(PeerConfirmation.id).where(
+        PeerConfirmation.event_id == event.id,
+        PeerConfirmation.confirmer_id == subject_id,
+        PeerConfirmation.subject_id == confirmer.id,
+        PeerConfirmation.decision == PeerConfirmationDecision.CONFIRMED,
+    ))
+    if reciprocal is not None:
+        confirmation.suspicious = True
+        subject.flagged_for_review = True
+        subject.review_reason = "Reciprocal peer confirmations require organizer review"
     db.add(confirmation)
     try:
         db.flush()
@@ -105,9 +140,16 @@ def confirm_peer(db: Session, event: Event, confirmer: User, subject_id, confirm
             event_id=event.id, subject_id=subject_id, decision=PeerConfirmationDecision.CONFIRMED
         ).count()
         if count >= event.confirmations_required:
-            subject.status = AttendanceStatus.PEER_VERIFIED
-            subject.confidence_score = max(subject.confidence_score, Decimal(60))
+            existing_signal = db.scalar(select(AttendanceVerification).where(
+                AttendanceVerification.attendance_id == subject.id,
+                AttendanceVerification.method == VerificationMethod.PEER,
+            ))
+            if existing_signal is None:
+                db.add(AttendanceVerification(attendance_id=subject.id, method=VerificationMethod.PEER,
+                                              is_valid=True, verified_at=datetime.now(UTC)))
     db.commit()
+    if confirmed and count >= event.confirmations_required:
+        calculate_attendance_confidence(db, subject)
     return confirmation
 
 
@@ -118,11 +160,8 @@ def organizer_verify(db: Session, attendance: Attendance, organizer: User, appro
         attendance_id=attendance.id, method=VerificationMethod.ORGANIZER,
         is_valid=approve, verified_at=datetime.now(UTC), verifier_id=organizer.id, reason=reason,
     ))
-    attendance.status = (
-        AttendanceStatus.ORGANIZER_VERIFIED if approve else AttendanceStatus.REJECTED
-    )
-    attendance.confidence_score = Decimal(100 if approve else 0)
     db.commit()
+    calculate_attendance_confidence(db, attendance)
     audit(db, actor_id=organizer.id, community_id=event.community_id,
           action="attendance.override", target_type="attendance", target_id=attendance.id,
           metadata={"approved": approve, "reason": reason})
@@ -146,7 +185,6 @@ def qr_verify(db: Session, attendance: Attendance, ticket: Ticket, verifier: Use
             verified_at=datetime.now(UTC),
             verifier_id=verifier.id,
         ))
-    attendance.status = AttendanceStatus.QR_VERIFIED
-    attendance.confidence_score = max(attendance.confidence_score, Decimal(80))
     db.commit()
+    calculate_attendance_confidence(db, attendance)
     return attendance

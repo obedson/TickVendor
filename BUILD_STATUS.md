@@ -99,8 +99,8 @@ verification. These remain active work; no completion claim is made.
 - [x] QR attendance verification API with event/attendee/ticket matching and idempotent signal
 - [x] Organizer verification/rejection with authorized verification signal and confidence update
 - [x] Peer confirmation service with eligibility, self/duplicate prevention, and configurable threshold
-- [ ] Attendance verification confidence/status calculation from layered signals
-- [ ] Duplicate scans/check-ins, time windows, geofence and low-accuracy review flags implemented; reciprocal peer/impossible-location analytics pending
+- [x] Attendance confidence/status is recalculated from weighted GPS, QR, peer and organizer signals with explicit organizer rejection precedence
+- [ ] Duplicate scans/check-ins, time windows, geofence, low-accuracy and reciprocal-peer review flags implemented; impossible-location and repeated-pattern analytics pending
 - [x] GPS fallbacks: QR and organizer verification
 - [ ] Location permission handling (denied, timeout, unavailable, low accuracy)
 - [ ] Explanation messaging for location requests
