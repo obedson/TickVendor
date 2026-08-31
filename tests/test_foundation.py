@@ -156,3 +156,13 @@ def test_recognition_and_platform_models_map():
     }
     assert required.issubset(Base.metadata.tables)
     assert Base.metadata.tables["badge_awards"].c.idempotency_key.unique
+
+
+def test_database_backed_business_configuration_models_map():
+    import src.models  # noqa: F401
+    from src.database import Base
+
+    configure_mappers()
+    assert {"event_categories", "point_rules", "contribution_bands"}.issubset(
+        Base.metadata.tables
+    )

@@ -16,7 +16,7 @@
   minimal SQLAlchemy foundation. `src/database.py` is now restricted to engine, session,
   Base, foreign-key enforcement, and initialization helpers; models are modular under
   `src/models/`.
-- Verification: automated tests pass (24), Ruff passes, source compilation passes,
+- Verification: automated tests pass (26), Ruff passes, source compilation passes,
   SQLite foreign keys are enabled, and `/health` plus standardized validation errors work.
 - Remaining warning: FastAPI's current TestClient emits an upstream Starlette/httpx
   deprecation warning; it does not fail tests.
@@ -111,6 +111,7 @@
 ### Impact Point / Reward Engine
 - [x] ImpactTransaction schema (auditable status, source references, reversals, unique idempotency key)
 - [ ] Centralized rules engine for Impact Points
+- [x] Database-backed PointRule defaults and community override structure
 - [ ] Point values: attendance → +10, task completion → +20, volunteer activity → +15, peer verification → +2, leadership activity → +30, contribution → configurable, special achievement → configurable
 - [ ] Never hard-code point values into individual components
 - [ ] Activity/reward engine: user, source activity, points, timestamp, organization/community, event/task reference, reason, status
@@ -194,6 +195,7 @@
 - [ ] Appropriate database indexes
 
 ### Event Categories
+- [x] Database-backed EventCategory configuration and idempotent default seeds
 - [ ] Configurable categories (technology, education, business, community, agriculture, entertainment, sports, training, conference, workshop, networking, volunteer, fundraising)
 - [ ] Administrators can add/edit categories
 
