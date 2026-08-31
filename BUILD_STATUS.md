@@ -142,7 +142,7 @@ verification. These remain active work; no completion claim is made.
 ### Milestone Engine
 - [x] Milestone/MilestoneRequirement schema (community-scoped configurable metrics, operators, thresholds, rewards)
 - [x] Configurable milestone qualification service using database metrics/operators
-- [ ] Milestone requirements: impact points, attendance count, task count, contribution count, service activities, leadership activities, peer confirmations, event participation, consecutive activities
+- [ ] Metrics now include tenant-scoped points, attendance, tasks, contributions, service, leadership and peer confirmations; event participation/consecutive activity metrics pending
 - [ ] Example: Community Builder — 300 Impact Points, 10 verified attendances, 5 completed tasks, 1 community contribution
 - [x] Idempotent automatic milestone awards, reward transactions, and notifications
 - [x] Milestone definitions and requirements are configurable through tenant-admin API

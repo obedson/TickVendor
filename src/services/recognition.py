@@ -6,16 +6,24 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from src.models import (
+    Activity,
+    ActivityStatus,
     Attendance,
     AttendanceStatus,
     Badge,
     BadgeAward,
+    Contribution,
+    EngagementDimension,
+    Event,
     ImpactTransaction,
     ImpactTransactionStatus,
     Milestone,
     MilestoneAward,
     MilestoneRequirement,
+    PeerConfirmation,
+    PeerConfirmationDecision,
     Rank,
+    Task,
     TaskAssignment,
     TaskAssignmentStatus,
 )
@@ -32,11 +40,35 @@ def user_metrics(db: Session, user_id, community_id) -> dict[str, int]:
         )),
         "attendance_count": db.scalar(select(func.count()).select_from(Attendance).where(
             Attendance.user_id == user_id,
+            Attendance.event_id.in_(select(Event.id).where(Event.community_id == community_id)),
             Attendance.status.notin_([AttendanceStatus.NOT_CHECKED_IN, AttendanceStatus.REJECTED]),
         )),
         "task_count": db.scalar(select(func.count()).select_from(TaskAssignment).where(
             TaskAssignment.assignee_id == user_id,
+            TaskAssignment.task_id.in_(select(Task.id).where(Task.community_id == community_id)),
             TaskAssignment.status == TaskAssignmentStatus.VERIFIED,
+        )),
+        "contribution_count": db.scalar(select(func.count()).select_from(Contribution).where(
+            Contribution.contributor_id == user_id,
+            Contribution.community_id == community_id,
+            Contribution.status == ActivityStatus.VERIFIED,
+        )),
+        "service_activities": db.scalar(select(func.count()).select_from(Activity).where(
+            Activity.user_id == user_id,
+            Activity.community_id == community_id,
+            Activity.dimension == EngagementDimension.SERVICE,
+            Activity.status == ActivityStatus.VERIFIED,
+        )),
+        "leadership_activities": db.scalar(select(func.count()).select_from(Activity).where(
+            Activity.user_id == user_id,
+            Activity.community_id == community_id,
+            Activity.dimension == EngagementDimension.LEADERSHIP,
+            Activity.status == ActivityStatus.VERIFIED,
+        )),
+        "peer_confirmations": db.scalar(select(func.count()).select_from(PeerConfirmation).where(
+            PeerConfirmation.subject_id == user_id,
+            PeerConfirmation.event_id.in_(select(Event.id).where(Event.community_id == community_id)),
+            PeerConfirmation.decision == PeerConfirmationDecision.CONFIRMED,
         )),
     }
 
