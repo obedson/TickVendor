@@ -9,11 +9,13 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from src.authorization import require_community_role
 from src.models import (
     Attendance,
     AttendanceStatus,
     AttendanceVerification,
     Event,
+    MembershipRole,
     PeerConfirmation,
     PeerConfirmationDecision,
     Ticket,
@@ -98,3 +100,18 @@ def confirm_peer(db: Session, event: Event, confirmer: User, subject_id, confirm
             subject.confidence_score = max(subject.confidence_score, Decimal(60))
     db.commit()
     return confirmation
+
+
+def organizer_verify(db: Session, attendance: Attendance, organizer: User, approve: bool, reason: str):
+    event = db.get(Event, attendance.event_id)
+    require_community_role(db, event.community_id, organizer, MembershipRole.ORGANIZER)
+    db.add(AttendanceVerification(
+        attendance_id=attendance.id, method=VerificationMethod.ORGANIZER,
+        is_valid=approve, verified_at=datetime.now(UTC), verifier_id=organizer.id, reason=reason,
+    ))
+    attendance.status = (
+        AttendanceStatus.ORGANIZER_VERIFIED if approve else AttendanceStatus.REJECTED
+    )
+    attendance.confidence_score = Decimal(100 if approve else 0)
+    db.commit()
+    return attendance

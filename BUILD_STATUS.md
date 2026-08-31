@@ -24,7 +24,7 @@
   constraints, and the initial authentication API are verified. Business services, complete
   RBAC, remaining APIs, payment adapters/webhooks, frontend/PWA, and end-to-end product
   journeys remain incomplete and must not be represented as finished.
-- Latest verification: clean four-revision migration, 39 backend tests, Ruff, Alembic drift check, and frontend production build pass.
+- Latest verification: clean four-revision migration, 40 backend tests, Ruff, Alembic drift check, and frontend production build pass.
 - Production deployment artifacts now include Dockerfile, PostgreSQL Compose topology, README,
   production database driver, and environment guidance; live infrastructure remains unverified.
 
@@ -88,7 +88,7 @@
 - [x] Geofenced attendance with coordinates, radius, opening/closing windows
 - [x] GPS verification with Haversine distance, accuracy capture, and review flag fallback
 - [ ] QR code attendance check-in
-- [ ] Manual/ organizer verification
+- [x] Organizer verification/rejection with authorized verification signal and confidence update
 - [x] Peer confirmation service with eligibility, self/duplicate prevention, and configurable threshold
 - [ ] Attendance verification confidence/status calculation from layered signals
 - [ ] Anti-abuse: duplicate QR scans, multiple check-ins, check-in outside event time, location outside radius, suspicious peer confirmations, reciprocal confirmations, impossible location changes
