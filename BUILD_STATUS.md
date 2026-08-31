@@ -204,7 +204,7 @@ verification. These remain active work; no completion claim is made.
 
 ### Search
 - [x] Global search covers events, organizers, public communities, privacy-permitted members and membership-authorized tasks
-- [ ] Appropriate database indexes
+- [x] Composite indexes support filtered event, community, profile and authorized task search paths
 
 ### Event Categories
 - [x] Database-backed EventCategory configuration and idempotent default seeds

@@ -50,6 +50,7 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
 class Profile(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "profiles"
+    __table_args__ = (Index("ix_profiles_search_identity", "visibility", "display_name"),)
 
     user_id: Mapped[Any] = mapped_column(
         GUID(), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True

@@ -31,7 +31,10 @@ class MembershipStatus(str, enum.Enum):
 
 class Community(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "communities"
-    __table_args__ = (Index("ix_communities_org_active", "organization_id", "is_active"),)
+    __table_args__ = (
+        Index("ix_communities_org_active", "organization_id", "is_active"),
+        Index("ix_communities_search_name", "is_public", "is_active", "name"),
+    )
 
     organization_id: Mapped[Any] = mapped_column(
         GUID(), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False

@@ -63,6 +63,7 @@ class Event(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __table_args__ = (
         Index("ix_events_discovery", "status", "starts_at"),
         Index("ix_events_community_status", "community_id", "status"),
+        Index("ix_events_search_title", "status", "title"),
     )
 
     community_id: Mapped[Any] = mapped_column(

@@ -40,7 +40,10 @@ class TaskAssignmentStatus(str, enum.Enum):
 
 class Task(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "tasks"
-    __table_args__ = (Index("ix_tasks_community_due", "community_id", "due_at"),)
+    __table_args__ = (
+        Index("ix_tasks_community_due", "community_id", "due_at"),
+        Index("ix_tasks_search_title", "community_id", "is_active", "title"),
+    )
 
     community_id: Mapped[Any] = mapped_column(
         GUID(), ForeignKey("communities.id", ondelete="CASCADE"), nullable=False
