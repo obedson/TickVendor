@@ -110,6 +110,7 @@ def test_payment_idempotency_key_is_unique(session):
     owner, _community, event_model = create_event_context(session)
     order = Order(
         reference="ORDER-1",
+        idempotency_key="database-test-order-key",
         user_id=owner.id,
         event_id=event_model.id,
         total_amount=Decimal("100.00"),

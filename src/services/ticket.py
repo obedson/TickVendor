@@ -1,0 +1,122 @@
+"""Ticket inventory, order, issuance, wallet, and atomic validation services."""
+
+from datetime import UTC, datetime, timedelta
+from secrets import token_urlsafe
+from uuid import UUID, uuid4
+
+from fastapi import HTTPException
+from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+
+from src.authorization import require_community_role
+from src.models import (
+    Event,
+    EventStaff,
+    EventStatus,
+    MembershipRole,
+    Order,
+    OrderStatus,
+    PlatformRole,
+    Ticket,
+    TicketStatus,
+    TicketType,
+    User,
+)
+from src.schemas.ticket import OrderCreate, TicketTypeCreate
+from src.services.event import as_utc
+
+
+def manage_event(db: Session, event_id: UUID, user: User) -> Event:
+    event = db.get(Event, event_id)
+    if event is None:
+        raise HTTPException(status_code=404, detail="Event not found")
+    membership = require_community_role(db, event.community_id, user, MembershipRole.ORGANIZER)
+    if user.role != PlatformRole.SUPER_ADMIN and membership.role != MembershipRole.ADMIN and event.organizer_id != user.id:
+        raise HTTPException(status_code=403, detail="Event ownership required")
+    return event
+
+
+def create_ticket_type(db: Session, event_id: UUID, payload: TicketTypeCreate, user: User) -> TicketType:
+    manage_event(db, event_id, user)
+    if payload.sales_start and payload.sales_end and payload.sales_end <= payload.sales_start:
+        raise HTTPException(status_code=422, detail="sales_end must be after sales_start")
+    model = TicketType(event_id=event_id, **payload.model_dump())
+    db.add(model)
+    db.commit()
+    return model
+
+
+def create_order(db: Session, event_id: UUID, payload: OrderCreate, user: User) -> Order:
+    existing = db.scalar(select(Order).where(Order.idempotency_key == payload.idempotency_key))
+    if existing:
+        if existing.user_id != user.id or existing.event_id != event_id:
+            raise HTTPException(status_code=409, detail="Idempotency key conflict")
+        return existing
+    event = db.get(Event, event_id)
+    ticket_type = db.get(TicketType, payload.ticket_type_id)
+    now = datetime.now(UTC)
+    if event is None or event.status != EventStatus.PUBLISHED:
+        raise HTTPException(status_code=404, detail="Published event not found")
+    if ticket_type is None or ticket_type.event_id != event_id:
+        raise HTTPException(status_code=404, detail="Ticket type not found")
+    if ticket_type.sales_start and as_utc(ticket_type.sales_start) > now:
+        raise HTTPException(status_code=409, detail="Ticket sales have not started")
+    if ticket_type.sales_end and as_utc(ticket_type.sales_end) < now:
+        raise HTTPException(status_code=409, detail="Ticket sales have ended")
+    issued = db.scalar(select(func.count()).select_from(Ticket).where(Ticket.ticket_type_id == ticket_type.id)) or 0
+    if issued + payload.quantity > ticket_type.quantity:
+        raise HTTPException(status_code=409, detail="Insufficient ticket inventory")
+    owned = db.scalar(select(func.count()).select_from(Ticket).where(
+        Ticket.ticket_type_id == ticket_type.id, Ticket.attendee_id == user.id,
+        Ticket.status.notin_([TicketStatus.CANCELLED, TicketStatus.REFUNDED, TicketStatus.EXPIRED]),
+    )) or 0
+    if owned + payload.quantity > ticket_type.max_per_user:
+        raise HTTPException(status_code=409, detail="Maximum tickets per user exceeded")
+    is_free = ticket_type.price == 0
+    order = Order(
+        reference=f"TE-{uuid4().hex[:20].upper()}", idempotency_key=payload.idempotency_key,
+        user_id=user.id, event_id=event_id,
+        status=OrderStatus.CONFIRMED if is_free else OrderStatus.PENDING,
+        total_amount=ticket_type.price * payload.quantity, currency=ticket_type.currency,
+        expires_at=None if is_free else now + timedelta(minutes=15),
+    )
+    db.add(order)
+    db.flush()
+    for _ in range(payload.quantity):
+        db.add(Ticket(
+            public_id=uuid4().hex[:24].upper(), qr_token=token_urlsafe(48), event_id=event_id,
+            ticket_type_id=ticket_type.id, attendee_id=user.id, order_id=order.id,
+            status=TicketStatus.ACTIVE if is_free else TicketStatus.PENDING_PAYMENT,
+        ))
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Concurrent order conflict; retry safely") from exc
+    return order
+
+
+def validate_ticket(db: Session, event_id: UUID, qr_token: str, staff: User) -> tuple[str, Ticket | None]:
+    event = manage_event(db, event_id, staff)
+    authorized_staff = db.scalar(select(EventStaff.id).where(
+        EventStaff.event_id == event_id, EventStaff.user_id == staff.id, EventStaff.is_active.is_(True)
+    ))
+    if staff.role != PlatformRole.SUPER_ADMIN and event.organizer_id != staff.id and authorized_staff is None:
+        membership = require_community_role(db, event.community_id, staff, MembershipRole.ADMIN)
+        if membership.role != MembershipRole.ADMIN:
+            raise HTTPException(status_code=403, detail="Ticket validation permission required")
+    ticket = db.scalar(select(Ticket).where(Ticket.qr_token == qr_token).with_for_update())
+    if ticket is None:
+        return "invalid", None
+    if ticket.event_id != event_id:
+        return "wrong_event", None
+    if ticket.status == TicketStatus.USED:
+        return "already_used", ticket
+    if ticket.status != TicketStatus.ACTIVE:
+        return "invalid_status", ticket
+    ticket.status = TicketStatus.USED
+    ticket.used_at = datetime.now(UTC)
+    ticket.validated_by_id = staff.id
+    db.commit()
+    return "valid", ticket

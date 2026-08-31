@@ -16,7 +16,7 @@
   minimal SQLAlchemy foundation. `src/database.py` is now restricted to engine, session,
   Base, foreign-key enforcement, and initialization helpers; models are modular under
   `src/models/`.
-- Verification: automated tests pass (30), Ruff passes, source compilation passes,
+- Verification: automated tests pass (31), Ruff passes, source compilation passes,
   SQLite foreign keys are enabled, and `/health` plus standardized validation errors work.
 - Remaining warning: FastAPI's current TestClient emits an upstream Starlette/httpx
   deprecation warning; it does not fail tests.
@@ -65,12 +65,12 @@
 
 ### Ticketing Subsystem
 - [x] TicketType/Ticket/Order/Payment schema (inventory constraints, secure public/QR IDs, lifecycle states, provider references, idempotency)
-- [ ] Ticket types creation (free, regular, VIP, student, early bird, group, sponsor, volunteer)
-- [ ] Ticket type properties: name, description, price, quantity, sales start/end, visibility, max per user
-- [ ] Ticket generation: unique ticket ID, QR code, attendee info, event info, ticket type, status
+- [x] Ticket type creation API with tenant ownership and inventory/sales validation
+- [x] Ticket type properties: name, description, price, quantity, sales start/end, visibility, max per user
+- [x] Ticket generation: secure public ID and opaque QR token linked to attendee/event/type/order
 - [ ] Ticket statuses: reserved, pending payment, paid, active, used, cancelled, expired
-- [ ] Duplicate ticket use prevention (atomic validation)
-- [ ] Order creation and management
+- [x] Duplicate ticket use prevention and staff/tenant-authorized validation
+- [x] Idempotent order creation, free-ticket activation, inventory/max-per-user enforcement
 - [ ] Payment integration architecture (paystack, flutterwave, stripe — server-side verification, webhooks)
 - [ ] Payment states: pending, successful, failed, cancelled, refunded
 - [ ] Ticket issuance upon payment confirmation

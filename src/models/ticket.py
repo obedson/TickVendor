@@ -84,6 +84,7 @@ class Order(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __table_args__ = (Index("ix_orders_user_status", "user_id", "status"),)
 
     reference: Mapped[str] = mapped_column(String(64), nullable=False, unique=True, index=True)
+    idempotency_key: Mapped[str] = mapped_column(String(128), nullable=False, unique=True)
     user_id: Mapped[Any] = mapped_column(
         GUID(), ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
     )
