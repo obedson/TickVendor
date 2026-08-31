@@ -181,8 +181,8 @@ verification. These remain active work; no completion claim is made.
 - [x] Privacy-aware public/private profile API and authenticated Impact Point summary foundation
 
 ### Leaderboards (Optional)
-- [ ] Optional leaderboard types: overall, attendance, tasks, community service, leadership, organization, event
-- [ ] Administrators can disable leaderboards
+- [ ] Tenant-isolated overall Impact Point leaderboard implemented; attendance/tasks/service/leadership/event variants pending
+- [x] Administrators can disable leaderboards through configuration state
 - [ ] Avoid making monetary contributions the primary public leaderboard metric
 
 ### Event Engagement
