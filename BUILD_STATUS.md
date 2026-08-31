@@ -280,7 +280,7 @@ verification. These remain active work; no completion claim is made.
 - [x] Support PWA installation with valid manifest icons and a browser install prompt
 - [ ] Queue non-sensitive actions where appropriate
 - [x] Retry idempotent GET/HEAD requests with bounded exponential backoff for network and transient server failures
-- [ ] Avoid large bundles
+- [x] Lazy-load QR generation and enforce a 210 kB maximum production JavaScript chunk
 - [x] Service worker excludes authenticated/private API data from its shared cache
 
 ### PWA

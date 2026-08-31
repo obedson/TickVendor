@@ -1,0 +1,13 @@
+import assert from'node:assert/strict';
+import{readdir,readFile,stat}from'node:fs/promises';
+const assets=new URL('../dist/assets/',import.meta.url);
+const files=await readdir(assets);
+const scripts=files.filter(file=>file.endsWith('.js'));
+assert.ok(scripts.length>=2,'production build should split optional QR code generation into a separate chunk');
+const source=await Promise.all(scripts.map(file=>readFile(new URL(file,assets),'utf8')));
+const entryIndex=source.findIndex(code=>code.includes('createRoot'));
+assert.ok(entryIndex>=0,'an application entry chunk should be emitted');
+assert.ok(scripts.some((_,index)=>index!==entryIndex),'an optional feature chunk should be emitted separately');
+const sizes=await Promise.all(scripts.map(file=>stat(new URL(file,assets)).then(value=>value.size)));
+assert.ok(Math.max(...sizes)<210000,'no JavaScript chunk should exceed 210 kB');
+console.log('frontend bundle boundaries passed');
