@@ -21,6 +21,7 @@ from src.models import (
     Venue,
 )
 from src.schemas.event import EventCreate, EventUpdate
+from src.services.notification import audit
 
 
 def make_slug(value: str) -> str:
@@ -82,6 +83,8 @@ def create_event(db: Session, payload: EventCreate, user: User) -> Event:
     )
     db.add(event)
     db.commit()
+    audit(db, actor_id=user.id, community_id=event.community_id, action="event.created",
+          target_type="event", target_id=event.id, metadata={"title": event.title})
     return db.scalar(select(Event).options(selectinload(Event.venue)).where(Event.id == event.id))
 
 
@@ -108,6 +111,8 @@ def update_event(db: Session, event_id: UUID, payload: EventUpdate, user: User) 
     if event.ends_at <= event.starts_at:
         raise HTTPException(status_code=422, detail="ends_at must be after starts_at")
     db.commit()
+    audit(db, actor_id=user.id, community_id=event.community_id, action="event.updated",
+          target_type="event", target_id=event.id, metadata={"fields": sorted(values)})
     return event
 
 
@@ -126,6 +131,9 @@ def publish_event(db: Session, event_id: UUID, user: User, publish: bool) -> Eve
         event.status = EventStatus.DRAFT
         event.published_at = None
     db.commit()
+    audit(db, actor_id=user.id, community_id=event.community_id,
+          action="event.published" if publish else "event.unpublished",
+          target_type="event", target_id=event.id)
     return event
 
 

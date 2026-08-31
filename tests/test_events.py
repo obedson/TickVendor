@@ -9,7 +9,15 @@ from sqlalchemy.orm import sessionmaker
 import src.models  # noqa: F401
 from src.database import Base, get_db
 from src.main import create_app
-from src.models import Community, EventCategory, Membership, MembershipRole, Organization, User
+from src.models import (
+    AuditLog,
+    Community,
+    EventCategory,
+    Membership,
+    MembershipRole,
+    Organization,
+    User,
+)
 from src.security import create_access_token, hash_password
 
 
@@ -81,4 +89,6 @@ def test_event_create_publish_discover_update_and_cross_tenant_denial(tmp_path):
     detail = client.get(f"/api/v1/events/{event_id}")
     assert detail.status_code == 200
     assert detail.json()["venue"]["city"] == "Abuja"
+    with _sessions() as db:
+        assert {item.action for item in db.query(AuditLog)} >= {"event.created", "event.published"}
     engine.dispose()

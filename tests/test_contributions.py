@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 import src.models  # noqa: F401
 from src.database import Base
 from src.models import (
+    AuditLog,
     ContributionBand,
     ContributionType,
     ImpactTransaction,
@@ -44,4 +45,5 @@ def test_verified_contribution_uses_configurable_band(tmp_path):
         verify_contribution(db, contribution, organizer, True)
         transaction = db.query(ImpactTransaction).one()
         assert transaction.points == 5
+        assert db.query(AuditLog).filter_by(action="contribution.verified").one().actor_id == organizer.id
     engine.dispose()

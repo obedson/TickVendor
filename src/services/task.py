@@ -15,6 +15,7 @@ from src.models import (
     User,
 )
 from src.services.impact import award_points
+from src.services.notification import audit
 
 
 def create_task(db: Session, community_id, creator: User, **values) -> Task:
@@ -51,6 +52,10 @@ def verify_task(db: Session, assignment: TaskAssignment, verifier: User, approve
     assignment.verified_at = datetime.now(UTC)
     assignment.status = TaskAssignmentStatus.VERIFIED if approve else TaskAssignmentStatus.REJECTED
     db.commit()
+    audit(db, actor_id=verifier.id, community_id=task.community_id,
+          action="task.verified" if approve else "task.rejected",
+          target_type="task_assignment", target_id=assignment.id,
+          metadata={"task_id": str(task.id), "assignee_id": str(assignment.assignee_id)})
     if approve and task.impact_point_reward:
         award_points(
             db, user_id=assignment.assignee_id, community_id=task.community_id,

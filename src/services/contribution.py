@@ -17,6 +17,7 @@ from src.models import (
     User,
 )
 from src.services.impact import award_points
+from src.services.notification import audit
 
 
 def record_contribution(db: Session, contributor: User, **values) -> Contribution:
@@ -31,6 +32,10 @@ def verify_contribution(db: Session, contribution: Contribution, verifier: User,
     contribution.status = ActivityStatus.VERIFIED if approve else ActivityStatus.REJECTED
     contribution.verified_by_id = verifier.id
     db.commit()
+    audit(db, actor_id=verifier.id, community_id=contribution.community_id,
+          action="contribution.verified" if approve else "contribution.rejected",
+          target_type="contribution", target_id=contribution.id,
+          metadata={"contributor_id": str(contribution.contributor_id)})
     if approve and contribution.amount is not None:
         band = db.scalar(select(ContributionBand).where(
             ContributionBand.currency == contribution.currency,

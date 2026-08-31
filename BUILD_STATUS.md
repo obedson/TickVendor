@@ -221,7 +221,7 @@ verification. These remain active work; no completion claim is made.
 
 ### Admin Audit Log
 - [x] AuditLog schema (actor/community/action/target/timestamp/metadata; append-only design)
-- [ ] Audit log tracking: event creation/changes, ticket changes, attendance override, task verification, contribution verification, point adjustments, badge awards/revocations, rank changes, user role changes
+- [ ] Audit tracking covers event creation/changes, ticket use/cancellation/refunds, attendance overrides, task/contribution verification, point adjustments and badge awards; badge revocations, rank changes and user role changes pending
 - [x] Append-only audit helper persists actor, community, action, target, timestamp, metadata
 
 ### Manual Point Adjustments

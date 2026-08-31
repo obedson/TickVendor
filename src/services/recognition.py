@@ -29,7 +29,7 @@ from src.models import (
 )
 from src.services.achievement import evaluate_condition
 from src.services.impact import award_points
-from src.services.notification import notify
+from src.services.notification import audit, notify
 
 
 def user_metrics(db: Session, user_id, community_id) -> dict[str, int]:
@@ -119,6 +119,9 @@ def award_badge(db: Session, badge: Badge, user_id, idempotency_key: str) -> Bad
     )
     db.add(award)
     db.commit()
+    audit(db, actor_id=None, community_id=badge.community_id, action="badge.awarded",
+          target_type="badge_award", target_id=award.id,
+          metadata={"badge_id": str(badge.id), "user_id": str(user_id)})
     return award
 
 

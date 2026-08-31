@@ -25,6 +25,7 @@ from src.models import (
 )
 from src.schemas.attendance import AttendanceCheckIn
 from src.services.event import as_utc
+from src.services.notification import audit
 
 
 def haversine_meters(lat1: Decimal, lon1: Decimal, lat2: Decimal, lon2: Decimal) -> float:
@@ -122,6 +123,9 @@ def organizer_verify(db: Session, attendance: Attendance, organizer: User, appro
     )
     attendance.confidence_score = Decimal(100 if approve else 0)
     db.commit()
+    audit(db, actor_id=organizer.id, community_id=event.community_id,
+          action="attendance.override", target_type="attendance", target_id=attendance.id,
+          metadata={"approved": approve, "reason": reason})
     return attendance
 
 

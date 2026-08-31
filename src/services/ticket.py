@@ -27,6 +27,7 @@ from src.models import (
 )
 from src.schemas.ticket import OrderCreate, TicketTypeCreate
 from src.services.event import as_utc
+from src.services.notification import audit
 
 
 def manage_event(db: Session, event_id: UUID, user: User) -> Event:
@@ -121,6 +122,8 @@ def validate_ticket(db: Session, event_id: UUID, qr_token: str, staff: User) -> 
     ticket.used_at = datetime.now(UTC)
     ticket.validated_by_id = staff.id
     db.commit()
+    audit(db, actor_id=staff.id, community_id=event.community_id, action="ticket.used",
+          target_type="ticket", target_id=ticket.id, metadata={"event_id": str(event_id)})
     return "valid", ticket
 
 
@@ -131,6 +134,9 @@ def cancel_ticket(db: Session, ticket: Ticket, user: User) -> Ticket:
         raise HTTPException(status_code=409, detail="Ticket cannot be cancelled")
     ticket.status = TicketStatus.CANCELLED
     db.commit()
+    event = db.get(Event, ticket.event_id)
+    audit(db, actor_id=user.id, community_id=event.community_id, action="ticket.cancelled",
+          target_type="ticket", target_id=ticket.id)
     return ticket
 
 
@@ -148,4 +154,7 @@ def refund_order(db: Session, order: Order, user: User) -> Order:
         if ticket.status != TicketStatus.USED:
             ticket.status = TicketStatus.REFUNDED
     db.commit()
+    event = db.get(Event, order.event_id)
+    audit(db, actor_id=user.id, community_id=event.community_id, action="order.refunded",
+          target_type="order", target_id=order.id)
     return order

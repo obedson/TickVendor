@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 import src.models  # noqa: F401
 from src.database import Base
-from src.models import Membership, MembershipRole, PointRule, TaskAssignmentStatus, User
+from src.models import AuditLog, Membership, MembershipRole, PointRule, TaskAssignmentStatus, User
 from src.services.task import assign_task, create_task, submit_task, verify_task
 from tests.test_database import create_event_context
 
@@ -31,4 +31,5 @@ def test_verified_task_awards_points_once(tmp_path):
         assert assignment.status == TaskAssignmentStatus.VERIFIED
         from src.models import ImpactTransaction
         assert db.query(ImpactTransaction).count() == 1
+        assert db.query(AuditLog).filter_by(action="task.verified").one().actor_id == organizer.id
     engine.dispose()
