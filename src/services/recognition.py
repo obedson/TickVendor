@@ -1,4 +1,6 @@
-"""Recognition qualification engine for configurable milestones, ranks, and badges."""
+"""Recognition qualification and idempotent automatic award engine."""
+
+from datetime import UTC, datetime
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -11,11 +13,15 @@ from src.models import (
     ImpactTransaction,
     ImpactTransactionStatus,
     Milestone,
+    MilestoneAward,
     MilestoneRequirement,
     Rank,
     TaskAssignment,
     TaskAssignmentStatus,
 )
+from src.services.achievement import evaluate_condition
+from src.services.impact import award_points
+from src.services.notification import notify
 
 
 def user_metrics(db: Session, user_id, community_id) -> dict[str, int]:
@@ -41,8 +47,11 @@ def qualifies(requirements, metrics: dict[str, int]) -> bool:
         "<=": lambda actual, threshold: actual <= threshold,
         "=": lambda actual, threshold: actual == threshold,
     }
-    return all(req.operator in operators and operators[req.operator](metrics.get(req.metric, 0), req.threshold)
-               for req in requirements)
+    return all(
+        req.operator in operators
+        and operators[req.operator](metrics.get(req.metric, 0), req.threshold)
+        for req in requirements
+    )
 
 
 def qualified_milestones(db: Session, user_id, community_id) -> list[Milestone]:
@@ -54,7 +63,7 @@ def qualified_milestones(db: Session, user_id, community_id) -> list[Milestone]:
         requirements = list(db.scalars(select(MilestoneRequirement).where(
             MilestoneRequirement.milestone_id == milestone.id
         )))
-        if qualifies(requirements, metrics):
+        if requirements and qualifies(requirements, metrics):
             result.append(milestone)
     return result
 
@@ -70,7 +79,105 @@ def award_badge(db: Session, badge: Badge, user_id, idempotency_key: str) -> Bad
     existing = db.scalar(select(BadgeAward).where(BadgeAward.idempotency_key == idempotency_key))
     if existing:
         return existing
-    from datetime import UTC, datetime
-    award = BadgeAward(badge_id=badge.id, user_id=user_id, idempotency_key=idempotency_key,
-                       awarded_at=datetime.now(UTC))
-    db.add(award); db.commit(); return award
+    award = BadgeAward(
+        badge_id=badge.id,
+        user_id=user_id,
+        idempotency_key=idempotency_key,
+        awarded_at=datetime.now(UTC),
+    )
+    db.add(award)
+    db.commit()
+    return award
+
+
+def award_milestone(db: Session, milestone: Milestone, user_id) -> MilestoneAward:
+    idempotency_key = f"milestone:{milestone.id}:user:{user_id}"
+    existing = db.scalar(select(MilestoneAward).where(
+        MilestoneAward.idempotency_key == idempotency_key
+    ))
+    if existing:
+        return existing
+    award = MilestoneAward(
+        milestone_id=milestone.id,
+        user_id=user_id,
+        idempotency_key=idempotency_key,
+        awarded_at=datetime.now(UTC),
+    )
+    db.add(award)
+    db.commit()
+    return award
+
+
+def evaluate_recognition(db: Session, user_id, community_id) -> dict[str, int]:
+    """Evaluate configured milestones and badges without duplicate awards."""
+    milestones_awarded = 0
+    badges_awarded = 0
+
+    for milestone in qualified_milestones(db, user_id, community_id):
+        already_awarded = db.scalar(select(MilestoneAward.id).where(
+            MilestoneAward.milestone_id == milestone.id,
+            MilestoneAward.user_id == user_id,
+        ))
+        if already_awarded:
+            continue
+        award_milestone(db, milestone, user_id)
+        milestones_awarded += 1
+        if milestone.reward_points:
+            award_points(
+                db,
+                user_id=user_id,
+                community_id=community_id,
+                source_type="milestone_reward",
+                source_id=milestone.id,
+                idempotency_key=f"milestone-reward:{milestone.id}:user:{user_id}",
+                reason=f"Milestone achieved: {milestone.name}",
+                points_override=milestone.reward_points,
+            )
+        notify(
+            db,
+            user_id,
+            "milestone_awarded",
+            "Milestone reached",
+            f"Congratulations! You reached {milestone.name}.",
+            {"milestone_id": str(milestone.id)},
+        )
+
+    metrics = user_metrics(db, user_id, community_id)
+    for badge in db.scalars(select(Badge).where(
+        Badge.community_id == community_id,
+        Badge.is_active.is_(True),
+    )):
+        already_awarded = db.scalar(select(BadgeAward.id).where(
+            BadgeAward.badge_id == badge.id,
+            BadgeAward.user_id == user_id,
+        ))
+        if already_awarded or not badge.requirements:
+            continue
+        if not evaluate_condition(badge.requirements, metrics):
+            continue
+        award_badge(db, badge, user_id, f"badge:{badge.id}:user:{user_id}")
+        badges_awarded += 1
+        if badge.reward_points:
+            award_points(
+                db,
+                user_id=user_id,
+                community_id=community_id,
+                source_type="badge_reward",
+                source_id=badge.id,
+                idempotency_key=f"badge-reward:{badge.id}:user:{user_id}",
+                reason=f"Badge earned: {badge.name}",
+                points_override=badge.reward_points,
+            )
+        notify(
+            db,
+            user_id,
+            "badge_awarded",
+            "New badge earned",
+            f"You earned the {badge.name} badge.",
+            {"badge_id": str(badge.id)},
+        )
+
+    return {
+        "milestones_awarded": milestones_awarded,
+        "badges_awarded": badges_awarded,
+    }

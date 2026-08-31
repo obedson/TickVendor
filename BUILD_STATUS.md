@@ -24,7 +24,7 @@
   constraints, and the initial authentication API are verified. Business services, complete
   RBAC, remaining APIs, payment adapters/webhooks, frontend/PWA, and end-to-end product
   journeys remain incomplete and must not be represented as finished.
-- Latest verification: clean four-revision migration, 42 backend tests, Ruff, Alembic drift check, and frontend production build pass.
+- Latest verification: clean five-revision migration, 43 backend tests, Ruff, Alembic drift check, and frontend production build pass.
 - Production deployment artifacts now include Dockerfile, PostgreSQL Compose topology, README,
   production database driver, and environment guidance; live infrastructure remains unverified.
 
@@ -144,7 +144,7 @@ verification. These remain active work; no completion claim is made.
 - [x] Configurable milestone qualification service using database metrics/operators
 - [ ] Milestone requirements: impact points, attendance count, task count, contribution count, service activities, leadership activities, peer confirmations, event participation, consecutive activities
 - [ ] Example: Community Builder — 300 Impact Points, 10 verified attendances, 5 completed tasks, 1 community contribution
-- [ ] Automatic milestone award when requirements satisfied
+- [x] Idempotent automatic milestone awards, reward transactions, and notifications
 - [ ] Milestone requirements should be configurable via admin (not hard-coded)
 
 ### Rank System
@@ -160,7 +160,7 @@ verification. These remain active work; no completion claim is made.
 - [x] Idempotent badge award primitive; full automatic rule evaluation remains pending
 - [ ] Badge properties: name, description, icon, category, requirements, reward, visibility
 - [ ] Example badges: First Step (first verified event attendance), Regular (attend 5 events), Consistent (attend 10 events), Task Starter (complete first task), Doer (complete 10 tasks), Community Helper (help 5 members), Facilitator (organize first event), Community Builder (complete defined community requirements)
-- [ ] Automatic badge award when conditions satisfied
+- [x] Idempotent automatic badge awards from configured condition trees with rewards/notifications
 - [ ] Admin-definable badge rules (achievement rule builder)
 
 ### Achievement Rule Builder

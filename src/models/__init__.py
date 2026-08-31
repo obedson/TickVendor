@@ -37,7 +37,7 @@ from src.models.event import (
     Venue,
 )
 from src.models.impact import ImpactTransaction, ImpactTransactionStatus
-from src.models.milestone import Milestone, MilestoneRequirement
+from src.models.milestone import Milestone, MilestoneAward, MilestoneRequirement
 from src.models.notification import AuditLog, Leaderboard, Notification
 from src.models.organization import Organization
 from src.models.payment import Payment, PaymentStatus
@@ -90,6 +90,7 @@ __all__ = [
     "MembershipRole",
     "MembershipStatus",
     "Milestone",
+    "MilestoneAward",
     "MilestoneRequirement",
     "Notification",
     "Order",
