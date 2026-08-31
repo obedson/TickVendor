@@ -217,7 +217,7 @@ verification. These remain active work; no completion claim is made.
 - [x] Community data isolation enforced in authorization/services with cross-tenant negative tests
 
 ### Event Organizer Profile
-- [ ] Organizer pages showing: name, logo/profile, description, events (past and upcoming), basic credibility/verification status
+- [x] Public organizer profile API shows name, profile image, description, published past/upcoming events and email verification status
 
 ### Admin Audit Log
 - [x] AuditLog schema (actor/community/action/target/timestamp/metadata; append-only design)
