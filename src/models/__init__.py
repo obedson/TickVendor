@@ -9,11 +9,24 @@ from src.models.community import (
     MembershipRole,
     MembershipStatus,
 )
+from src.models.event import (
+    Event,
+    EventStaff,
+    EventStaffRole,
+    EventStatus,
+    LocationType,
+    Venue,
+)
 from src.models.organization import Organization
 from src.models.user import PlatformRole, Profile, ProfileVisibility, User
 
 __all__ = [
     "Community",
+    "Event",
+    "EventStaff",
+    "EventStaffRole",
+    "EventStatus",
+    "LocationType",
     "Membership",
     "MembershipRole",
     "MembershipStatus",
@@ -22,4 +35,5 @@ __all__ = [
     "Profile",
     "ProfileVisibility",
     "User",
+    "Venue",
 ]

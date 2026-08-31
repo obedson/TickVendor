@@ -40,6 +40,7 @@
 - [ ] Shared types/interfaces
 
 ### Events Subsystem
+- [x] Event/Venue/EventStaff schema (publishing states, physical/online/hybrid location, attendance configuration, scoped staff roles)
 - [ ] Event creation (multi-step form: basic info, date/time, location, attendance settings)
 - [ ] Event editing
 - [ ] Event publishing/unpublishing

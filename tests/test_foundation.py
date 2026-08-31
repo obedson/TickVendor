@@ -63,3 +63,18 @@ def test_organization_community_membership_models_map_with_tenant_constraints():
         if constraint.__class__.__name__ == "UniqueConstraint"
     }
     assert ("community_id", "user_id") in unique_columns
+
+
+def test_event_venue_staff_models_map_with_staff_uniqueness():
+    import src.models  # noqa: F401
+    from src.database import Base
+
+    configure_mappers()
+    assert {"events", "venues", "event_staff"}.issubset(Base.metadata.tables)
+    staff = Base.metadata.tables["event_staff"]
+    unique_columns = {
+        tuple(column.name for column in constraint.columns)
+        for constraint in staff.constraints
+        if constraint.__class__.__name__ == "UniqueConstraint"
+    }
+    assert ("event_id", "user_id") in unique_columns
