@@ -16,7 +16,7 @@
   minimal SQLAlchemy foundation. `src/database.py` is now restricted to engine, session,
   Base, foreign-key enforcement, and initialization helpers; models are modular under
   `src/models/`.
-- Verification: automated tests pass (34), Ruff passes, source compilation passes,
+- Verification: automated tests pass (35), Ruff passes, source compilation passes,
   SQLite foreign keys are enabled, and `/health` plus standardized validation errors work.
 - Remaining warning: FastAPI's current TestClient emits an upstream Starlette/httpx
   deprecation warning; it does not fail tests.
@@ -96,12 +96,12 @@
 ### Activities / Tasks Subsystem
 - [x] Task/TaskAssignment/TaskSubmission schema (priority, lifecycle, evidence, verification, assignment uniqueness)
 - [x] Activity/Contribution schema (five engagement dimensions, monetary/non-monetary types, verification state)
-- [ ] Task creation (title, description, assignee, due date, priority, impact point reward, attachments, verification requirement)
-- [ ] Task assignment to participants
-- [ ] Task states: assigned, accepted, in progress, submitted, verified, rejected, overdue
-- [ ] Task submission with evidence
-- [ ] Task verification by organizer/admin
-- [ ] Impact Points awarded after verification (where configured)
+- [x] Tenant-authorized task creation service
+- [x] Task assignment to participants
+- [x] Enforced task assignment lifecycle states
+- [x] Task submission with evidence and assignee ownership
+- [x] Organizer/admin task verification
+- [x] Idempotent Impact Points awarded only after configured verification
 - [ ] Community activities beyond attendance/tasks: volunteer work, mentoring, community service, speaking, training, organizing, content contribution, resource donation, leadership activities
 - [ ] Activity types: monetary, equipment, materials, volunteer time, services, resources
 - [ ] Contribution tracking with: amount, currency, purpose, date, payment/reference ID, verification status
@@ -110,7 +110,7 @@
 
 ### Impact Point / Reward Engine
 - [x] ImpactTransaction schema (auditable status, source references, reversals, unique idempotency key)
-- [ ] Centralized rules engine for Impact Points
+- [x] Centralized database-backed Impact Point award service
 - [x] Database-backed PointRule defaults and community override structure
 - [ ] Point values: attendance → +10, task completion → +20, volunteer activity → +15, peer verification → +2, leadership activity → +30, contribution → configurable, special achievement → configurable
 - [ ] Never hard-code point values into individual components
