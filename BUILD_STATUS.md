@@ -20,6 +20,10 @@
   SQLite foreign keys are enabled, and `/health` plus standardized validation errors work.
 - Remaining warning: FastAPI's current TestClient emits an upstream Starlette/httpx
   deprecation warning; it does not fail tests.
+- Completion boundary: recovery, foundation, core model schema, migration, focused database
+  constraints, and the initial authentication API are verified. Business services, complete
+  RBAC, remaining APIs, payment adapters/webhooks, frontend/PWA, and end-to-end product
+  journeys remain incomplete and must not be represented as finished.
 
 ## Implementation Checklist — Grouped by Dependency-Aware Subsystem
 
