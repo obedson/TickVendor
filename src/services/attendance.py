@@ -1,0 +1,100 @@
+"""Attendance check-in, geofence, and layered verification services."""
+
+from datetime import UTC, datetime
+from decimal import Decimal
+from math import asin, cos, radians, sin, sqrt
+
+from fastapi import HTTPException
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+
+from src.models import (
+    Attendance,
+    AttendanceStatus,
+    AttendanceVerification,
+    Event,
+    PeerConfirmation,
+    PeerConfirmationDecision,
+    Ticket,
+    TicketStatus,
+    User,
+    VerificationMethod,
+)
+from src.schemas.attendance import AttendanceCheckIn
+from src.services.event import as_utc
+
+
+def haversine_meters(lat1: Decimal, lon1: Decimal, lat2: Decimal, lon2: Decimal) -> float:
+    phi1, phi2 = radians(float(lat1)), radians(float(lat2))
+    dphi = radians(float(lat2 - lat1)); dlambda = radians(float(lon2 - lon1))
+    a = sin(dphi / 2) ** 2 + cos(phi1) * cos(phi2) * sin(dlambda / 2) ** 2
+    return 6_371_000 * 2 * asin(sqrt(a))
+
+
+def check_in(db: Session, event: Event, user: User, payload: AttendanceCheckIn) -> Attendance:
+    now = datetime.now(UTC)
+    if event.check_in_opens_at and now < as_utc(event.check_in_opens_at):
+        raise HTTPException(status_code=409, detail="Check-in is not open")
+    if event.check_in_closes_at and now > as_utc(event.check_in_closes_at):
+        raise HTTPException(status_code=409, detail="Check-in is closed")
+    existing = db.scalar(select(Attendance).where(
+        Attendance.event_id == event.id, Attendance.user_id == user.id
+    ))
+    if existing:
+        return existing
+    ticket = db.get(Ticket, payload.ticket_id) if payload.ticket_id else None
+    if ticket and (ticket.event_id != event.id or ticket.attendee_id != user.id or ticket.status not in {TicketStatus.ACTIVE, TicketStatus.USED}):
+        raise HTTPException(status_code=403, detail="Ticket is not valid for this attendee and event")
+    attendance = Attendance(event_id=event.id, user_id=user.id, ticket_id=ticket.id if ticket else None,
+                            status=AttendanceStatus.CHECKED_IN, checked_in_at=now)
+    db.add(attendance); db.flush()
+    if event.geofence_enabled:
+        if payload.latitude is None or payload.longitude is None or event.venue is None:
+            raise HTTPException(status_code=422, detail="Location is required for geofence verification")
+        distance = haversine_meters(payload.latitude, payload.longitude, event.venue.latitude, event.venue.longitude)
+        valid = distance <= event.geofence_radius_meters
+        db.add(AttendanceVerification(
+            attendance_id=attendance.id, method=VerificationMethod.GPS, is_valid=valid,
+            verified_at=now, latitude=payload.latitude, longitude=payload.longitude,
+            accuracy_meters=payload.accuracy_meters, reason=f"distance_meters={distance:.2f}",
+        ))
+        if valid:
+            attendance.status = AttendanceStatus.GPS_VERIFIED
+            attendance.confidence_score = Decimal(70)
+        else:
+            attendance.flagged_for_review = True
+            attendance.review_reason = "Location outside event geofence"
+    db.commit()
+    return attendance
+
+
+def confirm_peer(db: Session, event: Event, confirmer: User, subject_id, confirmed: bool):
+    confirmer_attendance = db.scalar(select(Attendance).where(
+        Attendance.event_id == event.id, Attendance.user_id == confirmer.id,
+        Attendance.status.notin_([AttendanceStatus.NOT_CHECKED_IN, AttendanceStatus.REJECTED]),
+    ))
+    subject = db.scalar(select(Attendance).where(
+        Attendance.event_id == event.id, Attendance.user_id == subject_id
+    ))
+    if confirmer.id == subject_id or confirmer_attendance is None or subject is None:
+        raise HTTPException(status_code=403, detail="Peer confirmation is not permitted")
+    confirmation = PeerConfirmation(
+        event_id=event.id, confirmer_id=confirmer.id, subject_id=subject_id,
+        decision=PeerConfirmationDecision.CONFIRMED if confirmed else PeerConfirmationDecision.CANNOT_CONFIRM,
+        submitted_at=datetime.now(UTC),
+    )
+    db.add(confirmation)
+    try:
+        db.flush()
+    except IntegrityError as exc:
+        db.rollback(); raise HTTPException(status_code=409, detail="Peer confirmation already submitted") from exc
+    if confirmed:
+        count = db.query(PeerConfirmation).filter_by(
+            event_id=event.id, subject_id=subject_id, decision=PeerConfirmationDecision.CONFIRMED
+        ).count()
+        if count >= event.confirmations_required:
+            subject.status = AttendanceStatus.PEER_VERIFIED
+            subject.confidence_score = max(subject.confidence_score, Decimal(60))
+    db.commit()
+    return confirmation

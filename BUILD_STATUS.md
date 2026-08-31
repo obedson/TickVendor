@@ -16,7 +16,7 @@
   minimal SQLAlchemy foundation. `src/database.py` is now restricted to engine, session,
   Base, foreign-key enforcement, and initialization helpers; models are modular under
   `src/models/`.
-- Verification: automated tests pass (32), Ruff passes, source compilation passes,
+- Verification: automated tests pass (34), Ruff passes, source compilation passes,
   SQLite foreign keys are enabled, and `/health` plus standardized validation errors work.
 - Remaining warning: FastAPI's current TestClient emits an upstream Starlette/httpx
   deprecation warning; it does not fail tests.
@@ -80,13 +80,13 @@
 
 ### Attendance Subsystem
 - [x] Attendance/Verification/PeerConfirmation schema (independent attendance, layered signals, confidence/review fields, duplicate prevention)
-- [ ] Attendance record creation (separate from ticket purchase)
+- [x] Idempotent attendance record/check-in API independent from ticket purchase
 - [ ] Attendance states: not checked in, checked in, GPS verified, QR verified, peer verified, organizer verified, rejected
-- [ ] Geofenced attendance: latitude, longitude, radius, start/end time
-- [ ] GPS/geolocation verification (browser/device, Haversine distance calculation)
+- [x] Geofenced attendance with coordinates, radius, opening/closing windows
+- [x] GPS verification with Haversine distance, accuracy capture, and review flag fallback
 - [ ] QR code attendance check-in
 - [ ] Manual/ organizer verification
-- [ ] Peer confirmation system
+- [x] Peer confirmation service with eligibility, self/duplicate prevention, and configurable threshold
 - [ ] Attendance verification confidence/status calculation from layered signals
 - [ ] Anti-abuse: duplicate QR scans, multiple check-ins, check-in outside event time, location outside radius, suspicious peer confirmations, reciprocal confirmations, impossible location changes
 - [ ] GPS fallback methods (QR, organizer verification)
