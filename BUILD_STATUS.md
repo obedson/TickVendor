@@ -24,7 +24,7 @@
   constraints, and the initial authentication API are verified. Business services, complete
   RBAC, remaining APIs, payment adapters/webhooks, frontend/PWA, and end-to-end product
   journeys remain incomplete and must not be represented as finished.
-- Latest verification: clean four-revision migration, 41 backend tests, Ruff, Alembic drift check, and frontend production build pass.
+- Latest verification: clean four-revision migration, 42 backend tests, Ruff, Alembic drift check, and frontend production build pass.
 - Production deployment artifacts now include Dockerfile, PostgreSQL Compose topology, README,
   production database driver, and environment guidance; live infrastructure remains unverified.
 
@@ -157,7 +157,7 @@
 ### Achievement Rule Builder
 - [x] AchievementRule schema (versioned condition tree and reward definition for extensible operators)
 - [ ] Admin interface for defining achievement logic without modifying code
-- [ ] Supported logical operators: AND, OR, >=, <=, =, Count, Sum, Streak, Unique event count
+- [ ] Safe evaluator supports AND, OR, >=, <=, =; Count/Sum/Streak/Unique event aggregation pending
 - [ ] Example achievement: Community Champion — attendance >= 20, tasks >= 10, peer confirmations >= 10, leadership activities >= 3, Impact Points >= 500, reward: badge + 50 Impact Points
 - [ ] Additional rule types designed for future extensibility
 
