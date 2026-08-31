@@ -118,7 +118,7 @@ verification. These remain active work; no completion claim is made.
 - [x] Monetary/equipment/materials/volunteer-time/services/resources contribution types plus arbitrary activity types
 - [x] Contribution recording/verification service with amount, currency, purpose, date/reference and tenant authorization
 - [x] Configurable database contribution bands drive idempotent rewards
-- [ ] Caps to prevent financial contributions from overwhelming participation-based achievements
+- [x] Configurable per-user contribution reward caps prevent financial reward dominance
 
 ### Impact Point / Reward Engine
 - [x] ImpactTransaction schema (auditable status, source references, reversals, unique idempotency key)

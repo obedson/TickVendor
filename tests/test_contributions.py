@@ -29,7 +29,13 @@ def test_verified_contribution_uses_configurable_band(tmp_path):
         db.add(contributor); db.flush()
         db.add_all([
             Membership(community_id=community.id, user_id=organizer.id, role=MembershipRole.ORGANIZER),
-            ContributionBand(currency="NGN", minimum_amount=Decimal(1000), maximum_amount=Decimal("4999.99"), points=5),
+            ContributionBand(
+                currency="NGN",
+                minimum_amount=Decimal(1000),
+                maximum_amount=Decimal("4999.99"),
+                points=5,
+                per_user_period_cap=5,
+            ),
         ]); db.commit()
         contribution = record_contribution(
             db, contributor, community_id=community.id, contribution_type=ContributionType.MONETARY,
