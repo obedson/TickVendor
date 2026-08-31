@@ -276,7 +276,7 @@ verification. These remain active work; no completion claim is made.
 
 ### Offline/Low Connectivity
 - [x] Cache public event discovery data for offline reuse
-- [ ] Allow ticket QR to load from cached data
+- [x] Ticket wallet renders QR codes from an encrypted device-local offline copy and clears it on sign-out
 - [x] Support PWA installation with valid manifest icons and a browser install prompt
 - [ ] Queue non-sensitive actions where appropriate
 - [ ] Retry failed requests safely
