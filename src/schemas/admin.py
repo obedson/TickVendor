@@ -59,3 +59,19 @@ class EventCategoryUpdateInput(BaseModel):
     name: str | None = Field(default=None, min_length=2, max_length=120)
     description: str | None = Field(default=None, max_length=5000)
     is_active: bool | None = None
+
+
+class BadgeRevokeInput(BaseModel):
+    reason: str = Field(min_length=3, max_length=1000)
+
+
+class MembershipRoleUpdateInput(BaseModel):
+    role: Literal["member", "organizer", "admin"]
+
+
+class RankUpdateInput(BaseModel):
+    name: str | None = Field(default=None, min_length=2, max_length=120)
+    description: str | None = Field(default=None, max_length=5000)
+    minimum_points: int | None = Field(default=None, ge=0)
+    sort_order: int | None = Field(default=None, ge=0)
+    is_active: bool | None = None

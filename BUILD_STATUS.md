@@ -221,7 +221,7 @@ verification. These remain active work; no completion claim is made.
 
 ### Admin Audit Log
 - [x] AuditLog schema (actor/community/action/target/timestamp/metadata; append-only design)
-- [ ] Audit tracking covers event creation/changes, ticket use/cancellation/refunds, attendance overrides, task/contribution verification, point adjustments and badge awards; badge revocations, rank changes and user role changes pending
+- [x] Audit tracking covers event creation/changes, ticket changes, attendance overrides, task/contribution verification, point adjustments, badge awards/revocations, rank changes and user role changes
 - [x] Append-only audit helper persists actor, community, action, target, timestamp, metadata
 
 ### Manual Point Adjustments
@@ -251,7 +251,7 @@ verification. These remain active work; no completion claim is made.
 - [x] JPEG/PNG/WebP content validation with spoofing tests
 - [x] Provider webhook signature boundary, provider/reference lookup, server verification and idempotency
 - [x] API validation and secure response headers foundation
-- [ ] Audit logging
+- [x] Sensitive implemented operations emit append-only audit records with actor, target, timestamp and metadata
 - [ ] Abuse prevention
 - [x] Backend is authoritative; frontend validation is never the sole control
 - [x] Implemented sensitive operations authorize server-side

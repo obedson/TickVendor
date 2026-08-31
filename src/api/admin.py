@@ -1,5 +1,6 @@
 """Tenant-scoped administration configuration API."""
 
+from datetime import UTC, datetime
 from typing import Annotated
 from uuid import UUID
 
@@ -13,7 +14,9 @@ from src.database import get_db
 from src.models import (
     AchievementRule,
     Badge,
+    BadgeAward,
     EventCategory,
+    Membership,
     MembershipRole,
     Milestone,
     MilestoneRequirement,
@@ -24,10 +27,13 @@ from src.models import (
 from src.schemas.admin import (
     AchievementRuleCreateInput,
     BadgeCreateInput,
+    BadgeRevokeInput,
     EventCategoryCreateInput,
     EventCategoryUpdateInput,
+    MembershipRoleUpdateInput,
     MilestoneCreateInput,
     RankCreateInput,
+    RankUpdateInput,
 )
 from src.services.achievement import evaluate_condition
 from src.services.notification import audit
@@ -139,6 +145,24 @@ def create_rank(
     return {"id": str(rank.id), "slug": rank.slug}
 
 
+@router.patch("/ranks/{rank_id}")
+def update_rank(
+    community_id: UUID, rank_id: UUID, payload: RankUpdateInput,
+    db: Annotated[Session, Depends(get_db)], user: Annotated[User, Depends(get_current_user)],
+):
+    require_admin(db, community_id, user)
+    rank = db.get(Rank, rank_id)
+    if rank is None or rank.community_id != community_id:
+        raise HTTPException(status_code=404, detail="Rank not found")
+    values = payload.model_dump(exclude_unset=True)
+    for field, value in values.items():
+        setattr(rank, field, value)
+    db.commit()
+    audit(db, actor_id=user.id, community_id=community_id, action="rank.changed",
+          target_type="rank", target_id=rank.id, metadata={"fields": sorted(values)})
+    return {"id": str(rank.id), "slug": rank.slug}
+
+
 @router.post("/badges", status_code=status.HTTP_201_CREATED)
 def create_badge(
     community_id: UUID,
@@ -164,6 +188,43 @@ def create_badge(
         metadata={"slug": badge.slug},
     )
     return {"id": str(badge.id), "slug": badge.slug}
+
+
+@router.post("/badge-awards/{award_id}/revoke", status_code=204)
+def revoke_badge_award(
+    community_id: UUID, award_id: UUID, payload: BadgeRevokeInput,
+    db: Annotated[Session, Depends(get_db)], user: Annotated[User, Depends(get_current_user)],
+):
+    require_admin(db, community_id, user)
+    award = db.get(BadgeAward, award_id)
+    badge = db.get(Badge, award.badge_id) if award else None
+    if award is None or badge is None or badge.community_id != community_id:
+        raise HTTPException(status_code=404, detail="Badge award not found")
+    if award.revoked_at is not None:
+        raise HTTPException(status_code=409, detail="Badge award already revoked")
+    award.revoked_at = datetime.now(UTC); award.revoke_reason = payload.reason
+    db.commit()
+    audit(db, actor_id=user.id, community_id=community_id, action="badge.revoked",
+          target_type="badge_award", target_id=award.id,
+          metadata={"reason": payload.reason, "user_id": str(award.user_id)})
+
+
+@router.patch("/memberships/{membership_id}/role")
+def update_membership_role(
+    community_id: UUID, membership_id: UUID, payload: MembershipRoleUpdateInput,
+    db: Annotated[Session, Depends(get_db)], user: Annotated[User, Depends(get_current_user)],
+):
+    require_admin(db, community_id, user)
+    membership = db.get(Membership, membership_id)
+    if membership is None or membership.community_id != community_id:
+        raise HTTPException(status_code=404, detail="Membership not found")
+    if membership.user_id == user.id:
+        raise HTTPException(status_code=409, detail="Administrators cannot change their own role")
+    previous = membership.role.value; membership.role = MembershipRole(payload.role); db.commit()
+    audit(db, actor_id=user.id, community_id=community_id, action="user.role_changed",
+          target_type="membership", target_id=membership.id,
+          metadata={"user_id": str(membership.user_id), "from": previous, "to": payload.role})
+    return {"id": str(membership.id), "role": membership.role.value}
 
 
 @router.post("/achievement-rules", status_code=status.HTTP_201_CREATED)
