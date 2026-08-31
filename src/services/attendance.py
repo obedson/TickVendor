@@ -55,7 +55,11 @@ def check_in(db: Session, event: Event, user: User, payload: AttendanceCheckIn) 
         if payload.latitude is None or payload.longitude is None or event.venue is None:
             raise HTTPException(status_code=422, detail="Location is required for geofence verification")
         distance = haversine_meters(payload.latitude, payload.longitude, event.venue.latitude, event.venue.longitude)
-        valid = distance <= event.geofence_radius_meters
+        low_accuracy = (
+            payload.accuracy_meters is not None
+            and payload.accuracy_meters > event.geofence_radius_meters
+        )
+        valid = distance <= event.geofence_radius_meters and not low_accuracy
         db.add(AttendanceVerification(
             attendance_id=attendance.id, method=VerificationMethod.GPS, is_valid=valid,
             verified_at=now, latitude=payload.latitude, longitude=payload.longitude,
@@ -66,7 +70,11 @@ def check_in(db: Session, event: Event, user: User, payload: AttendanceCheckIn) 
             attendance.confidence_score = Decimal(70)
         else:
             attendance.flagged_for_review = True
-            attendance.review_reason = "Location outside event geofence"
+            attendance.review_reason = (
+                "Location accuracy is too low for automatic verification"
+                if low_accuracy
+                else "Location outside event geofence"
+            )
     db.commit()
     return attendance
 
