@@ -32,6 +32,9 @@ class BadgeAward(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
     badge_id: Mapped[Any] = mapped_column(GUID(), ForeignKey("badges.id", ondelete="RESTRICT"), nullable=False)
     user_id: Mapped[Any] = mapped_column(GUID(), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    event_id: Mapped[Any | None] = mapped_column(
+        GUID(), ForeignKey("events.id", ondelete="SET NULL"), index=True
+    )
     idempotency_key: Mapped[str] = mapped_column(String(160), nullable=False, unique=True)
     awarded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     awarded_by_id: Mapped[Any | None] = mapped_column(GUID(), ForeignKey("users.id", ondelete="SET NULL"))

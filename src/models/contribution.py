@@ -71,6 +71,9 @@ class Contribution(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     community_id: Mapped[Any] = mapped_column(
         GUID(), ForeignKey("communities.id", ondelete="CASCADE"), nullable=False
     )
+    event_id: Mapped[Any | None] = mapped_column(
+        GUID(), ForeignKey("events.id", ondelete="SET NULL"), index=True
+    )
     contributor_id: Mapped[Any] = mapped_column(
         GUID(), ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
     )

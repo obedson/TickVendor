@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from src.authorization import require_community_role
 from src.models import (
     Attendance,
+    BadgeAward,
     Community,
     Contribution,
     Event,
@@ -72,6 +73,16 @@ def event_summary(db: Session, event_id, user: User) -> dict[str, object]:
         "verified": verified,
         "tasks": db.scalar(
             select(func.count()).select_from(Task).where(Task.event_id == event_id)
+        ),
+        "contribution_amount": str(db.scalar(
+            select(func.coalesce(func.sum(Contribution.amount), 0)).where(
+                Contribution.event_id == event_id
+            )
+        )),
+        "badges_earned": db.scalar(
+            select(func.count()).select_from(BadgeAward).where(
+                BadgeAward.event_id == event_id, BadgeAward.revoked_at.is_(None)
+            )
         ),
         "impact_points": db.scalar(
             select(func.coalesce(func.sum(ImpactTransaction.points), 0)).where(

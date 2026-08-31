@@ -14,6 +14,7 @@ from src.api.auth import get_current_user
 from src.database import get_db
 from src.models import Event, EventStatus, User
 from src.schemas.event import EventCreate, EventResponse, EventUpdate
+from src.services.analytics import event_summary
 from src.services.event import (
     create_event,
     discover_events,
@@ -25,6 +26,14 @@ from src.services.event import (
 from src.uploads import safe_upload_name, validate_image_upload
 
 router = APIRouter(prefix="/events", tags=["events"])
+
+
+@router.get("/{event_id}/analytics")
+def event_analytics(
+    event_id: UUID, db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    return event_summary(db, event_id, current_user)
 
 
 @router.post("/{event_id}/cover-image")

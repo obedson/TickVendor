@@ -186,7 +186,7 @@ verification. These remain active work; no completion claim is made.
 - [x] Overall leaderboard uses auditable Impact Points rather than raw monetary contribution amounts
 
 ### Event Engagement
-- [ ] Tenant-authorized event summary covers tickets, check-ins, verified attendance, tasks and Impact Points; contribution amount/badges pending
+- [x] Tenant-authorized event summary covers tickets, check-ins, verified attendance, tasks, contribution amount, badges earned and Impact Points
 
 ### Organizer Dashboard
 - [ ] Upcoming events, total events, ticket sales, revenue, registrations, attendance, verification status, pending tasks, contributions, engagement, top participants, achievement distribution

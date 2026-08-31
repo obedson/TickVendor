@@ -1,5 +1,7 @@
 """Event engagement analytics service tests."""
 
+from datetime import UTC, datetime
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
@@ -8,6 +10,10 @@ from src.database import Base
 from src.models import (
     Attendance,
     AttendanceStatus,
+    Badge,
+    BadgeAward,
+    Contribution,
+    ContributionType,
     Membership,
     MembershipRole,
     Ticket,
@@ -50,9 +56,22 @@ def test_event_summary_counts_tickets_and_attendance(tmp_path):
                 ),
             ]
         )
+        badge = Badge(community_id=event.community_id, name="Event Badge", slug="event-badge",
+                      category="attendance")
+        db.add(badge); db.flush()
+        db.add_all([
+            Contribution(community_id=event.community_id, event_id=event.id,
+                         contributor_id=user.id, contribution_type=ContributionType.MONETARY,
+                         amount=2500, currency="NGN", purpose="Event support",
+                         occurred_at=datetime.now(UTC)),
+            BadgeAward(badge_id=badge.id, event_id=event.id, user_id=user.id,
+                       idempotency_key="event-badge-award", awarded_at=datetime.now(UTC)),
+        ])
         db.commit()
         summary = event_summary(db, event.id, user)
         assert summary["tickets"] == 1
         assert summary["checked_in"] == 1
         assert summary["verified"] == 1
+        assert summary["contribution_amount"] == "2500.00"
+        assert summary["badges_earned"] == 1
     engine.dispose()
