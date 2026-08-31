@@ -4,18 +4,34 @@ from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
 
-from src.models import AuditLog, Notification, NotificationPreference
+from src.models import AuditLog, Notification, NotificationPreference, User
+from src.notifications.email import EmailSender, get_email_sender
 
 
-def notify(db: Session, user_id, notification_type: str, title: str, message: str, payload=None):
+def notify(
+    db: Session,
+    user_id,
+    notification_type: str,
+    title: str,
+    message: str,
+    payload=None,
+    *,
+    email_sender: EmailSender | None = None,
+):
     preference = db.query(NotificationPreference).filter_by(user_id=user_id).one_or_none()
-    if preference and (
-        not preference.in_app_enabled or notification_type in preference.muted_types
-    ):
+    if preference and notification_type in preference.muted_types:
         return None
-    item = Notification(user_id=user_id, notification_type=notification_type, title=title,
-                        message=message, payload=payload or {})
-    db.add(item); db.commit(); return item
+    item = None
+    if preference is None or preference.in_app_enabled:
+        item = Notification(user_id=user_id, notification_type=notification_type, title=title,
+                            message=message, payload=payload or {})
+        db.add(item)
+    if preference and preference.email_enabled:
+        user = db.get(User, user_id)
+        if user is not None:
+            (email_sender or get_email_sender()).send(user.email, title, message)
+    db.commit()
+    return item
 
 
 def audit(db: Session, *, actor_id, action: str, target_type: str, target_id=None,
