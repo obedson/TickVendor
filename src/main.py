@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from src.api.auth import router as auth_router
+from src.api.events import router as events_router
 from src.config import settings
 from src.logging_config import configure_logging, request_id_context
 
@@ -25,6 +26,7 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     application.include_router(auth_router, prefix=settings.api_v1_prefix)
+    application.include_router(events_router, prefix=settings.api_v1_prefix)
 
     @application.middleware("http")
     async def request_context_middleware(request: Request, call_next):

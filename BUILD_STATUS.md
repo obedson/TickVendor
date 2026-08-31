@@ -16,7 +16,7 @@
   minimal SQLAlchemy foundation. `src/database.py` is now restricted to engine, session,
   Base, foreign-key enforcement, and initialization helpers; models are modular under
   `src/models/`.
-- Verification: automated tests pass (29), Ruff passes, source compilation passes,
+- Verification: automated tests pass (30), Ruff passes, source compilation passes,
   SQLite foreign keys are enabled, and `/health` plus standardized validation errors work.
 - Remaining warning: FastAPI's current TestClient emits an upstream Starlette/httpx
   deprecation warning; it does not fail tests.
@@ -49,17 +49,17 @@
 
 ### Events Subsystem
 - [x] Event/Venue/EventStaff schema (publishing states, physical/online/hybrid location, attendance configuration, scoped staff roles)
-- [ ] Event creation (multi-step form: basic info, date/time, location, attendance settings)
-- [ ] Event editing
-- [ ] Event publishing/unpublishing
-- [ ] Event discovery (browse, search, filter, sort)
+- [x] Event creation API (validated basic info, date/time, location, attendance settings, tenant organizer boundary)
+- [x] Event editing with owner/community-admin/super-admin authorization
+- [x] Event publishing/unpublishing lifecycle
+- [x] Event discovery/detail APIs (published-only browse, search, category, upcoming, pagination)
 - [ ] Event filtering by category, location, price, etc.
 - [ ] Event sorting
 - [ ] Nearby events support
 - [ ] Upcoming events view
 - [ ] Free vs paid events filtering
 - [ ] Event categories (configurable: technology, education, business, community, agriculture, entertainment, sports, training, conference, workshop, networking, volunteer, fundraising)
-- [ ] Event tags
+- [x] Event tags
 - [ ] Organizer profiles
 - [ ] Event images/cover photos
 
