@@ -27,7 +27,7 @@ from src.models import (
 )
 from src.schemas.ticket import OrderCreate, TicketTypeCreate
 from src.services.event import as_utc
-from src.services.notification import audit
+from src.services.notification import audit, notify
 
 
 def manage_event(db: Session, event_id: UUID, user: User) -> Event:
@@ -97,6 +97,9 @@ def create_order(db: Session, event_id: UUID, payload: OrderCreate, user: User) 
     except IntegrityError as exc:
         db.rollback()
         raise HTTPException(status_code=409, detail="Concurrent order conflict; retry safely") from exc
+    if is_free:
+        notify(db, user.id, "ticket_confirmed", "Ticket confirmed",
+               "Your ticket has been confirmed.", {"event_id": str(event_id), "order_id": str(order.id)})
     return order
 
 

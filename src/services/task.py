@@ -15,7 +15,7 @@ from src.models import (
     User,
 )
 from src.services.impact import award_points
-from src.services.notification import audit
+from src.services.notification import audit, notify
 
 
 def create_task(db: Session, community_id, creator: User, **values) -> Task:
@@ -63,4 +63,8 @@ def verify_task(db: Session, assignment: TaskAssignment, verifier: User, approve
             idempotency_key=f"task:{assignment.id}:verified", reason=f"Verified task: {task.title}",
             task_id=task.id, event_id=task.event_id,
         )
+    notify(db, assignment.assignee_id, "task_verified" if approve else "task_rejected",
+           "Task verified" if approve else "Task needs attention",
+           "Your task was verified." if approve else "Your task submission was not approved.",
+           {"task_id": str(task.id), "assignment_id": str(assignment.id)})
     return assignment

@@ -17,6 +17,7 @@ from src.models import (
     EventStatus,
     Membership,
     MembershipRole,
+    Notification,
     Organization,
     Ticket,
     TicketStatus,
@@ -64,6 +65,7 @@ def test_free_order_is_idempotent_wallet_ticket_and_duplicate_scan_is_safe(tmp_p
         assert repeated.id == order.id
         ticket = db.query(Ticket).filter_by(order_id=order.id).one()
         assert ticket.status == TicketStatus.ACTIVE
+        assert db.query(Notification).filter_by(notification_type="ticket_confirmed").one().user_id == buyer.id
         with pytest.raises(HTTPException) as limit:
             create_order(db, event_model.id, OrderCreate(
                 ticket_type_id=ticket_type.id, quantity=1, idempotency_key="another-safe-key-123"
