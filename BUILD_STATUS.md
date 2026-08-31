@@ -243,7 +243,7 @@ verification. These remain active work; no completion claim is made.
 - [x] Server-side authorization and resource ownership checks on sensitive implemented flows
 - [x] Platform/community RBAC with tenant isolation and negative tests
 - [x] In-process rate limiting foundation (distributed production backend still required for horizontal scale)
-- [ ] CSRF protection where applicable
+- [x] Cookie-authenticated mutations require an allowed Origin and constant-time double-submit CSRF token; bearer requests remain exempt
 - [x] Secure authentication lifecycle with opaque one-time and refresh tokens
 - [x] Bcrypt password hashing with minimum 12 rounds and length limits
 - [x] Hashed rotating refresh sessions, revocation and reset invalidation

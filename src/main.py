@@ -1,6 +1,7 @@
 """FastAPI application factory and ASGI entry point."""
 
 import logging
+import secrets
 from typing import Annotated
 from uuid import uuid4
 
@@ -56,6 +57,12 @@ def create_app() -> FastAPI:
         request.state.request_id = request_id
         try:
             rate_limiter.check(request_key(request))
+            if request.method not in {"GET", "HEAD", "OPTIONS", "TRACE"} and request.cookies.get("access_token"):
+                origin = request.headers.get("Origin")
+                csrf_cookie = request.cookies.get("csrf_token", "")
+                csrf_header = request.headers.get("X-CSRF-Token", "")
+                if origin not in settings.cors_origins or not csrf_cookie or not secrets.compare_digest(csrf_cookie, csrf_header):
+                    return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
             response = await call_next(request)
             response.headers["X-Request-ID"] = request_id
             response.headers["X-Content-Type-Options"] = "nosniff"
