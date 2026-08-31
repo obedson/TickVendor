@@ -10,9 +10,40 @@ from sqlalchemy.orm import Session
 
 from src.api.auth import get_current_user
 from src.database import get_db
-from src.models import Notification, User
+from src.models import Notification, NotificationPreference, User
+from src.schemas.notification import NotificationPreferenceUpdate
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
+
+
+@router.get("/preferences")
+def get_preferences(
+    db: Annotated[Session, Depends(get_db)], user: Annotated[User, Depends(get_current_user)],
+):
+    preference = db.query(NotificationPreference).filter_by(user_id=user.id).one_or_none()
+    if preference is None:
+        preference = NotificationPreference(user_id=user.id)
+        db.add(preference)
+        db.commit()
+    return {"in_app_enabled": preference.in_app_enabled, "email_enabled": preference.email_enabled,
+            "push_enabled": preference.push_enabled, "muted_types": preference.muted_types}
+
+
+@router.put("/preferences")
+def update_preferences(
+    payload: NotificationPreferenceUpdate,
+    db: Annotated[Session, Depends(get_db)], user: Annotated[User, Depends(get_current_user)],
+):
+    preference = db.query(NotificationPreference).filter_by(user_id=user.id).one_or_none()
+    if preference is None:
+        preference = NotificationPreference(user_id=user.id)
+        db.add(preference)
+    for field in ("in_app_enabled", "email_enabled", "push_enabled", "muted_types"):
+        value = getattr(payload, field)
+        if value is not None:
+            setattr(preference, field, value)
+    db.commit()
+    return {"status": "updated"}
 
 
 @router.get("")

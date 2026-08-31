@@ -197,7 +197,7 @@ verification. These remain active work; no completion claim is made.
 ### Notifications
 - [x] Notification schema (in-app payload and read state)
 - [x] In-app notification creation/list/read APIs with per-user ownership
-- [ ] Notification preferences per user
+- [x] Per-user in-app/email/push preferences and muted notification types
 - [ ] Example notifications: "Your event starts tomorrow", "Attendance is now open", "Your ticket has been confirmed", "Your task was verified", "You earned a new badge", "You're 20 Impact Points away from your next milestone", "You have attendance confirmations waiting", "Congratulations! You reached Community Builder"
 - [ ] Email notification architecture (framework ready, test adapters)
 - [ ] Push notification architecture (framework ready)

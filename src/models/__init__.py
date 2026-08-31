@@ -41,6 +41,7 @@ from src.models.milestone import Milestone, MilestoneAward, MilestoneRequirement
 from src.models.notification import AuditLog, Leaderboard, Notification
 from src.models.organization import Organization
 from src.models.payment import Payment, PaymentStatus
+from src.models.preference import NotificationPreference
 from src.models.rank import Rank, RankRequirement
 from src.models.task import (
     Task,
@@ -93,6 +94,7 @@ __all__ = [
     "MilestoneAward",
     "MilestoneRequirement",
     "Notification",
+    "NotificationPreference",
     "Order",
     "OrderStatus",
     "Organization",
