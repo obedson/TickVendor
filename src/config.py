@@ -35,7 +35,9 @@ class Settings(BaseSettings):
 
     payment_provider: Literal["paystack", "flutterwave", "stripe", "test"] = "paystack"
     paystack_secret_key: SecretStr | None = None
+    paystack_webhook_secret: SecretStr | None = None
     flutterwave_secret_key: SecretStr | None = None
+    flutterwave_webhook_secret: SecretStr | None = None
     stripe_secret_key: SecretStr | None = None
 
     @field_validator("cors_origins", mode="before")

@@ -6,8 +6,10 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from src.api.auth import get_current_user
+from src.config import settings
 from src.database import get_db
 from src.models import Order, Payment, User
+from src.payments.live_providers import FlutterwaveProvider, PaystackProvider
 from src.payments.providers import PaymentProvider, TestPaymentProvider
 from src.schemas.payment import (
     PaymentInitializeRequest,
@@ -21,7 +23,25 @@ _test_provider = TestPaymentProvider()
 
 
 def get_payment_provider() -> PaymentProvider:
-    return _test_provider
+    if settings.payment_provider == "test" or settings.environment in {"development", "test"}:
+        return _test_provider
+    if settings.payment_provider == "paystack":
+        return PaystackProvider(
+            settings.paystack_secret_key.get_secret_value() if settings.paystack_secret_key else "",
+            settings.paystack_webhook_secret.get_secret_value()
+            if settings.paystack_webhook_secret
+            else None,
+        )
+    if settings.payment_provider == "flutterwave":
+        return FlutterwaveProvider(
+            settings.flutterwave_secret_key.get_secret_value()
+            if settings.flutterwave_secret_key
+            else "",
+            settings.flutterwave_webhook_secret.get_secret_value()
+            if settings.flutterwave_webhook_secret
+            else "",
+        )
+    raise HTTPException(status_code=503, detail="Payment provider is not configured")
 
 
 @router.post("/initialize", response_model=PaymentInitializeResponse)
