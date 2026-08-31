@@ -16,7 +16,7 @@
   minimal SQLAlchemy foundation. `src/database.py` is now restricted to engine, session,
   Base, foreign-key enforcement, and initialization helpers; models are modular under
   `src/models/`.
-- Verification: automated tests pass (36), Ruff passes, source compilation passes,
+- Verification: automated tests pass (37), Ruff passes, source compilation passes,
   SQLite foreign keys are enabled, and `/health` plus standardized validation errors work.
 - Remaining warning: FastAPI's current TestClient emits an upstream Starlette/httpx
   deprecation warning; it does not fail tests.
@@ -129,7 +129,7 @@
 
 ### Milestone Engine
 - [x] Milestone/MilestoneRequirement schema (community-scoped configurable metrics, operators, thresholds, rewards)
-- [ ] Configurable milestones
+- [x] Configurable milestone qualification service using database metrics/operators
 - [ ] Milestone requirements: impact points, attendance count, task count, contribution count, service activities, leadership activities, peer confirmations, event participation, consecutive activities
 - [ ] Example: Community Builder — 300 Impact Points, 10 verified attendances, 5 completed tasks, 1 community contribution
 - [ ] Automatic milestone award when requirements satisfied
@@ -137,7 +137,7 @@
 
 ### Rank System
 - [x] Rank/RankRequirement schema (community-scoped points, ordered progression, activity/milestone/badge references)
-- [ ] Configurable ranks with name, description, icon, minimum points, required activities, required milestones, required badges
+- [x] Database-configured point-based current-rank evaluation foundation
 - [ ] Example rank thresholds: Starter (0–49), Active Member (50–149), Contributor (150–299), Community Builder (300–499), Community Leader (500–799), Impact Champion (800+)
 - [ ] Rank qualification requirements (not just minimum points — may require specific activities/milestones/badges)
 - [ ] Administrators define rank configuration without code changes
@@ -145,7 +145,7 @@
 
 ### Badge System
 - [x] Badge/BadgeAward schema (configurable JSON requirements, visibility/rewards, idempotent award and revocation history)
-- [ ] Flexible badge engine
+- [x] Idempotent badge award primitive; full automatic rule evaluation remains pending
 - [ ] Badge properties: name, description, icon, category, requirements, reward, visibility
 - [ ] Example badges: First Step (first verified event attendance), Regular (attend 5 events), Consistent (attend 10 events), Task Starter (complete first task), Doer (complete 10 tasks), Community Helper (help 5 members), Facilitator (organize first event), Community Builder (complete defined community requirements)
 - [ ] Automatic badge award when conditions satisfied
