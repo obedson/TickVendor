@@ -26,7 +26,7 @@
 ### Foundation / Architecture
 - [x] Project structure and configuration (venv, validated settings, declared packages)
 - [x] Application structure establishment (FastAPI factory, health endpoint, model registry)
-- [ ] Database schema design and migrations
+- [x] Initial 31-table model schema and Alembic migration (clean upgrade/check verified; 60 foreign keys, 88 indexes including SQLite auto-indexes)
 - [ ] API structure definition
 - [ ] Authentication architecture (User identity schema exists; password hashing, verification, reset, and sessions pending)
 - [ ] Authorization architecture (RBAC: Guest, Participant/Member, Organizer, Community Admin, Super Admin)
