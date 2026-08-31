@@ -3,6 +3,14 @@
 Import every SQLAlchemy model module here so metadata and Alembic discover it.
 """
 
+from src.models.attendance import (
+    Attendance,
+    AttendanceStatus,
+    AttendanceVerification,
+    PeerConfirmation,
+    PeerConfirmationDecision,
+    VerificationMethod,
+)
 from src.models.community import (
     Community,
     Membership,
@@ -30,6 +38,9 @@ from src.models.ticket import (
 from src.models.user import PlatformRole, Profile, ProfileVisibility, User
 
 __all__ = [
+    "Attendance",
+    "AttendanceStatus",
+    "AttendanceVerification",
     "Community",
     "Event",
     "EventStaff",
@@ -44,6 +55,8 @@ __all__ = [
     "Organization",
     "Payment",
     "PaymentStatus",
+    "PeerConfirmation",
+    "PeerConfirmationDecision",
     "PlatformRole",
     "Profile",
     "ProfileVisibility",
@@ -53,4 +66,5 @@ __all__ = [
     "TicketVisibility",
     "User",
     "Venue",
+    "VerificationMethod",
 ]

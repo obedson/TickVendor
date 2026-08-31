@@ -71,6 +71,7 @@
 - [ ] Ticket cancellation
 
 ### Attendance Subsystem
+- [x] Attendance/Verification/PeerConfirmation schema (independent attendance, layered signals, confidence/review fields, duplicate prevention)
 - [ ] Attendance record creation (separate from ticket purchase)
 - [ ] Attendance states: not checked in, checked in, GPS verified, QR verified, peer verified, organizer verified, rejected
 - [ ] Geofenced attendance: latitude, longitude, radius, start/end time

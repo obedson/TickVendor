@@ -90,3 +90,25 @@ def test_ticket_order_payment_models_map_with_idempotency_constraints():
     assert Base.metadata.tables["tickets"].c.qr_token.unique
     assert Base.metadata.tables["orders"].c.reference.unique
     assert Base.metadata.tables["payments"].c.idempotency_key.unique
+
+
+def test_attendance_verification_models_map_with_duplicate_prevention():
+    import src.models  # noqa: F401
+    from src.database import Base
+
+    configure_mappers()
+    required = {"attendances", "attendance_verifications", "peer_confirmations"}
+    assert required.issubset(Base.metadata.tables)
+    attendance = Base.metadata.tables["attendances"]
+    peer = Base.metadata.tables["peer_confirmations"]
+    assert any(
+        tuple(column.name for column in constraint.columns) == ("event_id", "user_id")
+        for constraint in attendance.constraints
+        if constraint.__class__.__name__ == "UniqueConstraint"
+    )
+    assert any(
+        tuple(column.name for column in constraint.columns)
+        == ("event_id", "confirmer_id", "subject_id")
+        for constraint in peer.constraints
+        if constraint.__class__.__name__ == "UniqueConstraint"
+    )
