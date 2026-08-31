@@ -252,7 +252,7 @@ verification. These remain active work; no completion claim is made.
 - [x] Provider webhook signature boundary, provider/reference lookup, server verification and idempotency
 - [x] API validation and secure response headers foundation
 - [x] Sensitive implemented operations emit append-only audit records with actor, target, timestamp and metadata
-- [ ] Abuse prevention
+- [x] Authentication abuse controls throttle repeated failures per client/account and reset only after successful login or expiry
 - [x] Backend is authoritative; frontend validation is never the sole control
 - [x] Implemented sensitive operations authorize server-side
 

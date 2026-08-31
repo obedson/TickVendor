@@ -3,7 +3,7 @@
 from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
@@ -32,6 +32,7 @@ from src.security import (
     hash_token,
     verify_password,
 )
+from src.security_middleware import login_attempt_limiter
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.api_v1_prefix}/auth/login")
@@ -95,10 +96,17 @@ def register(
 
 
 @router.post("/login", response_model=TokenResponse)
-def login(payload: LoginRequest, db: Annotated[Session, Depends(get_db)]) -> TokenResponse:
+def login(
+    payload: LoginRequest, request: Request, db: Annotated[Session, Depends(get_db)]
+) -> TokenResponse:
+    host = request.client.host if request.client else "unknown"
+    attempt_key = f"{host}:{str(payload.email).lower()}"
+    login_attempt_limiter.check(attempt_key)
     user = db.scalar(select(User).options(selectinload(User.profile)).where(User.email == str(payload.email)))
     if user is None or not user.is_active or not verify_password(payload.password, user.password_hash):
+        login_attempt_limiter.record_failure(attempt_key)
         raise HTTPException(status_code=401, detail="Invalid email or password")
+    login_attempt_limiter.record_success(attempt_key)
     response = issue_tokens(db, user)
     db.commit()
     return response
