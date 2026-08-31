@@ -1,5 +1,6 @@
 """Event creation, management, publishing, and discovery routes."""
 
+from decimal import Decimal
 from typing import Annotated
 from uuid import UUID
 
@@ -14,12 +15,26 @@ from src.schemas.event import EventCreate, EventResponse, EventUpdate
 from src.services.event import (
     create_event,
     discover_events,
+    nearby_events,
     publish_event,
     soft_delete_event,
     update_event,
 )
 
 router = APIRouter(prefix="/events", tags=["events"])
+
+
+@router.get("/nearby")
+def list_nearby_events(
+    db: Annotated[Session, Depends(get_db)],
+    latitude: Annotated[Decimal, Query(ge=-90, le=90)],
+    longitude: Annotated[Decimal, Query(ge=-180, le=180)],
+    radius_km: float = Query(default=25, gt=0, le=500), limit: int = Query(default=20, ge=1, le=100),
+):
+    return [{"id": str(event.id), "title": event.title, "starts_at": event.starts_at,
+             "venue": {"name": event.venue.name, "city": event.venue.city},
+             "distance_km": round(distance, 3)}
+            for event, distance in nearby_events(db, latitude, longitude, radius_km, limit)]
 
 
 @router.get("", response_model=list[EventResponse])

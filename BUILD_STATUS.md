@@ -67,7 +67,7 @@ verification. These remain active work; no completion claim is made.
 - [x] Event discovery/detail APIs (published-only browse, search, category, upcoming, pagination)
 - [x] Event filtering by category, city, free/paid and upcoming status
 - [x] Event chronological/reverse-chronological sorting
-- [ ] Nearby events support
+- [x] Nearby event API validates coordinates/radius, filters upcoming geocoded events by Haversine distance and sorts nearest-first
 - [x] Upcoming events view
 - [x] Free vs paid events filtering
 - [ ] Event categories (configurable: technology, education, business, community, agriculture, entertainment, sports, training, conference, workshop, networking, volunteer, fundraising)

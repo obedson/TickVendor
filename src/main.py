@@ -6,6 +6,7 @@ from typing import Annotated
 from uuid import uuid4
 
 from fastapi import FastAPI, Query, Request
+from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -83,7 +84,7 @@ def create_app() -> FastAPI:
                 "error": {
                     "code": "validation_error",
                     "message": "The request contains invalid data.",
-                    "details": exc.errors(),
+                    "details": jsonable_encoder(exc.errors()),
                 }
             },
         )

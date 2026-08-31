@@ -2,6 +2,8 @@
 
 import re
 from datetime import UTC, datetime
+from decimal import Decimal
+from math import asin, cos, radians, sin, sqrt
 from uuid import UUID
 
 from fastapi import HTTPException
@@ -31,6 +33,24 @@ def make_slug(value: str) -> str:
 
 def as_utc(value: datetime) -> datetime:
     return value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
+
+
+def event_distance_km(latitude: Decimal, longitude: Decimal, venue: Venue) -> float:
+    phi1, phi2 = radians(float(latitude)), radians(float(venue.latitude))
+    dphi = radians(float(venue.latitude - latitude))
+    dlambda = radians(float(venue.longitude - longitude))
+    value = sin(dphi / 2) ** 2 + cos(phi1) * cos(phi2) * sin(dlambda / 2) ** 2
+    return 6371 * 2 * asin(sqrt(value))
+
+
+def nearby_events(db: Session, latitude: Decimal, longitude: Decimal, radius_km: float,
+                  limit: int) -> list[tuple[Event, float]]:
+    candidates = db.scalars(select(Event).options(selectinload(Event.venue)).join(Event.venue).where(
+        Event.status == EventStatus.PUBLISHED, Event.deleted_at.is_(None),
+        Venue.latitude.is_not(None), Venue.longitude.is_not(None), Event.ends_at >= datetime.now(UTC),
+    ).limit(500))
+    result = [(event, event_distance_km(latitude, longitude, event.venue)) for event in candidates]
+    return sorted((item for item in result if item[1] <= radius_km), key=lambda item: item[1])[:limit]
 
 
 def unique_slug(db: Session, title: str) -> str:
