@@ -12,6 +12,7 @@ from src.models.attendance import (
     PeerConfirmationDecision,
     VerificationMethod,
 )
+from src.models.auth import AuthSession, AuthToken, AuthTokenPurpose
 from src.models.badge import Badge, BadgeAward
 from src.models.community import (
     Community,
@@ -66,6 +67,9 @@ __all__ = [
     "AttendanceStatus",
     "AttendanceVerification",
     "AuditLog",
+    "AuthSession",
+    "AuthToken",
+    "AuthTokenPurpose",
     "Badge",
     "BadgeAward",
     "Community",

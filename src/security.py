@@ -1,6 +1,8 @@
 """Authentication security helpers."""
 
 from datetime import UTC, datetime, timedelta
+from hashlib import sha256
+from secrets import token_urlsafe
 from uuid import UUID
 
 import bcrypt
@@ -52,3 +54,11 @@ def decode_access_token(token: str) -> dict[str, object]:
     if payload.get("type") != "access" or not payload.get("sub"):
         raise InvalidTokenError("Invalid access token claims")
     return payload
+
+
+def create_opaque_token() -> str:
+    return token_urlsafe(48)
+
+
+def hash_token(token: str) -> str:
+    return sha256(token.encode("utf-8")).hexdigest()
