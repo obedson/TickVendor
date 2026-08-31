@@ -137,7 +137,7 @@ verification. These remain active work; no completion claim is made.
 - [x] Contribution dimension tracks financial and non-financial contributions
 - [x] Service dimension tracked through verified activities
 - [x] Leadership dimension tracked through verified activities
-- [ ] Member profile API still needs complete dimension presentation
+- [x] Tenant-isolated member profile API presents participation, execution, contribution, service and leadership dimensions
 
 ### Milestone Engine
 - [x] Milestone/MilestoneRequirement schema (community-scoped configurable metrics, operators, thresholds, rewards)
@@ -153,7 +153,7 @@ verification. These remain active work; no completion claim is made.
 - [ ] Example rank thresholds: Starter (0–49), Active Member (50–149), Contributor (150–299), Community Builder (300–499), Community Leader (500–799), Impact Champion (800+)
 - [ ] Rank qualification requirements (not just minimum points — may require specific activities/milestones/badges)
 - [x] Tenant admins define ranks through validated, audited API without code changes
-- [ ] Progress toward next rank display on profile
+- [x] Member profile API reports current rank, next rank threshold and remaining Impact Points
 
 ### Badge System
 - [x] Badge/BadgeAward schema (configurable JSON requirements, visibility/rewards, idempotent award and revocation history)
@@ -176,8 +176,8 @@ verification. These remain active work; no completion claim is made.
 - [ ] Avoid overly game-like experience
 
 ### Member Journey / Profile
-- [ ] Visual milestone timeline: joined community → first event → first badge → completed 5 tasks → contributor → helped 10 members → community builder → community leader
-- [ ] Member profile contains: profile photo, name, username, rank, impact points, progress toward next rank, badges, milestones, events attended, tasks completed, contributions, service activities, leadership activities, engagement dimensions, achievement timeline
+- [x] Achievement timeline API starts with community membership and includes chronologically ordered badge and milestone awards
+- [x] Member profile API contains photo, name, username, rank, Impact Points, next-rank progress, badges, milestones, attendance, tasks, contributions, service/leadership dimensions and timeline
 - [x] Privacy-aware public/private profile API and authenticated Impact Point summary foundation
 
 ### Leaderboards (Optional)

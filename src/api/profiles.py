@@ -11,13 +11,21 @@ from sqlalchemy.orm import Session
 from src.api.auth import get_current_user
 from src.database import get_db
 from src.models import (
+    Badge,
+    BadgeAward,
     Event,
     EventStatus,
     ImpactTransaction,
     ImpactTransactionStatus,
+    Membership,
+    MembershipStatus,
+    Milestone,
+    MilestoneAward,
     ProfileVisibility,
+    Rank,
     User,
 )
+from src.services.recognition import user_metrics
 
 router = APIRouter(prefix="/profiles", tags=["profiles"])
 
@@ -52,13 +60,63 @@ def organizer_profile(user_id: UUID, db: Annotated[Session, Depends(get_db)]):
 
 
 @router.get("/me")
-def my_profile(db: Annotated[Session, Depends(get_db)], user: Annotated[User, Depends(get_current_user)]):
-    points = db.scalar(select(func.coalesce(func.sum(ImpactTransaction.points), 0)).where(
-        ImpactTransaction.user_id == user.id, ImpactTransaction.status == ImpactTransactionStatus.POSTED
+def my_profile(
+    db: Annotated[Session, Depends(get_db)], user: Annotated[User, Depends(get_current_user)],
+    community_id: UUID | None = None,
+):
+    if community_id is None:
+        points = db.scalar(select(func.coalesce(func.sum(ImpactTransaction.points), 0)).where(
+            ImpactTransaction.user_id == user.id,
+            ImpactTransaction.status == ImpactTransactionStatus.POSTED,
+        ))
+        return {"id": str(user.id), "username": user.profile.username,
+                "display_name": user.profile.display_name, "visibility": user.profile.visibility.value,
+                "impact_points": points}
+    membership = db.scalar(select(Membership).where(
+        Membership.community_id == community_id, Membership.user_id == user.id,
+        Membership.status == MembershipStatus.ACTIVE,
     ))
+    if membership is None:
+        raise HTTPException(status_code=403, detail="Active community membership required")
+    metrics = user_metrics(db, user.id, community_id)
+    rank = db.scalar(select(Rank).where(
+        Rank.community_id == community_id, Rank.is_active.is_(True),
+        Rank.minimum_points <= metrics["impact_points"],
+    ).order_by(Rank.minimum_points.desc()))
+    next_rank = db.scalar(select(Rank).where(
+        Rank.community_id == community_id, Rank.is_active.is_(True),
+        Rank.minimum_points > metrics["impact_points"],
+    ).order_by(Rank.minimum_points.asc()))
+    badges = list(db.execute(select(BadgeAward, Badge).join(Badge, Badge.id == BadgeAward.badge_id).where(
+        BadgeAward.user_id == user.id, Badge.community_id == community_id, BadgeAward.revoked_at.is_(None)
+    )))
+    milestones = list(db.execute(select(MilestoneAward, Milestone).join(
+        Milestone, Milestone.id == MilestoneAward.milestone_id
+    ).where(MilestoneAward.user_id == user.id, Milestone.community_id == community_id)))
+    timeline = [{"type": "joined_community", "occurred_at": (membership.joined_at or membership.created_at).isoformat()}]
+    timeline += [{"type": "badge_awarded", "name": badge.name, "occurred_at": award.awarded_at.isoformat()}
+                 for award, badge in badges]
+    timeline += [{"type": "milestone_awarded", "name": milestone.name,
+                  "occurred_at": award.awarded_at.isoformat()} for award, milestone in milestones]
+    dimensions = {"participation": metrics["attendance_count"], "execution": metrics["task_count"],
+                  "contribution": metrics["contribution_count"], "service": metrics["service_activities"],
+                  "leadership": metrics["leadership_activities"]}
     return {"id": str(user.id), "username": user.profile.username,
-            "display_name": user.profile.display_name, "visibility": user.profile.visibility.value,
-            "impact_points": points}
+            "display_name": user.profile.display_name, "photo_url": user.profile.photo_url,
+            "visibility": user.profile.visibility.value, "impact_points": metrics["impact_points"],
+            "rank": {"id": str(rank.id), "name": rank.name} if rank else None,
+            "next_rank": ({"id": str(next_rank.id), "name": next_rank.name,
+                           "minimum_points": next_rank.minimum_points,
+                           "points_remaining": next_rank.minimum_points - metrics["impact_points"]}
+                          if next_rank else None),
+            "badges": [{"name": badge.name, "icon_url": badge.icon_url} for _award, badge in badges],
+            "milestones": [{"name": milestone.name, "icon_url": milestone.icon_url}
+                           for _award, milestone in milestones],
+            "events_attended": metrics["attendance_count"], "tasks_completed": metrics["task_count"],
+            "contributions": metrics["contribution_count"], "service_activities": metrics["service_activities"],
+            "leadership_activities": metrics["leadership_activities"],
+            "engagement_dimensions": dimensions,
+            "achievement_timeline": sorted(timeline, key=lambda item: item["occurred_at"])}
 
 
 @router.get("/{user_id}")
