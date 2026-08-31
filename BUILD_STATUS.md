@@ -247,8 +247,8 @@ verification. These remain active work; no completion claim is made.
 - [x] Secure authentication lifecycle with opaque one-time and refresh tokens
 - [x] Bcrypt password hashing with minimum 12 rounds and length limits
 - [x] Hashed rotating refresh sessions, revocation and reset invalidation
-- [ ] File upload validation
-- [ ] Image validation
+- [x] File/image validation helper enforces MIME allowlist, magic bytes, 5 MB cap and safe filenames
+- [x] JPEG/PNG/WebP content validation with spoofing tests
 - [x] Provider webhook signature boundary, provider/reference lookup, server verification and idempotency
 - [x] API validation and secure response headers foundation
 - [ ] Audit logging
