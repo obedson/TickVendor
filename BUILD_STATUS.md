@@ -186,7 +186,7 @@ verification. These remain active work; no completion claim is made.
 - [ ] Avoid making monetary contributions the primary public leaderboard metric
 
 ### Event Engagement
-- [ ] Per-event engagement summary: tickets (total), checked in (count), verified (count), tasks (count), contributions (amount/badges earned), impact points generated
+- [ ] Tenant-authorized event summary covers tickets, check-ins, verified attendance, tasks and Impact Points; contribution amount/badges pending
 
 ### Organizer Dashboard
 - [ ] Upcoming events, total events, ticket sales, revenue, registrations, attendance, verification status, pending tasks, contributions, engagement, top participants, achievement distribution
