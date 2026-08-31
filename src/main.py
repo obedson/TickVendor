@@ -2,6 +2,7 @@
 
 import logging
 from typing import Annotated
+from uuid import uuid4
 
 from fastapi import FastAPI, Query, Request
 from fastapi.exceptions import RequestValidationError
@@ -10,17 +11,11 @@ from fastapi.responses import JSONResponse
 
 from src.api.auth import router as auth_router
 from src.config import settings
-
-
-def configure_logging() -> None:
-    logging.basicConfig(
-        level=getattr(logging, settings.log_level),
-        format="%(asctime)s %(levelname)s %(name)s %(message)s",
-    )
+from src.logging_config import configure_logging, request_id_context
 
 
 def create_app() -> FastAPI:
-    configure_logging()
+    configure_logging(settings.log_level)
     application = FastAPI(title=settings.app_name, debug=settings.debug, version="0.1.0")
     application.add_middleware(
         CORSMiddleware,
@@ -30,6 +25,18 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     application.include_router(auth_router, prefix=settings.api_v1_prefix)
+
+    @application.middleware("http")
+    async def request_context_middleware(request: Request, call_next):
+        request_id = request.headers.get("X-Request-ID") or str(uuid4())
+        token = request_id_context.set(request_id)
+        request.state.request_id = request_id
+        try:
+            response = await call_next(request)
+            response.headers["X-Request-ID"] = request_id
+            return response
+        finally:
+            request_id_context.reset(token)
 
     @application.exception_handler(RequestValidationError)
     async def validation_exception_handler(
@@ -47,8 +54,10 @@ def create_app() -> FastAPI:
         )
 
     @application.exception_handler(Exception)
-    async def unexpected_exception_handler(_request: Request, exc: Exception) -> JSONResponse:
-        logging.getLogger("tickeven.errors").exception("Unhandled application error", exc_info=exc)
+    async def unexpected_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+        logging.getLogger("tickeven.errors").exception(
+            {"event": "unhandled_error", "path": request.url.path}, exc_info=exc
+        )
         return JSONResponse(
             status_code=500,
             content={"error": {"code": "internal_error", "message": "An unexpected error occurred."}},

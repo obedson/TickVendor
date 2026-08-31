@@ -9,7 +9,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 import src.models  # noqa: F401
-from src.database import Base
+from src.database import Base, get_db
 from src.models import (
     Community,
     Event,
@@ -136,6 +136,25 @@ def test_payment_idempotency_key_is_unique(session):
             ),
         ]
     )
-
     with pytest.raises(IntegrityError):
         session.commit()
+
+
+def test_database_dependency_rolls_back_on_error(monkeypatch):
+    calls: list[str] = []
+
+    class FakeSession:
+        def rollback(self):
+            calls.append("rollback")
+
+        def close(self):
+            calls.append("close")
+
+    monkeypatch.setattr("src.database.SessionLocal", FakeSession)
+    dependency = get_db()
+    next(dependency)
+
+    with pytest.raises(RuntimeError):
+        dependency.throw(RuntimeError("boom"))
+
+    assert calls == ["rollback", "close"]

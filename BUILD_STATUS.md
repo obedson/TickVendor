@@ -16,7 +16,7 @@
   minimal SQLAlchemy foundation. `src/database.py` is now restricted to engine, session,
   Base, foreign-key enforcement, and initialization helpers; models are modular under
   `src/models/`.
-- Verification: automated tests pass (18), Ruff passes, source compilation passes,
+- Verification: automated tests pass (24), Ruff passes, source compilation passes,
   SQLite foreign keys are enabled, and `/health` plus standardized validation errors work.
 - Remaining warning: FastAPI's current TestClient emits an upstream Starlette/httpx
   deprecation warning; it does not fail tests.
@@ -39,9 +39,13 @@
 - [x] Community/Membership schema (organization tenancy, multi-community users, scoped roles/status, uniqueness)
 - [x] Configuration/environment files (`Settings`, `.env.example`, deployment-secret guard)
 - [x] Error handling architecture (stable validation/internal-error envelopes)
-- [x] Logging architecture (central standard-library configuration; sensitive data policy pending security pass)
+- [x] Logging/observability foundation (JSON logs, correlation IDs, secret redaction, safe error hook)
 - [x] Validation architecture (Pydantic settings and FastAPI request validation)
 - [ ] Shared types/interfaces
+- [x] CI/pre-commit quality gates (Ruff, pytest, clean migration check, Gitleaks secret scanning)
+- [x] Explicit DB policy (SQLite for development/test only; staging/production require server DB)
+- [x] DB dependency rollback/close behavior verified
+- [x] Legacy machine-specific installers isolated under `legacy_setup/`; `pyproject.toml` is authoritative
 
 ### Events Subsystem
 - [x] Event/Venue/EventStaff schema (publishing states, physical/online/hybrid location, attendance configuration, scoped staff roles)

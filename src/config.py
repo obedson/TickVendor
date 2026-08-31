@@ -53,6 +53,8 @@ class Settings(BaseSettings):
                 raise ValueError("SECRET_KEY must be a strong deployment secret")
             if self.debug:
                 raise ValueError("DEBUG must be disabled outside development and test")
+            if self.database_url.startswith("sqlite"):
+                raise ValueError("SQLite is not allowed for staging or production")
         return self
 
 
