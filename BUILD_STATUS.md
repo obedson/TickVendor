@@ -24,7 +24,7 @@
   constraints, and the initial authentication API are verified. Business services, complete
   RBAC, remaining APIs, payment adapters/webhooks, frontend/PWA, and end-to-end product
   journeys remain incomplete and must not be represented as finished.
-- Latest verification: clean five-revision migration, 45 backend tests, Ruff, Alembic drift check, and frontend production build pass.
+- Latest verification: clean six-revision migration, 47 backend tests, Ruff, Alembic drift check, and frontend production build pass.
 - Production deployment artifacts now include Dockerfile, PostgreSQL Compose topology, README,
   production database driver, and environment guidance; live infrastructure remains unverified.
 
@@ -114,8 +114,8 @@ verification. These remain active work; no completion claim is made.
 - [x] Task submission with evidence and assignee ownership
 - [x] Organizer/admin task verification
 - [x] Idempotent Impact Points awarded only after configured verification
-- [ ] Community activities beyond attendance/tasks: volunteer work, mentoring, community service, speaking, training, organizing, content contribution, resource donation, leadership activities
-- [ ] Activity types: monetary, equipment, materials, volunteer time, services, resources
+- [x] Configurable community activity recording/verification supports service and leadership categories beyond attendance/tasks
+- [x] Monetary/equipment/materials/volunteer-time/services/resources contribution types plus arbitrary activity types
 - [x] Contribution recording/verification service with amount, currency, purpose, date/reference and tenant authorization
 - [x] Configurable database contribution bands drive idempotent rewards
 - [ ] Caps to prevent financial contributions from overwhelming participation-based achievements
