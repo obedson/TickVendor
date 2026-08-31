@@ -28,9 +28,9 @@
 - [x] Application structure establishment (FastAPI factory, health endpoint, model registry)
 - [ ] Database schema design and migrations
 - [ ] API structure definition
-- [ ] Authentication architecture (email/password, verification, session management)
+- [ ] Authentication architecture (User identity schema exists; password hashing, verification, reset, and sessions pending)
 - [ ] Authorization architecture (RBAC: Guest, Participant/Member, Organizer, Community Admin, Super Admin)
-- [ ] User profiles with: name, username, profile photo, bio, location, interests, skills, memberships
+- [x] User/Profile schema: UUIDs, email/password hash, platform role, verification/activity state, name, username, photo, bio, location, interests, skills, privacy
 - [ ] Organizations/companies support
 - [ ] Communities support
 - [x] Configuration/environment files (`Settings`, `.env.example`, deployment-secret guard)

@@ -2,6 +2,7 @@
 
 from fastapi.testclient import TestClient
 from sqlalchemy import text
+from sqlalchemy.orm import configure_mappers
 
 
 def test_settings_load_with_safe_development_defaults():
@@ -36,3 +37,14 @@ def test_validation_errors_use_stable_envelope():
     body = response.json()
     assert body["error"]["code"] == "validation_error"
     assert isinstance(body["error"]["details"], list)
+
+
+def test_user_profile_models_map_and_enforce_identity_constraints():
+    import src.models  # noqa: F401
+    from src.database import Base
+
+    configure_mappers()
+    assert {"users", "profiles"}.issubset(Base.metadata.tables)
+    assert Base.metadata.tables["users"].c.email.unique
+    assert Base.metadata.tables["profiles"].c.user_id.unique
+    assert Base.metadata.tables["profiles"].c.username.unique
