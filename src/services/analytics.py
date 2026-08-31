@@ -7,17 +7,21 @@ from sqlalchemy.orm import Session
 from src.authorization import require_community_role
 from src.models import (
     Attendance,
+    AttendanceStatus,
     BadgeAward,
     Community,
     Contribution,
     Event,
     ImpactTransaction,
+    ImpactTransactionStatus,
     Membership,
     MembershipRole,
     Order,
     Payment,
     PaymentStatus,
     Task,
+    TaskAssignment,
+    TaskAssignmentStatus,
     Ticket,
     User,
 )
@@ -41,6 +45,44 @@ def community_summary(db: Session, community_id, user: User) -> dict[str, object
         "revenue": str(db.scalar(select(func.coalesce(func.sum(Payment.amount), 0))
             .join(Order, Payment.order_id == Order.id).join(Event, Order.event_id == Event.id)
             .where(Event.community_id == community_id, Payment.status == PaymentStatus.SUCCESSFUL))),
+    }
+
+
+def organizer_summary(db: Session, user: User) -> dict[str, object]:
+    event_ids = select(Event.id).where(Event.organizer_id == user.id, Event.deleted_at.is_(None))
+    top = db.execute(select(ImpactTransaction.user_id, func.sum(ImpactTransaction.points).label("score"))
+        .where(ImpactTransaction.event_id.in_(event_ids),
+               ImpactTransaction.status == ImpactTransactionStatus.POSTED)
+        .group_by(ImpactTransaction.user_id).order_by(func.sum(ImpactTransaction.points).desc())
+        .limit(10)).all()
+    return {
+        "upcoming_events": db.scalar(select(func.count()).select_from(Event).where(
+            Event.organizer_id == user.id, Event.starts_at >= func.now(), Event.deleted_at.is_(None))),
+        "total_events": db.scalar(select(func.count()).select_from(Event).where(
+            Event.organizer_id == user.id, Event.deleted_at.is_(None))),
+        "ticket_sales": db.scalar(select(func.count()).select_from(Ticket).where(
+            Ticket.event_id.in_(event_ids))),
+        "revenue": str(db.scalar(select(func.coalesce(func.sum(Payment.amount), 0)).join(
+            Order, Payment.order_id == Order.id).where(
+            Order.event_id.in_(event_ids), Payment.status == PaymentStatus.SUCCESSFUL))),
+        "registrations": db.scalar(select(func.count()).select_from(Order).where(
+            Order.event_id.in_(event_ids))),
+        "attendance": db.scalar(select(func.count()).select_from(Attendance).where(
+            Attendance.event_id.in_(event_ids))),
+        "verified_attendance": db.scalar(select(func.count()).select_from(Attendance).where(
+            Attendance.event_id.in_(event_ids), Attendance.status.notin_([
+                AttendanceStatus.NOT_CHECKED_IN, AttendanceStatus.CHECKED_IN,
+                AttendanceStatus.REJECTED]))),
+        "pending_tasks": db.scalar(select(func.count()).select_from(TaskAssignment).where(
+            TaskAssignment.task_id.in_(select(Task.id).where(Task.event_id.in_(event_ids))),
+            TaskAssignment.status.in_([TaskAssignmentStatus.ASSIGNED, TaskAssignmentStatus.SUBMITTED]))),
+        "contributions": db.scalar(select(func.count()).select_from(Contribution).where(
+            Contribution.event_id.in_(event_ids))),
+        "engagement": db.scalar(select(func.coalesce(func.sum(ImpactTransaction.points), 0)).where(
+            ImpactTransaction.event_id.in_(event_ids),
+            ImpactTransaction.status == ImpactTransactionStatus.POSTED)),
+        "top_participants": [{"user_id": str(user_id), "score": score}
+                             for user_id, score in top],
     }
 
 
