@@ -230,42 +230,42 @@ verification. These remain active work; no completion claim is made.
 - [x] Adjustments produce append-only audit entries; scores are never silently modified
 
 ### Data Model
-- [ ] Normalized database architecture around entities: User, Profile, Organization, Community, Membership, Event, Venue, TicketType, Ticket, Order, Payment, Attendance, AttendanceVerification, PeerConfirmation, Task, TaskAssignment, TaskSubmission, Contribution, Activity, ImpactTransaction, Milestone, MilestoneRequirement, Badge, BadgeAward, Rank, RankRequirement, AchievementRule, Notification, AuditLog, Leaderboard, EventStaff
-- [ ] UUIDs or secure unique IDs
-- [ ] Created and updated timestamps
+- [x] Normalized modular database architecture covers all named core entities plus auth/config/award/preferences extensions
+- [x] UUID primary keys and secure public/token identities
+- [x] Created/updated timestamps on mutable entities; append-only audit entries carry occurred_at
 - [ ] Soft deletion where appropriate
-- [ ] Proper indexes, constraints
-- [ ] Do not expose internal database IDs unnecessarily
+- [x] Foreign keys, uniqueness, check constraints, lifecycle indexes and idempotency constraints
+- [x] Secure public ticket identity/QR tokens; internal UUID exposure remains limited to authenticated/resource APIs
 
 ### Security
-- [ ] Input validation
-- [ ] Output encoding
-- [ ] Authorization checks
-- [ ] RBAC implementation
+- [x] Pydantic input validation for implemented APIs
+- [x] Framework JSON encoding and React escaped rendering
+- [x] Server-side authorization and resource ownership checks on sensitive implemented flows
+- [x] Platform/community RBAC with tenant isolation and negative tests
 - [x] In-process rate limiting foundation (distributed production backend still required for horizontal scale)
 - [ ] CSRF protection where applicable
-- [ ] Secure authentication
-- [ ] Password hashing (BCRYPT_ROUNDS: 12 default)
-- [ ] Secure session handling
+- [x] Secure authentication lifecycle with opaque one-time and refresh tokens
+- [x] Bcrypt password hashing with minimum 12 rounds and length limits
+- [x] Hashed rotating refresh sessions, revocation and reset invalidation
 - [ ] File upload validation
 - [ ] Image validation
-- [ ] Payment webhook validation
+- [x] Provider webhook signature boundary, provider/reference lookup, server verification and idempotency
 - [x] API validation and secure response headers foundation
 - [ ] Audit logging
 - [ ] Abuse prevention
-- [ ] Never rely exclusively on frontend validation
-- [ ] Every sensitive operation must be authorized server-side
+- [x] Backend is authoritative; frontend validation is never the sole control
+- [x] Implemented sensitive operations authorize server-side
 
 ### Privacy
-- [ ] Location information: requested only when needed, used only for attendance verification, not continuously tracked, minimized in storage, protected from unauthorized access
-- [ ] Clear consent messaging
-- [ ] Users control profile visibility
-- [ ] Do not expose private member information through public APIs
+- [x] Location accepted only during attendance verification and not continuously tracked
+- [ ] Frontend consent/permission messaging pending complete attendance UI
+- [x] Users have persisted profile visibility controls
+- [x] Private profiles excluded from public profile/search APIs
 
 ### Geolocation Implementation
 - [ ] Browser/device geolocation where supported
-- [ ] Haversine distance calculation
-- [ ] GPS accuracy consideration
+- [x] Haversine distance calculation
+- [x] GPS accuracy captured and low accuracy flagged for fallback review
 - [ ] Permission denied handling
 - [ ] Timeout handling
 - [ ] Location unavailable handling
