@@ -16,7 +16,7 @@
   minimal SQLAlchemy foundation. `src/database.py` is now restricted to engine, session,
   Base, foreign-key enforcement, and initialization helpers; models are modular under
   `src/models/`.
-- Verification: automated tests pass (37), Ruff passes, source compilation passes,
+- Verification: automated tests pass (38), Ruff passes, source compilation passes,
   SQLite foreign keys are enabled, and `/health` plus standardized validation errors work.
 - Remaining warning: FastAPI's current TestClient emits an upstream Starlette/httpx
   deprecation warning; it does not fail tests.
@@ -184,7 +184,7 @@
 
 ### Notifications
 - [x] Notification schema (in-app payload and read state)
-- [ ] In-app notifications only (no external delivery required initially)
+- [x] In-app notification creation/list/read APIs with per-user ownership
 - [ ] Notification preferences per user
 - [ ] Example notifications: "Your event starts tomorrow", "Attendance is now open", "Your ticket has been confirmed", "Your task was verified", "You earned a new badge", "You're 20 Impact Points away from your next milestone", "You have attendance confirmations waiting", "Congratulations! You reached Community Builder"
 - [ ] Email notification architecture (framework ready, test adapters)
@@ -210,7 +210,7 @@
 ### Admin Audit Log
 - [x] AuditLog schema (actor/community/action/target/timestamp/metadata; append-only design)
 - [ ] Audit log tracking: event creation/changes, ticket changes, attendance override, task verification, contribution verification, point adjustments, badge awards/revocations, rank changes, user role changes
-- [ ] Each entry: actor, action, target, timestamp, relevant metadata
+- [x] Append-only audit helper persists actor, community, action, target, timestamp, metadata
 
 ### Manual Point Adjustments
 - [ ] Authorized administrators adjust Impact Points
