@@ -6,6 +6,8 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from src.models import (
+    AchievementAward,
+    AchievementRule,
     Activity,
     ActivityStatus,
     Attendance,
@@ -150,7 +152,7 @@ def current_rank(db: Session, user_id, community_id) -> Rank | None:
     return None
 
 
-def award_badge(db: Session, badge: Badge, user_id, idempotency_key: str) -> BadgeAward:
+def award_badge(db: Session, badge: Badge, user_id, idempotency_key: str, *, commit: bool = True) -> BadgeAward:
     existing = db.scalar(select(BadgeAward).where(BadgeAward.idempotency_key == idempotency_key))
     if existing:
         return existing
@@ -161,10 +163,11 @@ def award_badge(db: Session, badge: Badge, user_id, idempotency_key: str) -> Bad
         awarded_at=datetime.now(UTC),
     )
     db.add(award)
-    db.commit()
+    if commit:
+        db.commit()
     audit(db, actor_id=None, community_id=badge.community_id, action="badge.awarded",
           target_type="badge_award", target_id=award.id,
-          metadata={"badge_id": str(badge.id), "user_id": str(user_id)})
+          metadata={"badge_id": str(badge.id), "user_id": str(user_id)}, commit=commit)
     return award
 
 
@@ -184,6 +187,45 @@ def award_milestone(db: Session, milestone: Milestone, user_id) -> MilestoneAwar
     db.add(award)
     db.commit()
     return award
+
+
+def evaluate_achievement_rules(db: Session, user_id, community_id, metrics: dict) -> int:
+    awarded = 0
+    for rule in db.scalars(select(AchievementRule).where(
+        AchievementRule.community_id == community_id, AchievementRule.is_active.is_(True),
+    )):
+        if not evaluate_condition(rule.condition_tree, metrics):
+            continue
+        existing = db.scalar(select(AchievementAward.id).where(
+            AchievementAward.rule_id == rule.id, AchievementAward.user_id == user_id,
+        ))
+        if existing:
+            continue
+        definition = rule.reward_definition
+        if not isinstance(definition, dict):
+            raise TypeError("Achievement reward definition must be an object")
+        award = AchievementAward(rule_id=rule.id, user_id=user_id, community_id=community_id,
+                                 awarded_at=datetime.now(UTC))
+        db.add(award); db.flush()
+        if definition.get("impact_points"):
+            award_points(db, user_id=user_id, community_id=community_id, source_type="achievement_reward",
+                         source_id=rule.id, idempotency_key=f"achievement:{rule.id}:user:{user_id}:points",
+                         reason=f"Achievement reward: {rule.name}", points_override=int(definition["impact_points"]),
+                         commit=False)
+        if definition.get("badge"):
+            badge = db.scalar(select(Badge).where(Badge.community_id == community_id,
+                                                  Badge.slug == definition["badge"], Badge.is_active.is_(True)))
+            if badge is None:
+                raise ValueError("Achievement reward badge not found")
+            award_badge(db, badge, user_id, f"achievement:{rule.id}:user:{user_id}:badge", commit=False)
+        audit(db, actor_id=None, community_id=community_id, action="achievement.rewarded",
+              target_type="achievement_award", target_id=award.id,
+              metadata={"rule_id": str(rule.id), "user_id": str(user_id)}, commit=False)
+        notify(db, user_id, "achievement_awarded", "Achievement earned", f"You earned {rule.name}.",
+               {"rule_id": str(rule.id)}, deduplication_key=f"achievement:{rule.id}:user:{user_id}", commit=False)
+        awarded += 1
+    db.commit()
+    return awarded
 
 
 def evaluate_recognition(db: Session, user_id, community_id) -> dict[str, int]:
@@ -255,7 +297,9 @@ def evaluate_recognition(db: Session, user_id, community_id) -> dict[str, int]:
             {"badge_id": str(badge.id)},
         )
 
+    achievement_rules_awarded = evaluate_achievement_rules(db, user_id, community_id, user_metrics(db, user_id, community_id))
     return {
         "milestones_awarded": milestones_awarded,
         "badges_awarded": badges_awarded,
+        "achievement_rules_awarded": achievement_rules_awarded,
     }

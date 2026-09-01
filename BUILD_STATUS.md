@@ -82,9 +82,9 @@ integrated product evidence. TickVendor is not specification-complete or product
 - [ ] Integrate `evaluate_recognition` into verified business transitions or a durable job so
   milestone/badge rewards and notifications happen automatically; task/activity/contribution and
   qualifying attendance verification now invoke it, but end-to-end recognition tests remain.
-- [ ] Implement automatic `AchievementRule.reward_definition` execution (badge and Impact Point
-  rewards) with idempotency, audit, and notification integration; current code validates/evaluates
-  condition trees but does not execute configured achievement-rule rewards.
+- [x] Execute active `AchievementRule.reward_definition` Impact Point and badge rewards through a
+  persisted per-rule/user award, stable idempotency keys, tenant isolation, audit and deduplicated
+  notification; malformed definitions fail safely before commit.
 - [ ] Persist or expose rank progression/history if rank-change recognition is required; current
   rank is calculated on profile reads rather than awarded through an automatic workflow.
 - [ ] Make profile rank reporting use the complete configured rank qualification service, add profile

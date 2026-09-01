@@ -3,7 +3,7 @@
 Import every SQLAlchemy model module here so metadata and Alembic discover it.
 """
 
-from src.models.achievement import AchievementRule
+from src.models.achievement import AchievementAward, AchievementRule
 from src.models.attendance import (
     Attendance,
     AttendanceReviewStatus,
@@ -62,6 +62,7 @@ from src.models.ticket import (
 from src.models.user import PlatformRole, Profile, ProfileVisibility, User
 
 __all__ = [
+    "AchievementAward",
     "AchievementRule",
     "Activity",
     "ActivityStatus",
