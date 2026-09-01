@@ -5,7 +5,14 @@ from sqlalchemy.orm import Session
 
 import src.models  # noqa: F401
 from src.database import Base
-from src.models import ContributionBand, EventCategory, Milestone, MilestoneRequirement, PointRule
+from src.models import (
+    ContributionBand,
+    EventCategory,
+    Milestone,
+    MilestoneRequirement,
+    PointRule,
+    Rank,
+)
 from src.seed import seed_business_configuration, seed_community_recognition
 from tests.test_database import create_event_context
 
@@ -54,4 +61,31 @@ def test_community_builder_milestone_seed_is_configurable_and_idempotent(tmp_pat
             "contribution_count": 1,
         }
         assert session.scalar(select(func.count()).select_from(Milestone)) == 1
+    engine.dispose()
+
+
+def test_default_rank_seed_is_configurable_and_idempotent(tmp_path):
+    engine = create_engine(f"sqlite:///{tmp_path / 'rank-seed.db'}")
+    Base.metadata.create_all(engine)
+    with Session(engine) as session:
+        _user, community, _event = create_event_context(session)
+
+        seed_community_recognition(session, community.id)
+        seed_community_recognition(session, community.id)
+
+        ranks = list(
+            session.scalars(
+                select(Rank)
+                .where(Rank.community_id == community.id)
+                .order_by(Rank.sort_order)
+            )
+        )
+        assert [(rank.name, rank.minimum_points) for rank in ranks] == [
+            ("Starter", 0),
+            ("Active Member", 50),
+            ("Contributor", 150),
+            ("Community Builder", 300),
+            ("Community Leader", 500),
+            ("Impact Champion", 800),
+        ]
     engine.dispose()

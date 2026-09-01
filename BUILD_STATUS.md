@@ -150,7 +150,7 @@ verification. These remain active work; no completion claim is made.
 ### Rank System
 - [x] Rank/RankRequirement schema (community-scoped points, ordered progression, activity/milestone/badge references)
 - [x] Database-configured point-based current-rank evaluation foundation
-- [ ] Example rank thresholds: Starter (0–49), Active Member (50–149), Contributor (150–299), Community Builder (300–499), Community Leader (500–799), Impact Champion (800+)
+- [x] Idempotent configurable rank seed thresholds: Starter (0–49), Active Member (50–149), Contributor (150–299), Community Builder (300–499), Community Leader (500–799), Impact Champion (800+)
 - [x] Rank qualification evaluates configured activity-count, milestone and non-revoked badge requirements in addition to minimum points
 - [x] Tenant admins define ranks through validated, audited API without code changes
 - [x] Member profile API reports current rank, next rank threshold and remaining Impact Points

@@ -11,6 +11,7 @@ from src.models import (
     Milestone,
     MilestoneRequirement,
     PointRule,
+    Rank,
 )
 
 EVENT_CATEGORIES = (
@@ -47,6 +48,14 @@ COMMUNITY_BUILDER_REQUIREMENTS = {
     "task_count": 5,
     "contribution_count": 1,
 }
+DEFAULT_RANKS = (
+    ("Starter", "starter", 0),
+    ("Active Member", "active-member", 50),
+    ("Contributor", "contributor", 150),
+    ("Community Builder", "community-builder", 300),
+    ("Community Leader", "community-leader", 500),
+    ("Impact Champion", "impact-champion", 800),
+)
 
 
 def seed_community_recognition(db: Session, community_id) -> None:
@@ -81,6 +90,20 @@ def seed_community_recognition(db: Session, community_id) -> None:
         )
         for metric, threshold in COMMUNITY_BUILDER_REQUIREMENTS.items()
         if metric not in existing
+    )
+    existing_ranks = set(
+        db.scalars(select(Rank.slug).where(Rank.community_id == community_id))
+    )
+    db.add_all(
+        Rank(
+            community_id=community_id,
+            name=name,
+            slug=slug,
+            minimum_points=minimum_points,
+            sort_order=sort_order,
+        )
+        for sort_order, (name, slug, minimum_points) in enumerate(DEFAULT_RANKS, start=1)
+        if slug not in existing_ranks
     )
     db.commit()
 
