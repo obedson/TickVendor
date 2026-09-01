@@ -114,7 +114,11 @@ integrated product evidence. TickVendor is not specification-complete or product
 - [x] Award attendance Impact Points idempotently after check-in and resolve the configured central
   PointRule; concurrent Impact Point key races return the existing transaction.
 - [x] Task verification, its audit record, notification, and reward insertion share one controlled
-  database commit; recognition evaluation runs only after that durable transition.
+  database commit; injected reward/audit/notification failures roll back the primary transition and
+  successful retry is exact-once for those effects.
+- [x] Recognition evaluation intentionally runs after the primary task transaction; its separate
+  failure cannot roll back the durable task/reward/audit/notification transition and remains
+  idempotent for retry.
 - [x] Enforce hidden/invite-only ticket visibility during ordering.
 - [x] Enrich My Tickets with event, date/time, venue, ticket-type, status, QR and order data plus
   upcoming/used/cancelled grouping.
