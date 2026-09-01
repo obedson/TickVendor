@@ -5,6 +5,26 @@ from sqlalchemy import text
 from sqlalchemy.orm import configure_mappers
 
 
+def test_shared_api_types_validate_errors_and_pagination():
+    from pydantic import ValidationError
+
+    from src.schemas.common import ErrorEnvelope, PaginationParams
+
+    page = PaginationParams(limit=25, offset=50)
+    assert page.model_dump() == {"limit": 25, "offset": 50}
+    assert ErrorEnvelope.from_parts("not_found", "Missing").model_dump() == {
+        "error": {"code": "not_found", "message": "Missing", "details": None}
+    }
+
+    for invalid in ({"limit": 0}, {"limit": 101}, {"offset": -1}):
+        try:
+            PaginationParams(**invalid)
+        except ValidationError:
+            pass
+        else:
+            raise AssertionError(f"accepted invalid pagination: {invalid}")
+
+
 def test_settings_load_with_safe_development_defaults():
     from src.config import settings
 

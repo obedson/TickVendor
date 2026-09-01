@@ -53,7 +53,7 @@ verification. These remain active work; no completion claim is made.
 - [x] Error handling architecture (stable validation/internal-error envelopes)
 - [x] Logging/observability foundation (JSON logs, correlation IDs, secret redaction, safe error hook)
 - [x] Validation architecture (Pydantic settings and FastAPI request validation)
-- [ ] Shared types/interfaces
+- [x] Shared validated pagination and stable API error envelope types/interfaces
 - [x] CI/pre-commit quality gates (Ruff, pytest, clean migration check, Gitleaks secret scanning)
 - [x] Explicit DB policy (SQLite for development/test only; staging/production require server DB)
 - [x] DB dependency rollback/close behavior verified
