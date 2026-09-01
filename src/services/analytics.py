@@ -8,6 +8,7 @@ from src.authorization import require_community_role
 from src.models import (
     Attendance,
     AttendanceStatus,
+    Badge,
     BadgeAward,
     Community,
     Contribution,
@@ -16,6 +17,8 @@ from src.models import (
     ImpactTransactionStatus,
     Membership,
     MembershipRole,
+    Milestone,
+    MilestoneAward,
     Order,
     Payment,
     PaymentStatus,
@@ -50,6 +53,23 @@ def community_summary(db: Session, community_id, user: User) -> dict[str, object
 
 def organizer_summary(db: Session, user: User) -> dict[str, object]:
     event_ids = select(Event.id).where(Event.organizer_id == user.id, Event.deleted_at.is_(None))
+    community_ids = select(Event.community_id).where(
+        Event.organizer_id == user.id, Event.deleted_at.is_(None)
+    )
+    badge_distribution = db.execute(
+        select(Badge.name, func.count(BadgeAward.id))
+        .join(BadgeAward, BadgeAward.badge_id == Badge.id)
+        .where(Badge.community_id.in_(community_ids), BadgeAward.revoked_at.is_(None))
+        .group_by(Badge.id, Badge.name)
+        .order_by(Badge.name)
+    ).all()
+    milestone_distribution = db.execute(
+        select(Milestone.name, func.count(MilestoneAward.id))
+        .join(MilestoneAward, MilestoneAward.milestone_id == Milestone.id)
+        .where(Milestone.community_id.in_(community_ids))
+        .group_by(Milestone.id, Milestone.name)
+        .order_by(Milestone.name)
+    ).all()
     top = db.execute(select(ImpactTransaction.user_id, func.sum(ImpactTransaction.points).label("score"))
         .where(ImpactTransaction.event_id.in_(event_ids),
                ImpactTransaction.status == ImpactTransactionStatus.POSTED)
@@ -83,6 +103,12 @@ def organizer_summary(db: Session, user: User) -> dict[str, object]:
             ImpactTransaction.status == ImpactTransactionStatus.POSTED)),
         "top_participants": [{"user_id": str(user_id), "score": score}
                              for user_id, score in top],
+        "achievement_distribution": {
+            "badges": [{"name": name, "awards": awards} for name, awards in badge_distribution],
+            "milestones": [
+                {"name": name, "awards": awards} for name, awards in milestone_distribution
+            ],
+        },
     }
 
 
