@@ -126,9 +126,9 @@ integrated product evidence. TickVendor is not specification-complete or product
 - [ ] Add task/assignment browse APIs and task
   attachments, implement overdue and `verification_required` behavior, and resolve configured task
   reward values consistently with central PointRule policy.
-- [ ] Add an organizer attendance-abuse review workflow and broader repeated-suspicious-signal
-  aggregation; duplicate check-ins now preserve state while recording an idempotent
-  `duplicate_check_in` review signal.
+- [x] Organizer/admin attendance review APIs list flagged records with event, participant, reason
+  and open/cleared/confirmed/rejected filters, preserve original signals, and resolve outcomes with
+  tenant authorization and audit records; duplicate check-ins retain `duplicate_check_in` evidence.
 - [ ] Add production-grade distributed rate limiting for horizontally scaled deployment.
 - [ ] Expand README/project documentation to cover architecture, API/authentication, migrations and
   seeds, payment providers/webhooks, geolocation, PWA, recognition/admin configuration, and deployment.

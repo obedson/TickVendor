@@ -26,3 +26,19 @@ class QRAttendanceInput(BaseModel):
 class OrganizerAttendanceInput(BaseModel):
     approve: bool
     reason: str = Field(min_length=2, max_length=500)
+
+
+class AttendanceReviewInput(BaseModel):
+    outcome: str = Field(pattern="^(cleared|confirmed|rejected)$")
+    reason: str = Field(min_length=2, max_length=500)
+
+
+class AttendanceReviewResponse(BaseModel):
+    attendance_id: UUID
+    event_id: UUID
+    participant_id: UUID
+    status: str
+    review_status: str
+    review_reason: str | None
+    review_resolution: str | None
+    suspicious_signal_count: int

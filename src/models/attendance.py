@@ -32,6 +32,13 @@ class AttendanceStatus(str, enum.Enum):
     REJECTED = "rejected"
 
 
+class AttendanceReviewStatus(str, enum.Enum):
+    OPEN = "open"
+    CLEARED = "cleared"
+    CONFIRMED = "confirmed"
+    REJECTED = "rejected"
+
+
 class VerificationMethod(str, enum.Enum):
     GPS = "gps"
     QR = "qr"
@@ -69,6 +76,15 @@ class Attendance(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     confidence_score: Mapped[Decimal] = mapped_column(Numeric(5, 2), default=0, nullable=False)
     flagged_for_review: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     review_reason: Mapped[str | None] = mapped_column(Text)
+    review_status: Mapped[AttendanceReviewStatus] = mapped_column(
+        Enum(AttendanceReviewStatus, native_enum=False, length=16),
+        default=AttendanceReviewStatus.OPEN, nullable=False,
+    )
+    reviewed_by_id: Mapped[Any | None] = mapped_column(
+        GUID(), ForeignKey("users.id", ondelete="SET NULL")
+    )
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    review_resolution: Mapped[str | None] = mapped_column(String(500))
 
 
 class AttendanceVerification(UUIDPrimaryKeyMixin, TimestampMixin, Base):
