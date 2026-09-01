@@ -159,7 +159,7 @@ verification. These remain active work; no completion claim is made.
 - [x] Badge/BadgeAward schema (configurable JSON requirements, visibility/rewards, idempotent award and revocation history)
 - [x] Idempotent badge award primitive; full automatic rule evaluation remains pending
 - [x] Badge properties include name, description, icon, category, requirements, reward points and visibility
-- [ ] Example badges: First Step (first verified event attendance), Regular (attend 5 events), Consistent (attend 10 events), Task Starter (complete first task), Doer (complete 10 tasks), Community Helper (help 5 members), Facilitator (organize first event), Community Builder (complete defined community requirements)
+- [x] Idempotent configurable badge seeds: First Step, Regular, Consistent, Task Starter, Doer, Community Helper, Facilitator, and Community Builder
 - [x] Idempotent automatic badge awards from configured condition trees with rewards/notifications
 - [x] Tenant-admin badge configuration API validates safe rule trees and audits changes
 

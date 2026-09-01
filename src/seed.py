@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from src.models import (
+    Badge,
     ContributionBand,
     EventCategory,
     Milestone,
@@ -56,6 +57,16 @@ DEFAULT_RANKS = (
     ("Community Leader", "community-leader", 500),
     ("Impact Champion", "impact-champion", 800),
 )
+DEFAULT_BADGES = (
+    ("First Step", "first-step", "attendance_count", 1),
+    ("Regular", "regular", "attendance_count", 5),
+    ("Consistent", "consistent", "attendance_count", 10),
+    ("Task Starter", "task-starter", "task_count", 1),
+    ("Doer", "doer", "task_count", 10),
+    ("Community Helper", "community-helper", "service_activities", 5),
+    ("Facilitator", "facilitator", "organized_event_count", 1),
+    ("Community Builder", "community-builder", "community_builder_milestones", 1),
+)
 
 
 def seed_community_recognition(db: Session, community_id) -> None:
@@ -104,6 +115,21 @@ def seed_community_recognition(db: Session, community_id) -> None:
         )
         for sort_order, (name, slug, minimum_points) in enumerate(DEFAULT_RANKS, start=1)
         if slug not in existing_ranks
+    )
+    existing_badges = set(
+        db.scalars(select(Badge.slug).where(Badge.community_id == community_id))
+    )
+    db.add_all(
+        Badge(
+            community_id=community_id,
+            name=name,
+            slug=slug,
+            description=f"Earned when {metric.replace('_', ' ')} reaches {threshold}.",
+            category="community",
+            requirements={"operator": ">=", "metric": metric, "value": threshold},
+        )
+        for name, slug, metric, threshold in DEFAULT_BADGES
+        if slug not in existing_badges
     )
     db.commit()
 

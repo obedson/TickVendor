@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 import src.models  # noqa: F401
 from src.database import Base
 from src.models import (
+    Badge,
     ContributionBand,
     EventCategory,
     Milestone,
@@ -88,4 +89,44 @@ def test_default_rank_seed_is_configurable_and_idempotent(tmp_path):
             ("Community Leader", 500),
             ("Impact Champion", 800),
         ]
+    engine.dispose()
+
+
+def test_default_badge_seed_is_configurable_and_idempotent(tmp_path):
+    engine = create_engine(f"sqlite:///{tmp_path / 'badge-seed.db'}")
+    Base.metadata.create_all(engine)
+    with Session(engine) as session:
+        _user, community, _event = create_event_context(session)
+
+        seed_community_recognition(session, community.id)
+        seed_community_recognition(session, community.id)
+
+        badges = {
+            badge.slug: badge.requirements
+            for badge in session.scalars(
+                select(Badge).where(Badge.community_id == community.id)
+            )
+        }
+        assert badges == {
+            "first-step": {"operator": ">=", "metric": "attendance_count", "value": 1},
+            "regular": {"operator": ">=", "metric": "attendance_count", "value": 5},
+            "consistent": {"operator": ">=", "metric": "attendance_count", "value": 10},
+            "task-starter": {"operator": ">=", "metric": "task_count", "value": 1},
+            "doer": {"operator": ">=", "metric": "task_count", "value": 10},
+            "community-helper": {
+                "operator": ">=",
+                "metric": "service_activities",
+                "value": 5,
+            },
+            "facilitator": {
+                "operator": ">=",
+                "metric": "organized_event_count",
+                "value": 1,
+            },
+            "community-builder": {
+                "operator": ">=",
+                "metric": "community_builder_milestones",
+                "value": 1,
+            },
+        }
     engine.dispose()
