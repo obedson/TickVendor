@@ -29,3 +29,18 @@ class SubmissionInput(BaseModel):
 
 class VerificationInput(BaseModel):
     approve: bool
+
+
+class TaskResponse(TaskCreateInput):
+    id: UUID
+    community_id: UUID
+    created_by_id: UUID
+    status: str
+
+
+class TaskAssignmentResponse(BaseModel):
+    id: UUID
+    task_id: UUID
+    assignee_id: UUID
+    status: str
+    due_at: datetime | None

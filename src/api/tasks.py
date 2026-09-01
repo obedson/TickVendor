@@ -4,12 +4,20 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from src.api.auth import get_current_user
 from src.database import get_db
 from src.models import Task, TaskAssignment, TaskAssignmentStatus, User
-from src.schemas.task import AssignmentInput, SubmissionInput, TaskCreateInput, VerificationInput
+from src.schemas.task import (
+    AssignmentInput,
+    SubmissionInput,
+    TaskAssignmentResponse,
+    TaskCreateInput,
+    TaskResponse,
+    VerificationInput,
+)
 from src.services.task import (
     assign_task,
     create_task,
@@ -19,6 +27,24 @@ from src.services.task import (
 )
 
 router = APIRouter(tags=["tasks"])
+
+
+@router.get("/communities/{community_id}/tasks", response_model=list[TaskResponse])
+def list_tasks(community_id: UUID, db: Annotated[Session, Depends(get_db)],
+               user: Annotated[User, Depends(get_current_user)], status_filter: TaskAssignmentStatus | None = None):
+    from src.authorization import require_community_role
+    require_community_role(db, community_id, user)
+    query = select(Task).where(Task.community_id == community_id, Task.is_active.is_(True))
+    if status_filter:
+        query = query.where(Task.id.in_(select(TaskAssignment.task_id).where(TaskAssignment.status == status_filter)))
+    return [{**{field: getattr(task, field) for field in ("id", "community_id", "created_by_id", "title", "description", "event_id", "due_at", "priority", "impact_point_reward", "verification_required")}, "status": "active"} for task in db.scalars(query.order_by(Task.due_at))]
+
+
+@router.get("/task-assignments/me", response_model=list[TaskAssignmentResponse])
+def my_assignments(db: Annotated[Session, Depends(get_db)], user: Annotated[User, Depends(get_current_user)]):
+    return [{"id": item.id, "task_id": item.task_id, "assignee_id": item.assignee_id,
+             "status": item.status.value, "due_at": db.get(Task, item.task_id).due_at}
+            for item in db.scalars(select(TaskAssignment).where(TaskAssignment.assignee_id == user.id))]
 
 
 @router.post("/task-assignments/{assignment_id}/accept")

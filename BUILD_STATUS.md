@@ -123,9 +123,9 @@ integrated product evidence. TickVendor is not specification-complete or product
 - [x] Enrich My Tickets with event, date/time, venue, ticket-type, status, QR and order data plus
   upcoming/used/cancelled grouping.
 - [x] Enforce task assignee and event tenant membership.
-- [ ] Add task/assignment browse APIs and task
-  attachments, implement overdue and `verification_required` behavior, and resolve configured task
-  reward values consistently with central PointRule policy.
+- [x] Add tenant-authorized task and participant-assignment browse APIs with community filtering.
+- [ ] Add task attachments, implement overdue and `verification_required` behavior, and resolve
+  configured task reward values consistently with central PointRule policy.
 - [x] Organizer/admin attendance review APIs list flagged records with event, participant, reason
   and open/cleared/confirmed/rejected filters, preserve original signals, and resolve outcomes with
   tenant authorization and audit records; duplicate check-ins retain `duplicate_check_in` evidence.
