@@ -48,6 +48,9 @@ integrated product evidence. TickEven is not specification-complete or productio
 - [ ] Complete organizer/admin frontend journeys: event creation/edit/publish, ticket setup and
   attendee management, QR scanning, attendance review, task/member/contribution management,
   analytics, audit log, and all data-driven recognition/configuration screens.
+- [ ] Complete server-side admin configuration APIs for point rules, attendance/verification rules,
+  contribution bands/caps, notification rules, and leaderboard visibility; current admin routes
+  chiefly cover milestones, ranks, badges, achievement rules, memberships, and category management.
 - [ ] Integrate `evaluate_recognition` into verified business transitions or a durable job so
   milestone/badge rewards and notifications happen automatically; add end-to-end recognition tests.
 - [ ] Implement automatic `AchievementRule.reward_definition` execution (badge and Impact Point
