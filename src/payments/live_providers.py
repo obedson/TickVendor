@@ -112,3 +112,48 @@ class FlutterwaveProvider:
             "event": event.get("event"),
             "provider_reference": data.get("tx_ref"),
         }
+
+
+class StripeProvider:
+    name = "stripe"
+
+    def __init__(self, secret_key: str, webhook_secret: str | None = None):
+        if not secret_key:
+            raise ValueError("Stripe secret key is required")
+        self.secret_key = secret_key
+        self.webhook_secret = webhook_secret
+
+    @property
+    def headers(self) -> dict[str, str]:
+        return {"Authorization": f"Bearer {self.secret_key}"}
+
+    def initialize(self, reference: str, amount: Decimal, currency: str, email: str) -> PaymentInitialization:
+        response = httpx.post("https://api.stripe.com/v1/checkout/sessions", headers=self.headers, data={
+            "mode": "payment", "client_reference_id": reference, "customer_email": email,
+            "line_items[0][price_data][currency]": currency.lower(),
+            "line_items[0][price_data][product_data][name]": "TickEven ticket",
+            "line_items[0][price_data][unit_amount]": str(int(amount * 100)),
+            "line_items[0][quantity]": "1", "success_url": "https://tickeven.example/payment/success",
+            "cancel_url": "https://tickeven.example/payment/cancel"}, timeout=15)
+        response.raise_for_status()
+        data = response.json()
+        return PaymentInitialization(data["id"], data["url"])
+
+    def verify(self, provider_reference: str) -> bool:
+        response = httpx.get(f"https://api.stripe.com/v1/checkout/sessions/{provider_reference}",
+                             headers=self.headers, timeout=15)
+        response.raise_for_status()
+        return response.json().get("payment_status") == "paid"
+
+    def verify_webhook(self, body: bytes, signature: str | None) -> dict[str, object]:
+        if not self.webhook_secret or not signature:
+            raise ValueError("Stripe webhook secret and signature are required")
+        timestamp, _, provided = signature.partition(",v1=")
+        if not timestamp.startswith("t=") or not provided:
+            raise ValueError("Invalid Stripe webhook signature")
+        expected = hmac.new(self.webhook_secret.encode(), f"{timestamp[2:]}.".encode() + body, hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(expected, provided):
+            raise ValueError("Invalid Stripe webhook signature")
+        event = json.loads(body)
+        data = event.get("data", {}).get("object", {})
+        return {"event": event.get("type"), "provider_reference": data.get("id")}

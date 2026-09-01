@@ -39,6 +39,7 @@ class Settings(BaseSettings):
     flutterwave_secret_key: SecretStr | None = None
     flutterwave_webhook_secret: SecretStr | None = None
     stripe_secret_key: SecretStr | None = None
+    stripe_webhook_secret: SecretStr | None = None
 
     @field_validator("cors_origins", mode="before")
     @classmethod

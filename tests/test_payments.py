@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 import src.models  # noqa: F401
 from src.database import Base
 from src.models import Order, OrderStatus, Payment, PaymentStatus, Ticket, TicketStatus, TicketType
+from src.payments.live_providers import StripeProvider
 from src.payments.providers import TestPaymentProvider
 from src.services.payment import apply_successful_payment
 from tests.test_database import create_event_context
@@ -36,3 +37,15 @@ def test_successful_payment_activates_tickets_once(tmp_path):
         assert order.status == OrderStatus.CONFIRMED
         assert ticket.status == TicketStatus.ACTIVE
     engine.dispose()
+
+
+def test_stripe_webhook_signature_contract_is_verified():
+    import hashlib
+    import hmac
+
+    body = b'{"type":"checkout.session.completed","data":{"object":{"id":"cs_123"}}}'
+    timestamp = "1700000000"
+    secret = "whsec_test"
+    signature = "t=" + timestamp + ",v1=" + hmac.new(secret.encode(), timestamp.encode() + b"." + body, hashlib.sha256).hexdigest()
+    event = StripeProvider("sk_test", secret).verify_webhook(body, signature)
+    assert event == {"event": "checkout.session.completed", "provider_reference": "cs_123"}

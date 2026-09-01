@@ -9,7 +9,7 @@ from src.api.auth import get_current_user
 from src.config import settings
 from src.database import get_db
 from src.models import Order, Payment, User
-from src.payments.live_providers import FlutterwaveProvider, PaystackProvider
+from src.payments.live_providers import FlutterwaveProvider, PaystackProvider, StripeProvider
 from src.payments.providers import PaymentProvider, TestPaymentProvider
 from src.schemas.payment import (
     PaymentInitializeRequest,
@@ -40,6 +40,11 @@ def get_payment_provider() -> PaymentProvider:
             settings.flutterwave_webhook_secret.get_secret_value()
             if settings.flutterwave_webhook_secret
             else "",
+        )
+    if settings.payment_provider == "stripe":
+        return StripeProvider(
+            settings.stripe_secret_key.get_secret_value() if settings.stripe_secret_key else "",
+            settings.stripe_webhook_secret.get_secret_value() if settings.stripe_webhook_secret else None,
         )
     raise HTTPException(status_code=503, detail="Payment provider is not configured")
 

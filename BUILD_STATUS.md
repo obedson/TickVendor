@@ -83,7 +83,7 @@ verification. These remain active work; no completion claim is made.
 - [x] Ticket lifecycle states implemented: reserved, pending payment, paid, active, used, cancelled, refunded, expired
 - [x] Duplicate ticket use prevention and staff/tenant-authorized validation
 - [x] Idempotent order creation, free-ticket activation, inventory/max-per-user enforcement
-- [x] Payment provider contract, test adapter, Paystack/Flutterwave HTTP adapters, initialization/verification APIs and signed idempotent webhook path (live verification externally blocked; Stripe adapter pending)
+- [x] Payment provider contract, test adapter, Paystack/Flutterwave/Stripe HTTP adapters, initialization/verification APIs and signed idempotent webhook path (live verification externally blocked)
 - [x] Payment state enforcement and server-side amount/currency/provider verification
 - [x] Ticket activation upon verified payment confirmation
 - [x] Ticket activation flow for free and provider-verified paid orders
