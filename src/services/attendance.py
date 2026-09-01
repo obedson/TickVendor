@@ -1,11 +1,11 @@
 """Attendance check-in, geofence, and layered verification services."""
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from math import asin, cos, radians, sin, sqrt
 
 from fastapi import HTTPException
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -60,7 +60,7 @@ def calculate_attendance_confidence(db: Session, attendance: Attendance) -> Atte
 
 
 def evaluate_attendance_abuse(db: Session, attendance: Attendance) -> Attendance:
-    """Flag implausible GPS transitions conservatively and idempotently."""
+    """Flag implausible transitions and burst patterns conservatively."""
     current = db.scalar(select(AttendanceVerification).where(
         AttendanceVerification.attendance_id == attendance.id,
         AttendanceVerification.method == VerificationMethod.GPS,
@@ -76,15 +76,32 @@ def evaluate_attendance_abuse(db: Session, attendance: Attendance) -> Attendance
         AttendanceVerification.is_valid.is_(True),
         AttendanceVerification.verified_at < current.verified_at,
     ).order_by(AttendanceVerification.verified_at.desc()))
-    if previous is None:
-        return attendance
-    elapsed = (as_utc(current.verified_at) - as_utc(previous.verified_at)).total_seconds()
-    speed_kmh = haversine_meters(previous.latitude, previous.longitude,
-                                 current.latitude, current.longitude) / elapsed * 3.6 if elapsed > 0 else 0
-    if speed_kmh > 1_000 and "impossible_location_transition" not in (attendance.review_reason or ""):
+    speed_kmh = 0
+    if previous is not None:
+        elapsed = (as_utc(current.verified_at) - as_utc(previous.verified_at)).total_seconds()
+        speed_kmh = haversine_meters(previous.latitude, previous.longitude,
+                                     current.latitude, current.longitude) / elapsed * 3.6 if elapsed > 0 else 0
+    if previous is not None and speed_kmh > 1_000 and "impossible_location_transition" not in (attendance.review_reason or ""):
         attendance.flagged_for_review = True
         attendance.review_reason = ((attendance.review_reason + "; ") if attendance.review_reason else "") + \
             f"impossible_location_transition:speed_kmh={speed_kmh:.1f}"
+        db.commit()
+    burst = db.scalar(select(func.count()).select_from(AttendanceVerification).join(
+        Attendance, Attendance.id == AttendanceVerification.attendance_id,
+    ).where(
+        Attendance.user_id == attendance.user_id,
+        AttendanceVerification.method == VerificationMethod.GPS,
+        AttendanceVerification.is_valid.is_(True),
+        AttendanceVerification.latitude == current.latitude,
+        AttendanceVerification.longitude == current.longitude,
+        AttendanceVerification.verified_at.between(
+            current.verified_at - timedelta(minutes=15), current.verified_at,
+        ),
+    ))
+    if burst >= 3 and "repeated_location_pattern" not in (attendance.review_reason or ""):
+        attendance.flagged_for_review = True
+        attendance.review_reason = ((attendance.review_reason + "; ") if attendance.review_reason else "") + \
+            f"repeated_location_pattern:count={burst}"
         db.commit()
     return attendance
 
