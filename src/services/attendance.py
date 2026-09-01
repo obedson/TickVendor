@@ -186,14 +186,18 @@ def qr_verify(db: Session, attendance: Attendance, ticket: Ticket, verifier: Use
         AttendanceVerification.attendance_id == attendance.id,
         AttendanceVerification.method == VerificationMethod.QR,
     ))
-    if existing is None:
-        db.add(AttendanceVerification(
-            attendance_id=attendance.id,
-            method=VerificationMethod.QR,
-            is_valid=True,
-            verified_at=datetime.now(UTC),
-            verifier_id=verifier.id,
-        ))
+    if existing is not None:
+        attendance.flagged_for_review = True
+        attendance.review_reason = "Duplicate QR verification requires organizer review"
+        db.commit()
+        return attendance
+    db.add(AttendanceVerification(
+        attendance_id=attendance.id,
+        method=VerificationMethod.QR,
+        is_valid=True,
+        verified_at=datetime.now(UTC),
+        verifier_id=verifier.id,
+    ))
     db.commit()
     calculate_attendance_confidence(db, attendance)
     return attendance
