@@ -11,10 +11,22 @@ class PaymentInitialization:
     checkout_url: str
 
 
+@dataclass(frozen=True)
+class PaymentVerification:
+    provider_reference: str
+    amount: Decimal
+    currency: str
+    status: str
+
+    @property
+    def successful(self) -> bool:
+        return self.status == "success"
+
+
 class PaymentProvider(Protocol):
     name: str
     def initialize(self, reference: str, amount: Decimal, currency: str, email: str) -> PaymentInitialization: ...
-    def verify(self, provider_reference: str) -> bool: ...
+    def verify(self, provider_reference: str) -> PaymentVerification: ...
     def verify_webhook(self, body: bytes, signature: str | None) -> dict[str, object]: ...
 
 
@@ -24,8 +36,13 @@ class TestPaymentProvider:
     def initialize(self, reference: str, amount: Decimal, currency: str, email: str) -> PaymentInitialization:
         return PaymentInitialization(reference, f"https://payments.test/{reference}")
 
-    def verify(self, provider_reference: str) -> bool:
-        return provider_reference.startswith("success-")
+    def verify(self, provider_reference: str) -> PaymentVerification:
+        return PaymentVerification(
+            provider_reference,
+            Decimal(100),
+            "NGN",
+            "success" if provider_reference.startswith("success-") else "failed",
+        )
 
     def verify_webhook(self, body: bytes, signature: str | None) -> dict[str, object]:
         import json

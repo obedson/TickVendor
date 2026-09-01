@@ -90,14 +90,18 @@ async def webhook(
     request: Request,
     db: Annotated[Session, Depends(get_db)],
     provider: Annotated[PaymentProvider, Depends(get_payment_provider)],
+    x_paystack_signature: Annotated[str | None, Header()] = None,
     x_payment_signature: Annotated[str | None, Header()] = None,
 ):
     if provider_name != provider.name:
         raise HTTPException(status_code=404, detail="Provider not configured")
     try:
-        event = provider.verify_webhook(await request.body(), x_payment_signature)
+        signature = x_paystack_signature if provider.name == "paystack" else x_payment_signature
+        event = provider.verify_webhook(await request.body(), signature)
     except ValueError as exc:
         raise HTTPException(status_code=401, detail="Invalid webhook") from exc
+    if provider.name == "paystack" and event.get("event") != "charge.success":
+        return {"status": "ignored"}
     reference = str(event.get("provider_reference", ""))
     payment = db.query(Payment).filter_by(provider=provider.name, provider_reference=reference).one_or_none()
     if payment is None:

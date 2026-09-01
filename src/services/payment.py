@@ -13,9 +13,14 @@ from src.payments.providers import PaymentProvider
 def initialize_payment(db: Session, order: Order, user_email: str, idempotency_key: str, provider: PaymentProvider):
     existing = db.scalar(select(Payment).where(Payment.idempotency_key == idempotency_key))
     if existing:
-        return existing, provider.initialize(
-            existing.provider_reference, existing.amount, existing.currency, user_email
-        )
+        if (existing.order_id != order.id or existing.provider != provider.name
+                or existing.amount != order.total_amount or existing.currency != order.currency):
+            raise HTTPException(status_code=409, detail="Payment idempotency key conflict")
+        checkout_url = str(existing.provider_metadata.get("checkout_url", ""))
+        if not checkout_url:
+            raise HTTPException(status_code=409, detail="Original payment checkout is unavailable")
+        from src.payments.providers import PaymentInitialization
+        return existing, PaymentInitialization(existing.provider_reference, checkout_url)
     if order.status != OrderStatus.PENDING or order.total_amount <= 0:
         raise HTTPException(status_code=409, detail="Order is not payable")
     initialization = provider.initialize(order.reference, order.total_amount, order.currency, user_email)
@@ -23,6 +28,7 @@ def initialize_payment(db: Session, order: Order, user_email: str, idempotency_k
         order_id=order.id, provider=provider.name,
         provider_reference=initialization.provider_reference,
         idempotency_key=idempotency_key, amount=order.total_amount, currency=order.currency,
+        provider_metadata={"checkout_url": initialization.checkout_url},
     )
     db.add(payment)
     db.commit()
@@ -32,14 +38,19 @@ def initialize_payment(db: Session, order: Order, user_email: str, idempotency_k
 def apply_successful_payment(db: Session, payment: Payment, provider: PaymentProvider) -> Payment:
     if payment.status == PaymentStatus.SUCCESSFUL:
         return payment
-    if not provider.verify(payment.provider_reference):
+    verification = provider.verify(payment.provider_reference)
+    if not verification.successful:
         payment.status = PaymentStatus.FAILED
         payment.failure_reason = "Provider verification failed"
         db.commit()
-        raise HTTPException(status_code=409, detail="Payment could not be verified")
+        raise HTTPException(status_code=409, detail="Payment status is not successful")
     order = db.get(Order, payment.order_id)
-    if order is None or payment.amount != order.total_amount or payment.currency != order.currency:
-        raise HTTPException(status_code=409, detail="Payment amount or currency mismatch")
+    if verification.provider_reference != payment.provider_reference:
+        raise HTTPException(status_code=409, detail="Payment reference mismatch")
+    if verification.amount != payment.amount or verification.amount != order.total_amount:
+        raise HTTPException(status_code=409, detail="Payment amount mismatch")
+    if verification.currency != payment.currency or verification.currency != order.currency:
+        raise HTTPException(status_code=409, detail="Payment currency mismatch")
     payment.status = PaymentStatus.SUCCESSFUL
     payment.verified_at = datetime.now(UTC)
     order.status = OrderStatus.CONFIRMED

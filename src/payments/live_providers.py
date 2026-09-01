@@ -7,7 +7,7 @@ from decimal import Decimal
 
 import httpx
 
-from src.payments.providers import PaymentInitialization
+from src.payments.providers import PaymentInitialization, PaymentVerification
 
 
 class PaystackProvider:
@@ -41,14 +41,18 @@ class PaystackProvider:
         data = response.json()["data"]
         return PaymentInitialization(data["reference"], data["authorization_url"])
 
-    def verify(self, provider_reference: str) -> bool:
+    def verify(self, provider_reference: str) -> PaymentVerification:
         response = httpx.get(
             f"https://api.paystack.co/transaction/verify/{provider_reference}",
             headers=self.headers,
             timeout=15,
         )
         response.raise_for_status()
-        return response.json().get("data", {}).get("status") == "success"
+        data = response.json().get("data", {})
+        return PaymentVerification(
+            str(data.get("reference", "")), Decimal(data.get("amount", 0)) / 100,
+            str(data.get("currency", "")), str(data.get("status", "")),
+        )
 
     def verify_webhook(self, body: bytes, signature: str | None) -> dict[str, object]:
         expected = hmac.new(
@@ -94,14 +98,19 @@ class FlutterwaveProvider:
         response.raise_for_status()
         return PaymentInitialization(reference, response.json()["data"]["link"])
 
-    def verify(self, provider_reference: str) -> bool:
+    def verify(self, provider_reference: str) -> PaymentVerification:
         response = httpx.get(
             f"https://api.flutterwave.com/v3/transactions/verify_by_reference?tx_ref={provider_reference}",
             headers=self.headers,
             timeout=15,
         )
         response.raise_for_status()
-        return response.json().get("data", {}).get("status") == "successful"
+        data = response.json().get("data", {})
+        return PaymentVerification(
+            str(data.get("tx_ref", "")), Decimal(str(data.get("amount", 0))),
+            str(data.get("currency", "")),
+            "success" if data.get("status") == "successful" else str(data.get("status", "")),
+        )
 
     def verify_webhook(self, body: bytes, signature: str | None) -> dict[str, object]:
         if not signature or not hmac.compare_digest(signature, self.webhook_secret):
@@ -139,11 +148,16 @@ class StripeProvider:
         data = response.json()
         return PaymentInitialization(data["id"], data["url"])
 
-    def verify(self, provider_reference: str) -> bool:
+    def verify(self, provider_reference: str) -> PaymentVerification:
         response = httpx.get(f"https://api.stripe.com/v1/checkout/sessions/{provider_reference}",
                              headers=self.headers, timeout=15)
         response.raise_for_status()
-        return response.json().get("payment_status") == "paid"
+        data = response.json()
+        return PaymentVerification(
+            str(data.get("id", "")), Decimal(data.get("amount_total", 0)) / 100,
+            str(data.get("currency", "")).upper(),
+            "success" if data.get("payment_status") == "paid" else str(data.get("payment_status", "")),
+        )
 
     def verify_webhook(self, body: bytes, signature: str | None) -> dict[str, object]:
         if not self.webhook_secret or not signature:
