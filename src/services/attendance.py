@@ -63,6 +63,8 @@ def calculate_attendance_confidence(db: Session, attendance: Attendance) -> Atte
     attendance.status = next((status for method, status in precedence if method in valid), AttendanceStatus.CHECKED_IN)
     if required and not required.issubset(valid):
         attendance.status = AttendanceStatus.CHECKED_IN
+    elif not required and valid:
+        attendance.status = next((status for method, status in precedence if method in valid), AttendanceStatus.CHECKED_IN)
     db.commit()
     return attendance
 
