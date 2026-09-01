@@ -44,6 +44,8 @@ class EventCreate(BaseModel):
     max_peer_confirmations: int | None = Field(default=None, ge=1, le=100)
     peer_confirmation_deadline: datetime | None = None
     required_verification_methods: list[str] = Field(default_factory=list, max_length=4)
+    peer_selection_limit: int = Field(default=5, ge=1, le=20)
+    peer_eligibility_statuses: list[str] = Field(default_factory=list, max_length=7)
 
     @model_validator(mode="after")
     def validate_event(self):

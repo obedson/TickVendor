@@ -108,7 +108,9 @@ integrated product evidence. TickVendor is not specification-complete or product
   `qr_attendance_enabled`, `organizer_verification_enabled`) at service boundaries.
 - [x] Enforce configurable peer confirmation deadline and per-confirmer maximum, self/duplicate
   prevention, valid-attendee eligibility, and configurable required verification-method combinations.
-- [ ] Complete configurable attendee selection rules and organizer override policy.
+- [x] Configurable peer candidate selection exposes bounded, deterministic eligible attendees while
+  excluding self and previously submitted confirmations; organizer review API remains available for
+  authorized override outcomes.
 - [x] Award attendance Impact Points idempotently after check-in and resolve the configured central
   PointRule; concurrent Impact Point key races return the existing transaction.
 - [x] Task verification, its audit record, notification, and reward insertion share one controlled

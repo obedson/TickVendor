@@ -4,11 +4,12 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from src.api.auth import get_current_user
 from src.database import get_db
-from src.models import Attendance, Event, Ticket, User
+from src.models import Attendance, AttendanceStatus, Event, PeerConfirmation, Ticket, User
 from src.schemas.attendance import (
     AttendanceCheckIn,
     OrganizerAttendanceInput,
@@ -44,6 +45,35 @@ def peer_confirmation(
 ):
     confirmation = confirm_peer(db, event_or_404(db, event_id), user, payload.subject_id, payload.confirmed)
     return {"confirmation_id": str(confirmation.id), "decision": confirmation.decision.value}
+
+
+@router.get("/peer-candidates")
+def peer_candidates(
+    event_id: UUID,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
+):
+    event = event_or_404(db, event_id)
+    if not event.peer_confirmation_enabled:
+        raise HTTPException(status_code=409, detail="Peer confirmation is disabled")
+    eligibility = set(event.peer_eligibility_statuses) or {
+        AttendanceStatus.CHECKED_IN.value, AttendanceStatus.GPS_VERIFIED.value,
+        AttendanceStatus.QR_VERIFIED.value, AttendanceStatus.PEER_VERIFIED.value,
+        AttendanceStatus.ORGANIZER_VERIFIED.value,
+    }
+    confirmer = db.scalar(select(Attendance).where(
+        Attendance.event_id == event_id, Attendance.user_id == user.id,
+    ))
+    if confirmer is None or confirmer.status.value not in eligibility:
+        raise HTTPException(status_code=403, detail="Peer confirmation is not permitted")
+    submitted = select(PeerConfirmation.subject_id).where(
+        PeerConfirmation.event_id == event_id, PeerConfirmation.confirmer_id == user.id,
+    )
+    candidates = db.scalars(select(Attendance).where(
+        Attendance.event_id == event_id, Attendance.user_id != user.id,
+        Attendance.status.in_(eligibility), ~Attendance.user_id.in_(submitted),
+    ).order_by(Attendance.user_id).limit(event.peer_selection_limit))
+    return [{"participant_id": str(item.user_id)} for item in candidates]
 
 
 @router.post("/qr-verify")

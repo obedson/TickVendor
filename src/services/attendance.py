@@ -198,8 +198,22 @@ def confirm_peer(db: Session, event: Event, confirmer: User, subject_id, confirm
     subject = db.scalar(select(Attendance).where(
         Attendance.event_id == event.id, Attendance.user_id == subject_id
     ))
-    if confirmer.id == subject_id or confirmer_attendance is None or subject is None:
+    eligibility = set(event.peer_eligibility_statuses) or {
+        AttendanceStatus.CHECKED_IN.value, AttendanceStatus.GPS_VERIFIED.value,
+        AttendanceStatus.QR_VERIFIED.value, AttendanceStatus.PEER_VERIFIED.value,
+        AttendanceStatus.ORGANIZER_VERIFIED.value,
+    }
+    if (confirmer.id == subject_id or confirmer_attendance is None or subject is None
+            or confirmer_attendance.status.value not in eligibility
+            or subject.status.value not in eligibility):
         raise HTTPException(status_code=403, detail="Peer confirmation is not permitted")
+    duplicate = db.scalar(select(PeerConfirmation.id).where(
+        PeerConfirmation.event_id == event.id,
+        PeerConfirmation.confirmer_id == confirmer.id,
+        PeerConfirmation.subject_id == subject_id,
+    ))
+    if duplicate is not None:
+        raise HTTPException(status_code=409, detail="Peer confirmation already submitted")
     submitted_count = db.scalar(select(func.count()).select_from(PeerConfirmation).where(
         PeerConfirmation.event_id == event.id,
         PeerConfirmation.confirmer_id == confirmer.id,

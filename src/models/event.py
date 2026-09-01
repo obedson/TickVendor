@@ -106,6 +106,8 @@ class Event(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     max_peer_confirmations: Mapped[int | None] = mapped_column(Integer)
     peer_confirmation_deadline: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     required_verification_methods: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    peer_selection_limit: Mapped[int] = mapped_column(Integer, default=5, nullable=False, server_default="5")
+    peer_eligibility_statuses: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False, server_default="[]")
 
     venue: Mapped[Venue | None] = relationship()
     staff: Mapped[list[EventStaff]] = relationship(

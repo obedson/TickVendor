@@ -103,6 +103,8 @@ def create_event(db: Session, payload: EventCreate, user: User) -> Event:
         max_peer_confirmations=payload.max_peer_confirmations,
         peer_confirmation_deadline=payload.peer_confirmation_deadline,
         required_verification_methods=payload.required_verification_methods,
+        peer_selection_limit=payload.peer_selection_limit,
+        peer_eligibility_statuses=payload.peer_eligibility_statuses,
     )
     db.add(event)
     db.commit()
