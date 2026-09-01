@@ -124,8 +124,10 @@ integrated product evidence. TickVendor is not specification-complete or product
   upcoming/used/cancelled grouping.
 - [x] Enforce task assignee and event tenant membership.
 - [x] Add tenant-authorized task and participant-assignment browse APIs with community filtering.
-- [ ] Add task attachments, implement overdue and `verification_required` behavior, and resolve
-  configured task reward values consistently with central PointRule policy.
+- [x] Add task overdue handling and `verification_required` semantics: required tasks await review,
+  non-required tasks qualify on completion, overdue tasks reject late completion, and rewards resolve
+  through central PointRule policy.
+- [ ] Add task attachments/evidence attachment support.
 - [x] Organizer/admin attendance review APIs list flagged records with event, participant, reason
   and open/cleared/confirmed/rejected filters, preserve original signals, and resolve outcomes with
   tenant authorization and audit records; duplicate check-ins retain `duplicate_check_in` evidence.

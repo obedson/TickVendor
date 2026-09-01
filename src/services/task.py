@@ -69,12 +69,28 @@ def submit_task(db: Session, assignment: TaskAssignment, user: User, evidence_te
         raise HTTPException(status_code=403, detail="Task is not assigned to this user")
     if assignment.status not in {TaskAssignmentStatus.ASSIGNED, TaskAssignmentStatus.ACCEPTED, TaskAssignmentStatus.IN_PROGRESS, TaskAssignmentStatus.REJECTED}:
         raise HTTPException(status_code=409, detail="Task cannot be submitted in its current state")
+    task = db.get(Task, assignment.task_id)
+    now = datetime.now(UTC)
+    if task.due_at and now > task.due_at and assignment.status != TaskAssignmentStatus.REJECTED:
+        assignment.status = TaskAssignmentStatus.OVERDUE
+        db.commit()
+        raise HTTPException(status_code=409, detail="Task is overdue")
     submission = TaskSubmission(
         assignment_id=assignment.id, evidence_text=evidence_text,
-        evidence_url=evidence_url, submitted_at=datetime.now(UTC),
+        evidence_url=evidence_url, submitted_at=now,
     )
-    assignment.status = TaskAssignmentStatus.SUBMITTED
-    db.add(submission); db.commit(); return submission
+    assignment.status = TaskAssignmentStatus.SUBMITTED if task.verification_required else TaskAssignmentStatus.VERIFIED
+    assignment.completed_at = now
+    db.add(submission)
+    if not task.verification_required and task.impact_point_reward:
+        award_points(db, user_id=assignment.assignee_id, community_id=task.community_id,
+                     source_type="task_completion", source_id=assignment.id,
+                     idempotency_key=f"task:{assignment.id}:verified", reason=f"Completed task: {task.title}",
+                     task_id=task.id, event_id=task.event_id, commit=False)
+    db.commit()
+    if not task.verification_required:
+        evaluate_recognition(db, assignment.assignee_id, task.community_id)
+    return submission
 
 
 def verify_task(db: Session, assignment: TaskAssignment, verifier: User, approve: bool):
