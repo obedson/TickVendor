@@ -37,6 +37,30 @@ dashboards, complete frontend journeys/screens, full PWA offline/install behavio
 handling, distributed rate limiting, comprehensive fraud analysis, and live external-provider
 verification. These remain active work; no completion claim is made.
 
+## Final Specification Audit — 2026-09-01
+
+The checklist below corrects earlier backend-capability claims that were broader than the
+integrated product evidence. TickEven is not specification-complete or production-ready.
+
+- [ ] Complete the participant frontend journeys: authentication, event detail/ticket acquisition,
+  check-in result, peer confirmation, tasks, contributions, achievements, milestones, ranks,
+  community selection, profile/privacy settings, and meaningful empty/error states.
+- [ ] Complete organizer/admin frontend journeys: event creation/edit/publish, ticket setup and
+  attendee management, QR scanning, attendance review, task/member/contribution management,
+  analytics, audit log, and all data-driven recognition/configuration screens.
+- [ ] Integrate `evaluate_recognition` into verified business transitions or a durable job so
+  milestone/badge rewards and notifications happen automatically; add end-to-end recognition tests.
+- [ ] Persist or expose rank progression/history if rank-change recognition is required; current
+  rank is calculated on profile reads rather than awarded through an automatic workflow.
+- [ ] Provide production email and push senders; current defaults are in-memory adapters only.
+- [ ] Add production-grade distributed rate limiting for horizontally scaled deployment.
+- [ ] Expand README/project documentation to cover architecture, API/authentication, migrations and
+  seeds, payment providers/webhooks, geolocation, PWA, recognition/admin configuration, and deployment.
+- [ ] Add browser/E2E coverage for the participant, organizer, and community-administrator journeys;
+  current frontend checks are source/runtime policy scripts rather than browser interaction tests.
+- [ ] Verify PostgreSQL migration/application behavior, production deployment, HTTPS/TLS, CORS,
+  monitoring/error tracking, and live Paystack/Flutterwave/Stripe/email/push providers.
+
 ## Implementation Checklist — Grouped by Dependency-Aware Subsystem
 
 ### Foundation / Architecture
