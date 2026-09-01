@@ -61,6 +61,9 @@ integrated product evidence. TickEven is not specification-complete or productio
   service compares order values only against the locally created Payment row.
 - [ ] Integrate provider-side refunds for paid orders and reconcile webhook/provider refund state;
   current refund logic transitions local Payment/Ticket/Order records only.
+- [ ] Accept and verify each provider's real webhook signature header (`x-paystack-signature`,
+  Flutterwave `verif-hash`/configured signature header, and `Stripe-Signature`); the current route
+  exposes only the generic `X-Payment-Signature` header and is not live-provider compatible as-is.
 - [ ] Add production-grade distributed rate limiting for horizontally scaled deployment.
 - [ ] Expand README/project documentation to cover architecture, API/authentication, migrations and
   seeds, payment providers/webhooks, geolocation, PWA, recognition/admin configuration, and deployment.
