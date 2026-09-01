@@ -108,8 +108,9 @@ integrated product evidence. TickVendor is not specification-complete or product
 - [ ] Complete configurable peer limits, deadlines, eligibility, attendee selection, and required
   verification combinations.
 - [x] Award attendance Impact Points idempotently after check-in and resolve the configured central
-  PointRule; task verification posts its reward before commit and concurrent Impact Point key races
-  return the existing transaction.
+  PointRule; concurrent Impact Point key races return the existing transaction.
+- [ ] Make task verification, its audit record, notification, and reward insertion one atomic
+  transaction; the current reward helper commits independently before the surrounding task flow.
 - [x] Enforce hidden/invite-only ticket visibility during ordering.
 - [ ] Enrich My Tickets with event,
   date, venue, ticket-type data and upcoming/used/cancelled grouping.
