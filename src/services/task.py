@@ -64,7 +64,7 @@ def transition_assignment(db: Session, assignment: TaskAssignment, user: User,
     return assignment
 
 
-def submit_task(db: Session, assignment: TaskAssignment, user: User, evidence_text=None, evidence_url=None):
+def submit_task(db: Session, assignment: TaskAssignment, user: User, evidence_text=None, evidence_url=None, evidence_attachments=None):
     if assignment.assignee_id != user.id:
         raise HTTPException(status_code=403, detail="Task is not assigned to this user")
     if assignment.status not in {TaskAssignmentStatus.ASSIGNED, TaskAssignmentStatus.ACCEPTED, TaskAssignmentStatus.IN_PROGRESS, TaskAssignmentStatus.REJECTED}:
@@ -78,6 +78,7 @@ def submit_task(db: Session, assignment: TaskAssignment, user: User, evidence_te
     submission = TaskSubmission(
         assignment_id=assignment.id, evidence_text=evidence_text,
         evidence_url=evidence_url, submitted_at=now,
+        evidence_attachments=[str(item) for item in (evidence_attachments or [])],
     )
     assignment.status = TaskAssignmentStatus.SUBMITTED if task.verification_required else TaskAssignmentStatus.VERIFIED
     assignment.completed_at = now

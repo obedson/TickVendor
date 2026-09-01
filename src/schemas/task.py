@@ -16,6 +16,7 @@ class TaskCreateInput(BaseModel):
     priority: TaskPriority = TaskPriority.NORMAL
     impact_point_reward: int = Field(default=0, ge=0, le=10000)
     verification_required: bool = True
+    attachments: list[HttpUrl] = Field(default_factory=list, max_length=10)
 
 
 class AssignmentInput(BaseModel):
@@ -25,6 +26,7 @@ class AssignmentInput(BaseModel):
 class SubmissionInput(BaseModel):
     evidence_text: str | None = Field(default=None, max_length=10000)
     evidence_url: HttpUrl | None = None
+    evidence_attachments: list[HttpUrl] = Field(default_factory=list, max_length=10)
 
 
 class VerificationInput(BaseModel):

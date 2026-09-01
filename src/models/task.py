@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import Any
 
 from sqlalchemy import (
+    JSON,
     Boolean,
     DateTime,
     Enum,
@@ -65,6 +66,7 @@ class Task(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     impact_point_reward: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     verification_required: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    attachments: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
 
 
 class TaskAssignment(UUIDPrimaryKeyMixin, TimestampMixin, Base):
@@ -107,3 +109,4 @@ class TaskSubmission(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     evidence_text: Mapped[str | None] = mapped_column(Text)
     evidence_url: Mapped[str | None] = mapped_column(String(2048))
     submitted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    evidence_attachments: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)

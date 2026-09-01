@@ -127,7 +127,8 @@ integrated product evidence. TickVendor is not specification-complete or product
 - [x] Add task overdue handling and `verification_required` semantics: required tasks await review,
   non-required tasks qualify on completion, overdue tasks reject late completion, and rewards resolve
   through central PointRule policy.
-- [ ] Add task attachments/evidence attachment support.
+- [x] Add task attachments and evidence attachment support as validated URL metadata with bounded
+  cardinality and tenant-authorized task/submission flows.
 - [x] Organizer/admin attendance review APIs list flagged records with event, participant, reason
   and open/cleared/confirmed/rejected filters, preserve original signals, and resolve outcomes with
   tenant authorization and audit records; duplicate check-ins retain `duplicate_check_in` evidence.

@@ -85,7 +85,8 @@ def submit(assignment_id: UUID, payload: SubmissionInput,
     assignment = db.get(TaskAssignment, assignment_id)
     if assignment is None: raise HTTPException(status_code=404, detail="Assignment not found")
     submission = submit_task(db, assignment, user, payload.evidence_text,
-                             str(payload.evidence_url) if payload.evidence_url else None)
+                             str(payload.evidence_url) if payload.evidence_url else None,
+                             payload.evidence_attachments)
     return {"id": str(submission.id)}
 
 
