@@ -50,6 +50,9 @@ integrated product evidence. TickEven is not specification-complete or productio
   analytics, audit log, and all data-driven recognition/configuration screens.
 - [ ] Integrate `evaluate_recognition` into verified business transitions or a durable job so
   milestone/badge rewards and notifications happen automatically; add end-to-end recognition tests.
+- [ ] Implement automatic `AchievementRule.reward_definition` execution (badge and Impact Point
+  rewards) with idempotency, audit, and notification integration; current code validates/evaluates
+  condition trees but does not execute configured achievement-rule rewards.
 - [ ] Persist or expose rank progression/history if rank-change recognition is required; current
   rank is calculated on profile reads rather than awarded through an automatic workflow.
 - [ ] Provide production email and push senders; current defaults are in-memory adapters only.
