@@ -168,7 +168,7 @@ verification. These remain active work; no completion claim is made.
 - [x] Tenant-admin achievement rule API supports validated condition/reward definitions
 - [x] Safe evaluator supports AND, OR, >=, <=, =, Count, Sum, Streak, and Unique event count
 - [x] Idempotent configurable Community Champion rule seed: attendance >= 20, tasks >= 10, peer confirmations >= 10, leadership >= 3, Impact Points >= 500, reward badge + 50 points
-- [ ] Additional rule types designed for future extensibility
+- [x] Achievement evaluator supports safely registered additional aggregate rule types without changing condition-tree evaluation
 
 ### Streaks (Optional)
 - [ ] Optional engagement streaks: 3-event attendance streak, 5-task completion streak, 4-week activity streak

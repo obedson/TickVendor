@@ -1,10 +1,19 @@
 """Safe, extensible achievement condition-tree evaluator."""
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from typing import Any
 
 SUPPORTED_COMPARISONS = {">=", "<=", "="}
 SUPPORTED_AGGREGATES = {"Count", "Sum", "Streak", "Unique event count"}
+CUSTOM_AGGREGATES: dict[str, Callable[[Sequence[Any]], int | float]] = {}
+
+
+def register_aggregate(
+    name: str, handler: Callable[[Sequence[Any]], int | float]
+) -> None:
+    if not name or name in SUPPORTED_COMPARISONS | SUPPORTED_AGGREGATES:
+        raise ValueError("Aggregate name must be new and non-empty")
+    CUSTOM_AGGREGATES[name] = handler
 
 
 def compare(actual: float, expected: float, operator: str) -> bool:
@@ -36,6 +45,8 @@ def aggregate(operator: str, values: Any) -> int | float:
         return longest_truthy_streak(values)
     if operator == "Unique event count":
         return len(set(values))
+    if operator in CUSTOM_AGGREGATES:
+        return CUSTOM_AGGREGATES[operator](values)
     raise ValueError(f"Unsupported aggregate operator: {operator}")
 
 
@@ -47,7 +58,7 @@ def evaluate_condition(node: dict[str, Any], metrics: dict[str, Any]) -> bool:
     if operator == "OR":
         conditions = node.get("conditions", [])
         return bool(conditions) and any(evaluate_condition(child, metrics) for child in conditions)
-    if operator not in SUPPORTED_COMPARISONS | SUPPORTED_AGGREGATES:
+    if operator not in SUPPORTED_COMPARISONS | SUPPORTED_AGGREGATES | CUSTOM_AGGREGATES.keys():
         raise ValueError(f"Unsupported achievement operator: {operator}")
     metric = node.get("metric")
     if metric not in metrics:
@@ -55,7 +66,7 @@ def evaluate_condition(node: dict[str, Any], metrics: dict[str, Any]) -> bool:
     expected = node.get("value", 0)
     if operator in SUPPORTED_COMPARISONS:
         return compare(metrics[metric], expected, operator)
-    if operator in SUPPORTED_AGGREGATES:
+    if operator in SUPPORTED_AGGREGATES | CUSTOM_AGGREGATES.keys():
         return compare(
             aggregate(operator, metrics[metric]),
             expected,
