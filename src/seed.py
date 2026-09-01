@@ -5,7 +5,13 @@ from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from src.models import ContributionBand, EventCategory, PointRule
+from src.models import (
+    ContributionBand,
+    EventCategory,
+    Milestone,
+    MilestoneRequirement,
+    PointRule,
+)
 
 EVENT_CATEGORIES = (
     "technology",
@@ -35,6 +41,48 @@ CONTRIBUTION_BANDS = (
     (Decimal(5000), Decimal("9999.99"), 10),
     (Decimal(10000), None, 15),
 )
+COMMUNITY_BUILDER_REQUIREMENTS = {
+    "impact_points": 300,
+    "attendance_count": 10,
+    "task_count": 5,
+    "contribution_count": 1,
+}
+
+
+def seed_community_recognition(db: Session, community_id) -> None:
+    milestone = db.scalar(
+        select(Milestone).where(
+            Milestone.community_id == community_id,
+            Milestone.slug == "community-builder",
+        )
+    )
+    if milestone is None:
+        milestone = Milestone(
+            community_id=community_id,
+            name="Community Builder",
+            slug="community-builder",
+            description="Sustained attendance, execution, and contribution.",
+        )
+        db.add(milestone)
+        db.flush()
+    existing = set(
+        db.scalars(
+            select(MilestoneRequirement.metric).where(
+                MilestoneRequirement.milestone_id == milestone.id
+            )
+        )
+    )
+    db.add_all(
+        MilestoneRequirement(
+            milestone_id=milestone.id,
+            metric=metric,
+            operator=">=",
+            threshold=threshold,
+        )
+        for metric, threshold in COMMUNITY_BUILDER_REQUIREMENTS.items()
+        if metric not in existing
+    )
+    db.commit()
 
 
 def seed_business_configuration(db: Session) -> None:

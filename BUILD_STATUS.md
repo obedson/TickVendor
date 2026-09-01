@@ -143,7 +143,7 @@ verification. These remain active work; no completion claim is made.
 - [x] Milestone/MilestoneRequirement schema (community-scoped configurable metrics, operators, thresholds, rewards)
 - [x] Configurable milestone qualification service using database metrics/operators
 - [x] Metrics include tenant-scoped points, attendance, tasks, contributions, service, leadership, peer confirmations, event participation and consecutive verified-activity days
-- [ ] Example: Community Builder — 300 Impact Points, 10 verified attendances, 5 completed tasks, 1 community contribution
+- [x] Idempotent configurable Community Builder seed: 300 Impact Points, 10 verified attendances, 5 completed tasks, 1 community contribution
 - [x] Idempotent automatic milestone awards, reward transactions, and notifications
 - [x] Milestone definitions and requirements are configurable through tenant-admin API
 
