@@ -10,7 +10,15 @@ from sqlalchemy.orm import Session
 
 import src.models  # noqa: F401
 from src.database import Base
-from src.models import AttendanceVerification, LocationType, User, Venue, VerificationMethod
+from src.models import (
+    AttendanceVerification,
+    ImpactTransaction,
+    LocationType,
+    PointRule,
+    User,
+    Venue,
+    VerificationMethod,
+)
 from src.schemas.attendance import AttendanceCheckIn
 from src.services.attendance import calculate_attendance_confidence, check_in, haversine_meters
 from tests.test_database import create_event_context
@@ -27,6 +35,7 @@ def test_haversine_and_idempotent_geofence_checkin(tmp_path):
         db.add_all([attendee, venue]); db.flush()
         event.venue_id = venue.id; event.venue = venue; event.location_type = LocationType.PHYSICAL
         event.geofence_enabled = True; event.geofence_radius_meters = 100
+        db.add(PointRule(source_type="attendance", points=10))
         event.check_in_opens_at = datetime.now(UTC) - timedelta(minutes=5)
         event.check_in_closes_at = datetime.now(UTC) + timedelta(minutes=5)
         db.commit()
@@ -35,6 +44,7 @@ def test_haversine_and_idempotent_geofence_checkin(tmp_path):
         second = check_in(db, event, attendee, payload)
         assert first.id == second.id
         assert first.status.value == "gps_verified"
+        assert db.query(ImpactTransaction).filter_by(source_type="attendance").count() == 1
     engine.dispose()
 
 

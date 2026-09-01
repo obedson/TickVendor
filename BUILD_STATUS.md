@@ -106,9 +106,9 @@ integrated product evidence. TickVendor is not specification-complete or product
 - [ ] Enforce event attendance-method configuration (`peer_confirmation_enabled`,
   `qr_attendance_enabled`, `organizer_verification_enabled`) and complete configurable peer limits,
   deadlines, eligibility, attendee selection, and required verification combinations.
-- [ ] Award attendance Impact Points idempotently after configured verification and make task
-  verification plus reward posting atomic/retry-safe; handle concurrent Impact Point key races by
-  returning the existing transaction rather than surfacing an integrity error.
+- [x] Award attendance Impact Points idempotently after check-in and resolve the configured central
+  PointRule; task verification posts its reward before commit and concurrent Impact Point key races
+  return the existing transaction.
 - [ ] Enforce hidden/invite-only ticket visibility during ordering and enrich My Tickets with event,
   date, venue, ticket-type data and upcoming/used/cancelled grouping.
 - [ ] Enforce task assignee and event tenant membership, add task/assignment browse APIs and task

@@ -2,6 +2,7 @@
 
 from fastapi import HTTPException
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from src.models import ImpactTransaction, ImpactTransactionStatus, PointRule
@@ -30,5 +31,14 @@ def award_points(
         status=ImpactTransactionStatus.POSTED,
     )
     db.add(transaction)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        existing = db.scalar(select(ImpactTransaction).where(
+            ImpactTransaction.idempotency_key == idempotency_key,
+        ))
+        if existing is not None:
+            return existing
+        raise exc
     return transaction

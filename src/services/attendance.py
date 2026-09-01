@@ -27,6 +27,7 @@ from src.models import (
 )
 from src.schemas.attendance import AttendanceCheckIn
 from src.services.event import as_utc
+from src.services.impact import award_points
 from src.services.notification import audit
 
 
@@ -151,6 +152,13 @@ def check_in(db: Session, event: Event, user: User, payload: AttendanceCheckIn) 
     db.commit()
     if event.geofence_enabled:
         calculate_attendance_confidence(db, attendance)
+    if attendance.status != AttendanceStatus.REJECTED:
+        award_points(
+            db, user_id=user.id, community_id=event.community_id,
+            source_type="attendance", source_id=attendance.id,
+            idempotency_key=f"attendance:{attendance.id}:verified",
+            reason=f"Attendance recorded: {event.title}", event_id=event.id,
+        )
     evaluate_attendance_abuse(db, attendance)
     return attendance
 
