@@ -171,9 +171,9 @@ verification. These remain active work; no completion claim is made.
 - [x] Achievement evaluator supports safely registered additional aggregate rule types without changing condition-tree evaluation
 
 ### Streaks (Optional)
-- [ ] Optional engagement streaks: 3-event attendance streak, 5-task completion streak, 4-week activity streak
+- [x] Optional 3-event attendance, 5-task completion and 4-week activity streak rules are configurable and seeded disabled by default
 - [x] Tenant administrators can enable/disable streak achievement rules through an audited API
-- [ ] Avoid overly game-like experience
+- [x] Streaks are opt-in, disabled by default and use restrained recognition without automatic point rewards
 
 ### Member Journey / Profile
 - [x] Achievement timeline API starts with community membership and includes chronologically ordered badge and milestone awards

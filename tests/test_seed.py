@@ -162,5 +162,44 @@ def test_community_champion_rule_seed_is_configurable_and_idempotent(tmp_path):
             "badge": "community-champion",
             "impact_points": 50,
         }
-        assert session.scalar(select(func.count()).select_from(AchievementRule)) == 1
+        assert session.scalar(
+            select(func.count()).select_from(AchievementRule).where(
+                AchievementRule.slug == "community-champion"
+            )
+        ) == 1
+    engine.dispose()
+
+
+def test_optional_streak_rules_are_seeded_disabled_and_idempotent(tmp_path):
+    engine = create_engine(f"sqlite:///{tmp_path / 'streak-seed.db'}")
+    Base.metadata.create_all(engine)
+    with Session(engine) as session:
+        _user, community, _event = create_event_context(session)
+
+        seed_community_recognition(session, community.id)
+        seed_community_recognition(session, community.id)
+
+        rules = {
+            rule.slug: (rule.condition_tree, rule.is_active)
+            for rule in session.scalars(
+                select(AchievementRule).where(
+                    AchievementRule.community_id == community.id,
+                    AchievementRule.slug.like("%-streak"),
+                )
+            )
+        }
+        assert rules == {
+            "three-event-attendance-streak": (
+                {"operator": ">=", "metric": "attendance_count", "value": 3},
+                False,
+            ),
+            "five-task-completion-streak": (
+                {"operator": ">=", "metric": "task_count", "value": 5},
+                False,
+            ),
+            "four-week-activity-streak": (
+                {"operator": ">=", "metric": "consecutive_activities", "value": 4},
+                False,
+            ),
+        }
     engine.dispose()

@@ -78,6 +78,11 @@ COMMUNITY_CHAMPION_CONDITIONS = {
         {"operator": ">=", "metric": "impact_points", "value": 500},
     ],
 }
+OPTIONAL_STREAK_RULES = (
+    ("Three Event Attendance Streak", "three-event-attendance-streak", "attendance_count", 3),
+    ("Five Task Completion Streak", "five-task-completion-streak", "task_count", 5),
+    ("Four Week Activity Streak", "four-week-activity-streak", "consecutive_activities", 4),
+)
 
 
 def seed_community_recognition(db: Session, community_id) -> None:
@@ -158,6 +163,26 @@ def seed_community_recognition(db: Session, community_id) -> None:
                 reward_definition={"badge": "community-champion", "impact_points": 50},
             )
         )
+    existing_rules = set(
+        db.scalars(
+            select(AchievementRule.slug).where(
+                AchievementRule.community_id == community_id
+            )
+        )
+    )
+    db.add_all(
+        AchievementRule(
+            community_id=community_id,
+            name=name,
+            slug=slug,
+            description="Optional recognition for sustained engagement.",
+            condition_tree={"operator": ">=", "metric": metric, "value": threshold},
+            reward_definition={},
+            is_active=False,
+        )
+        for name, slug, metric, threshold in OPTIONAL_STREAK_RULES
+        if slug not in existing_rules
+    )
     db.commit()
 
 
