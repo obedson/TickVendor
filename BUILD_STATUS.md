@@ -167,7 +167,7 @@ verification. These remain active work; no completion claim is made.
 - [x] AchievementRule schema (versioned condition tree and reward definition for extensible operators)
 - [x] Tenant-admin achievement rule API supports validated condition/reward definitions
 - [x] Safe evaluator supports AND, OR, >=, <=, =, Count, Sum, Streak, and Unique event count
-- [ ] Example achievement: Community Champion — attendance >= 20, tasks >= 10, peer confirmations >= 10, leadership activities >= 3, Impact Points >= 500, reward: badge + 50 Impact Points
+- [x] Idempotent configurable Community Champion rule seed: attendance >= 20, tasks >= 10, peer confirmations >= 10, leadership >= 3, Impact Points >= 500, reward badge + 50 points
 - [ ] Additional rule types designed for future extensibility
 
 ### Streaks (Optional)

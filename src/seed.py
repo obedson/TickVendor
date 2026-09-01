@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from src.models import (
+    AchievementRule,
     Badge,
     ContributionBand,
     EventCategory,
@@ -67,6 +68,16 @@ DEFAULT_BADGES = (
     ("Facilitator", "facilitator", "organized_event_count", 1),
     ("Community Builder", "community-builder", "community_builder_milestones", 1),
 )
+COMMUNITY_CHAMPION_CONDITIONS = {
+    "operator": "AND",
+    "conditions": [
+        {"operator": ">=", "metric": "attendance_count", "value": 20},
+        {"operator": ">=", "metric": "task_count", "value": 10},
+        {"operator": ">=", "metric": "peer_confirmations", "value": 10},
+        {"operator": ">=", "metric": "leadership_activities", "value": 3},
+        {"operator": ">=", "metric": "impact_points", "value": 500},
+    ],
+}
 
 
 def seed_community_recognition(db: Session, community_id) -> None:
@@ -131,6 +142,22 @@ def seed_community_recognition(db: Session, community_id) -> None:
         for name, slug, metric, threshold in DEFAULT_BADGES
         if slug not in existing_badges
     )
+    champion = db.scalar(
+        select(AchievementRule).where(
+            AchievementRule.community_id == community_id,
+            AchievementRule.slug == "community-champion",
+        )
+    )
+    if champion is None:
+        db.add(
+            AchievementRule(
+                community_id=community_id,
+                name="Community Champion",
+                slug="community-champion",
+                condition_tree=COMMUNITY_CHAMPION_CONDITIONS,
+                reward_definition={"badge": "community-champion", "impact_points": 50},
+            )
+        )
     db.commit()
 
 

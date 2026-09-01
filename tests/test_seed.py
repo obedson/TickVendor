@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 import src.models  # noqa: F401
 from src.database import Base
 from src.models import (
+    AchievementRule,
     Badge,
     ContributionBand,
     EventCategory,
@@ -129,4 +130,37 @@ def test_default_badge_seed_is_configurable_and_idempotent(tmp_path):
                 "value": 1,
             },
         }
+    engine.dispose()
+
+
+def test_community_champion_rule_seed_is_configurable_and_idempotent(tmp_path):
+    engine = create_engine(f"sqlite:///{tmp_path / 'achievement-seed.db'}")
+    Base.metadata.create_all(engine)
+    with Session(engine) as session:
+        _user, community, _event = create_event_context(session)
+
+        seed_community_recognition(session, community.id)
+        seed_community_recognition(session, community.id)
+
+        rule = session.scalar(
+            select(AchievementRule).where(
+                AchievementRule.community_id == community.id,
+                AchievementRule.slug == "community-champion",
+            )
+        )
+        assert rule.condition_tree == {
+            "operator": "AND",
+            "conditions": [
+                {"operator": ">=", "metric": "attendance_count", "value": 20},
+                {"operator": ">=", "metric": "task_count", "value": 10},
+                {"operator": ">=", "metric": "peer_confirmations", "value": 10},
+                {"operator": ">=", "metric": "leadership_activities", "value": 3},
+                {"operator": ">=", "metric": "impact_points", "value": 500},
+            ],
+        }
+        assert rule.reward_definition == {
+            "badge": "community-champion",
+            "impact_points": 50,
+        }
+        assert session.scalar(select(func.count()).select_from(AchievementRule)) == 1
     engine.dispose()
