@@ -286,4 +286,5 @@ verification. These remain active work; no completion claim is made.
 ### PWA
 - [x] Manifest, service worker, and cached offline application shell build successfully
 - [x] App icons and install-prompt UX
+- [x] Existing participant shell is mobile-first, keyboard navigable, and responsive across narrow and wide layouts
 - [ ] Complete responsive application screens
