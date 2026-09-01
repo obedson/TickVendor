@@ -59,6 +59,36 @@ def calculate_attendance_confidence(db: Session, attendance: Attendance) -> Atte
     return attendance
 
 
+def evaluate_attendance_abuse(db: Session, attendance: Attendance) -> Attendance:
+    """Flag implausible GPS transitions conservatively and idempotently."""
+    current = db.scalar(select(AttendanceVerification).where(
+        AttendanceVerification.attendance_id == attendance.id,
+        AttendanceVerification.method == VerificationMethod.GPS,
+        AttendanceVerification.is_valid.is_(True),
+    ))
+    if current is None or current.latitude is None or current.longitude is None:
+        return attendance
+    previous = db.scalar(select(AttendanceVerification).join(
+        Attendance, Attendance.id == AttendanceVerification.attendance_id,
+    ).where(
+        Attendance.user_id == attendance.user_id, Attendance.id != attendance.id,
+        AttendanceVerification.method == VerificationMethod.GPS,
+        AttendanceVerification.is_valid.is_(True),
+        AttendanceVerification.verified_at < current.verified_at,
+    ).order_by(AttendanceVerification.verified_at.desc()))
+    if previous is None:
+        return attendance
+    elapsed = (as_utc(current.verified_at) - as_utc(previous.verified_at)).total_seconds()
+    speed_kmh = haversine_meters(previous.latitude, previous.longitude,
+                                 current.latitude, current.longitude) / elapsed * 3.6 if elapsed > 0 else 0
+    if speed_kmh > 1_000 and "impossible_location_transition" not in (attendance.review_reason or ""):
+        attendance.flagged_for_review = True
+        attendance.review_reason = ((attendance.review_reason + "; ") if attendance.review_reason else "") + \
+            f"impossible_location_transition:speed_kmh={speed_kmh:.1f}"
+        db.commit()
+    return attendance
+
+
 def check_in(db: Session, event: Event, user: User, payload: AttendanceCheckIn) -> Attendance:
     now = datetime.now(UTC)
     if event.check_in_opens_at and now < as_utc(event.check_in_opens_at):
@@ -102,6 +132,7 @@ def check_in(db: Session, event: Event, user: User, payload: AttendanceCheckIn) 
     db.commit()
     if event.geofence_enabled:
         calculate_attendance_confidence(db, attendance)
+    evaluate_attendance_abuse(db, attendance)
     return attendance
 
 

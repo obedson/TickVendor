@@ -16,7 +16,7 @@ from src.models import (
     User,
 )
 from src.schemas.attendance import AttendanceCheckIn
-from src.services.attendance import check_in, confirm_peer
+from src.services.attendance import check_in, confirm_peer, evaluate_attendance_abuse
 from tests.test_database import create_event_context
 
 
@@ -77,6 +77,62 @@ def test_duplicate_qr_verification_is_flagged_for_review(tmp_path):
         qr_verify(session, attendance, ticket, attendee)
         assert attendance.flagged_for_review
         assert "duplicate" in attendance.review_reason.lower()
+    engine.dispose()
+
+
+def test_impossible_location_transition_is_flagged_without_punishment(tmp_path):
+    engine = create_engine(f"sqlite:///{tmp_path / 'impossible-transition.db'}")
+    Base.metadata.create_all(engine)
+    with Session(engine, expire_on_commit=False) as session:
+        attendee, community, first_event = create_event_context(session)
+        from src.models import AttendanceVerification, Event, VerificationMethod
+        second_event = Event(community_id=community.id, organizer_id=attendee.id, title="Second",
+                             slug="second-transition", description="second", category="technology",
+                             starts_at=datetime.now(UTC), ends_at=datetime.now(UTC), location_type="online",
+                             online_url="https://example.com")
+        session.add(second_event); session.flush()
+        first = Attendance(event_id=first_event.id, user_id=attendee.id, status=AttendanceStatus.GPS_VERIFIED)
+        second = Attendance(event_id=second_event.id, user_id=attendee.id, status=AttendanceStatus.GPS_VERIFIED)
+        session.add_all([first, second]); session.flush()
+        session.add_all([
+            AttendanceVerification(attendance_id=first.id, method=VerificationMethod.GPS, is_valid=True,
+                                   verified_at=datetime(2026, 1, 1, 12, 0, tzinfo=UTC), latitude=Decimal(9), longitude=Decimal(7)),
+            AttendanceVerification(attendance_id=second.id, method=VerificationMethod.GPS, is_valid=True,
+                                   verified_at=datetime(2026, 1, 1, 12, 1, tzinfo=UTC), latitude=Decimal(0), longitude=Decimal(0)),
+        ])
+        session.commit()
+        evaluate_attendance_abuse(session, second)
+        assert second.flagged_for_review
+        assert "impossible_location_transition" in second.review_reason
+        assert second.status == AttendanceStatus.GPS_VERIFIED
+        evaluate_attendance_abuse(session, second)
+        assert second.review_reason.count("impossible_location_transition") == 1
+    engine.dispose()
+
+
+def test_normal_location_transition_is_not_flagged(tmp_path):
+    engine = create_engine(f"sqlite:///{tmp_path / 'normal-transition.db'}")
+    Base.metadata.create_all(engine)
+    with Session(engine, expire_on_commit=False) as session:
+        attendee, community, first_event = create_event_context(session)
+        from src.models import AttendanceVerification, Event, VerificationMethod
+        second_event = Event(community_id=community.id, organizer_id=attendee.id, title="Nearby",
+                             slug="nearby-transition", description="nearby", category="technology",
+                             starts_at=datetime.now(UTC), ends_at=datetime.now(UTC), location_type="online",
+                             online_url="https://example.com")
+        session.add(second_event); session.flush()
+        first = Attendance(event_id=first_event.id, user_id=attendee.id, status=AttendanceStatus.GPS_VERIFIED)
+        second = Attendance(event_id=second_event.id, user_id=attendee.id, status=AttendanceStatus.GPS_VERIFIED)
+        session.add_all([first, second]); session.flush()
+        session.add_all([
+            AttendanceVerification(attendance_id=first.id, method=VerificationMethod.GPS, is_valid=True,
+                                   verified_at=datetime(2026, 1, 1, 12, 0, tzinfo=UTC), latitude=Decimal(9), longitude=Decimal(7)),
+            AttendanceVerification(attendance_id=second.id, method=VerificationMethod.GPS, is_valid=True,
+                                   verified_at=datetime(2026, 1, 1, 13, 0, tzinfo=UTC), latitude=Decimal("9.001"), longitude=Decimal("7.001")),
+        ])
+        session.commit()
+        evaluate_attendance_abuse(session, second)
+        assert not second.flagged_for_review
     engine.dispose()
 
 
