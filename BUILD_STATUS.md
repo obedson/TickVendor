@@ -117,7 +117,8 @@ integrated product evidence. TickVendor is not specification-complete or product
   attachments, implement overdue and `verification_required` behavior, and resolve configured task
   reward values consistently with central PointRule policy.
 - [ ] Add an organizer attendance-abuse review workflow and broader repeated-suspicious-signal
-  aggregation; duplicate check-ins currently return the existing row without a review signal.
+  aggregation; duplicate check-ins now preserve state while recording an idempotent
+  `duplicate_check_in` review signal.
 - [ ] Add production-grade distributed rate limiting for horizontally scaled deployment.
 - [ ] Expand README/project documentation to cover architecture, API/authentication, migrations and
   seeds, payment providers/webhooks, geolocation, PWA, recognition/admin configuration, and deployment.

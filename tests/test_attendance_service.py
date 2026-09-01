@@ -45,6 +45,8 @@ def test_haversine_and_idempotent_geofence_checkin(tmp_path):
         assert first.id == second.id
         assert first.status.value == "gps_verified"
         assert db.query(ImpactTransaction).filter_by(source_type="attendance").count() == 1
+        assert second.flagged_for_review
+        assert "duplicate_check_in" in second.review_reason
     engine.dispose()
 
 

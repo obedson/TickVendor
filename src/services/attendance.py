@@ -120,6 +120,9 @@ def check_in(db: Session, event: Event, user: User, payload: AttendanceCheckIn) 
         Attendance.event_id == event.id, Attendance.user_id == user.id
     ))
     if existing:
+        existing.flagged_for_review = True
+        existing.review_reason = ((existing.review_reason + "; ") if existing.review_reason else "") + "duplicate_check_in"
+        db.commit()
         return existing
     ticket = db.get(Ticket, payload.ticket_id) if payload.ticket_id else None
     if ticket and (ticket.event_id != event.id or ticket.attendee_id != user.id or ticket.status not in {TicketStatus.ACTIVE, TicketStatus.USED}):
