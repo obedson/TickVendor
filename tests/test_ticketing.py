@@ -78,3 +78,17 @@ def test_free_order_is_idempotent_wallet_ticket_and_duplicate_scan_is_safe(tmp_p
         result, _ = validate_ticket(db, event_model.id, ticket.qr_token, organizer)
         assert result == "already_used"
     engine.dispose()
+
+
+def test_non_public_ticket_type_cannot_be_ordered(tmp_path):
+    engine = create_engine(f"sqlite:///{tmp_path / 'ticket-visibility.db'}")
+    Base.metadata.create_all(engine)
+    with Session(engine, expire_on_commit=False) as db:
+        organizer, buyer, _outsider, event_model = setup(db)
+        ticket_type = create_ticket_type(db, event_model.id, TicketTypeCreate(
+            name="Invite", price=Decimal(0), quantity=2, visibility="invite_only"), organizer)
+        with pytest.raises(HTTPException) as denied:
+            create_order(db, event_model.id, OrderCreate(ticket_type_id=ticket_type.id, quantity=1,
+                                                         idempotency_key="visibility-key-12345"), buyer)
+        assert denied.value.status_code == 403
+    engine.dispose()

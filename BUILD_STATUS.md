@@ -110,7 +110,8 @@ integrated product evidence. TickVendor is not specification-complete or product
 - [x] Award attendance Impact Points idempotently after check-in and resolve the configured central
   PointRule; task verification posts its reward before commit and concurrent Impact Point key races
   return the existing transaction.
-- [ ] Enforce hidden/invite-only ticket visibility during ordering and enrich My Tickets with event,
+- [x] Enforce hidden/invite-only ticket visibility during ordering.
+- [ ] Enrich My Tickets with event,
   date, venue, ticket-type data and upcoming/used/cancelled grouping.
 - [x] Enforce task assignee and event tenant membership.
 - [ ] Add task/assignment browse APIs and task

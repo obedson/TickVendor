@@ -24,6 +24,7 @@ from src.models import (
     TicketStatus,
     TicketType,
     User,
+    TicketVisibility,
 )
 from src.schemas.ticket import OrderCreate, TicketTypeCreate
 from src.services.event import as_utc
@@ -63,6 +64,8 @@ def create_order(db: Session, event_id: UUID, payload: OrderCreate, user: User) 
         raise HTTPException(status_code=404, detail="Published event not found")
     if ticket_type is None or ticket_type.event_id != event_id:
         raise HTTPException(status_code=404, detail="Ticket type not found")
+    if ticket_type.visibility != TicketVisibility.PUBLIC:
+        raise HTTPException(status_code=403, detail="Ticket type is not publicly available")
     if ticket_type.sales_start and as_utc(ticket_type.sales_start) > now:
         raise HTTPException(status_code=409, detail="Ticket sales have not started")
     if ticket_type.sales_end and as_utc(ticket_type.sales_end) < now:
