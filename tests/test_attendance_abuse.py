@@ -59,6 +59,27 @@ def test_low_accuracy_location_is_flagged_for_review(tmp_path):
     engine.dispose()
 
 
+def test_duplicate_qr_verification_is_flagged_for_review(tmp_path):
+    engine = create_engine(f"sqlite:///{tmp_path / 'duplicate-qr.db'}")
+    Base.metadata.create_all(engine)
+    with Session(engine, expire_on_commit=False) as session:
+        attendee, _community, event = create_event_context(session)
+        attendance = Attendance(event_id=event.id, user_id=attendee.id, status=AttendanceStatus.CHECKED_IN)
+        session.add(attendance); session.flush()
+        from src.models import Ticket, TicketStatus, TicketType
+        ticket_type = TicketType(event_id=event.id, name="Free", quantity=1)
+        session.add(ticket_type); session.flush()
+        ticket = Ticket(event_id=event.id, ticket_type_id=ticket_type.id, attendee_id=attendee.id,
+                        status=TicketStatus.ACTIVE, public_id="DUPQR1", qr_token="duplicate-qr-token")
+        session.add(ticket); session.commit()
+        from src.services.attendance import qr_verify
+        qr_verify(session, attendance, ticket, attendee)
+        qr_verify(session, attendance, ticket, attendee)
+        assert attendance.flagged_for_review
+        assert "duplicate" in attendance.review_reason.lower()
+    engine.dispose()
+
+
 def test_reciprocal_peer_confirmation_is_flagged_not_auto_rejected(tmp_path):
     engine = create_engine(f"sqlite:///{tmp_path / 'peer-abuse.db'}")
     Base.metadata.create_all(engine)
