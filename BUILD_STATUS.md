@@ -172,7 +172,7 @@ verification. These remain active work; no completion claim is made.
 
 ### Streaks (Optional)
 - [ ] Optional engagement streaks: 3-event attendance streak, 5-task completion streak, 4-week activity streak
-- [ ] Administrators can enable/disable streaks
+- [x] Tenant administrators can enable/disable streak achievement rules through an audited API
 - [ ] Avoid overly game-like experience
 
 ### Member Journey / Profile

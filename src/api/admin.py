@@ -27,6 +27,7 @@ from src.models import (
 )
 from src.schemas.admin import (
     AchievementRuleCreateInput,
+    AchievementRuleUpdateInput,
     BadgeCreateInput,
     BadgeRevokeInput,
     EventCategoryCreateInput,
@@ -257,3 +258,29 @@ def create_achievement_rule(
         metadata={"slug": rule.slug},
     )
     return {"id": str(rule.id), "slug": rule.slug}
+
+
+@router.patch("/achievement-rules/{rule_id}")
+def update_achievement_rule(
+    community_id: UUID,
+    rule_id: UUID,
+    payload: AchievementRuleUpdateInput,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
+):
+    require_admin(db, community_id, user)
+    rule = db.get(AchievementRule, rule_id)
+    if rule is None or rule.community_id != community_id:
+        raise HTTPException(status_code=404, detail="Achievement rule not found")
+    rule.is_active = payload.is_active
+    db.commit()
+    audit(
+        db,
+        actor_id=user.id,
+        community_id=community_id,
+        action="achievement_rule.updated",
+        target_type="achievement_rule",
+        target_id=rule.id,
+        metadata={"is_active": rule.is_active},
+    )
+    return {"id": str(rule.id), "slug": rule.slug, "is_active": rule.is_active}

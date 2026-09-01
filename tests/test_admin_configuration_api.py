@@ -7,7 +7,7 @@ from sqlalchemy.orm import sessionmaker
 import src.models  # noqa: F401
 from src.database import Base, get_db
 from src.main import create_app
-from src.models import Community, Membership, MembershipRole, Organization, User
+from src.models import AchievementRule, Community, Membership, MembershipRole, Organization, User
 from src.security import create_access_token
 
 
@@ -76,4 +76,29 @@ def test_community_admin_can_create_milestone_and_outsider_cannot(tmp_path):
     )
     assert created.status_code == 201, created.text
     assert created.json()["slug"] == "community-builder"
+
+    with sessions() as db:
+        streak = AchievementRule(
+            community_id=community_id,
+            name="Four Week Activity Streak",
+            slug="four-week-activity-streak",
+            condition_tree={
+                "operator": ">=",
+                "metric": "consecutive_activities",
+                "value": 4,
+            },
+            reward_definition={},
+            is_active=False,
+        )
+        db.add(streak)
+        db.commit()
+        streak_id = streak.id
+
+    toggled = client.patch(
+        f"/api/v1/admin/communities/{community_id}/achievement-rules/{streak_id}",
+        json={"is_active": True},
+        headers={"Authorization": f"Bearer {create_access_token(admin_id, 'participant')}"},
+    )
+    assert toggled.status_code == 200, toggled.text
+    assert toggled.json()["is_active"] is True
     engine.dispose()

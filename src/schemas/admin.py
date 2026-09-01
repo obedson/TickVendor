@@ -59,6 +59,10 @@ class AchievementRuleCreateInput(BaseModel):
     reward_definition: dict[str, Any]
 
 
+class AchievementRuleUpdateInput(BaseModel):
+    is_active: bool
+
+
 class EventCategoryCreateInput(BaseModel):
     slug: str = Field(min_length=2, max_length=80, pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
     name: str = Field(min_length=2, max_length=120)
