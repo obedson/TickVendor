@@ -1,5 +1,7 @@
 """Task and Impact Point service tests."""
 
+import pytest
+from fastapi import HTTPException
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
@@ -49,4 +51,19 @@ def test_verified_task_awards_points_once(tmp_path):
         assert db.query(ImpactTransaction).count() == 1
         assert db.query(AuditLog).filter_by(action="task.verified").one().actor_id == organizer.id
         assert db.query(Notification).filter_by(notification_type="task_verified").one().user_id == member.id
+    engine.dispose()
+
+
+def test_task_assignment_rejects_assignee_from_another_community(tmp_path):
+    engine = create_engine(f"sqlite:///{tmp_path / 'task-isolation.db'}")
+    Base.metadata.create_all(engine)
+    with Session(engine, expire_on_commit=False) as db:
+        organizer, community, _event = create_event_context(db)
+        outsider = User(email="task-outsider@example.com", password_hash="hash")
+        db.add(outsider); db.commit()
+        db.add(Membership(community_id=community.id, user_id=organizer.id, role=MembershipRole.ORGANIZER)); db.commit()
+        task = create_task(db, community.id, organizer, title="Scoped", description="Scoped task")
+        with pytest.raises(HTTPException) as denied:
+            assign_task(db, task, outsider.id, organizer)
+        assert denied.value.status_code == 404
     engine.dispose()

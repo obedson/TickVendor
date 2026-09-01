@@ -20,6 +20,7 @@ from src.models import (
     PeerConfirmation,
     PeerConfirmationDecision,
     PlatformRole,
+    PointRule,
     Ticket,
     TicketStatus,
     User,
@@ -152,7 +153,10 @@ def check_in(db: Session, event: Event, user: User, payload: AttendanceCheckIn) 
     db.commit()
     if event.geofence_enabled:
         calculate_attendance_confidence(db, attendance)
-    if attendance.status != AttendanceStatus.REJECTED:
+    if attendance.status != AttendanceStatus.REJECTED and db.scalar(select(PointRule.id).where(
+        PointRule.source_type == "attendance", PointRule.is_active.is_(True),
+        (PointRule.community_id == event.community_id) | PointRule.community_id.is_(None),
+    )) is not None:
         award_points(
             db, user_id=user.id, community_id=event.community_id,
             source_type="attendance", source_id=attendance.id,

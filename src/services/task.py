@@ -3,11 +3,15 @@
 from datetime import UTC, datetime
 
 from fastapi import HTTPException
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from src.authorization import require_community_role
 from src.models import (
+    Event,
+    Membership,
     MembershipRole,
+    MembershipStatus,
     Task,
     TaskAssignment,
     TaskAssignmentStatus,
@@ -20,12 +24,24 @@ from src.services.notification import audit, notify
 
 def create_task(db: Session, community_id, creator: User, **values) -> Task:
     require_community_role(db, community_id, creator, MembershipRole.ORGANIZER)
+    event_id = values.get("event_id")
+    if event_id:
+        event = db.get(Event, event_id)
+        if event is None or event.community_id != community_id:
+            raise HTTPException(status_code=404, detail="Event not found")
     task = Task(community_id=community_id, created_by_id=creator.id, **values)
     db.add(task); db.commit(); return task
 
 
 def assign_task(db: Session, task: Task, assignee_id, assigner: User) -> TaskAssignment:
     require_community_role(db, task.community_id, assigner, MembershipRole.ORGANIZER)
+    member = db.scalar(select(Membership).where(
+        Membership.community_id == task.community_id,
+        Membership.user_id == assignee_id,
+        Membership.status == MembershipStatus.ACTIVE,
+    ))
+    if member is None:
+        raise HTTPException(status_code=404, detail="Task assignee not found in community")
     assignment = TaskAssignment(task_id=task.id, assignee_id=assignee_id, assigned_by_id=assigner.id)
     db.add(assignment); db.commit(); return assignment
 

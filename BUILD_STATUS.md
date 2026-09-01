@@ -103,15 +103,17 @@ integrated product evidence. TickVendor is not specification-complete or product
   amount, and currency; valid replay returns the stored checkout and conflicts are rejected.
 - [x] QR attendance verification requires organizer/admin/event-staff authorization and an
   authorized organizer approval/rejection API enforces event/tenant scope.
-- [ ] Enforce event attendance-method configuration (`peer_confirmation_enabled`,
-  `qr_attendance_enabled`, `organizer_verification_enabled`) and complete configurable peer limits,
-  deadlines, eligibility, attendee selection, and required verification combinations.
+- [x] Enforce event attendance-method configuration (`peer_confirmation_enabled`,
+  `qr_attendance_enabled`, `organizer_verification_enabled`) at service boundaries.
+- [ ] Complete configurable peer limits, deadlines, eligibility, attendee selection, and required
+  verification combinations.
 - [x] Award attendance Impact Points idempotently after check-in and resolve the configured central
   PointRule; task verification posts its reward before commit and concurrent Impact Point key races
   return the existing transaction.
 - [ ] Enforce hidden/invite-only ticket visibility during ordering and enrich My Tickets with event,
   date, venue, ticket-type data and upcoming/used/cancelled grouping.
-- [ ] Enforce task assignee and event tenant membership, add task/assignment browse APIs and task
+- [x] Enforce task assignee and event tenant membership.
+- [ ] Add task/assignment browse APIs and task
   attachments, implement overdue and `verification_required` behavior, and resolve configured task
   reward values consistently with central PointRule policy.
 - [ ] Add an organizer attendance-abuse review workflow and broader repeated-suspicious-signal

@@ -33,12 +33,12 @@ def award_points(
     db.add(transaction)
     try:
         db.commit()
-    except IntegrityError as exc:
+    except IntegrityError:
         db.rollback()
         existing = db.scalar(select(ImpactTransaction).where(
             ImpactTransaction.idempotency_key == idempotency_key,
         ))
         if existing is not None:
             return existing
-        raise exc
+        raise
     return transaction
