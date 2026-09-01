@@ -100,7 +100,8 @@ verification. These remain active work; no completion claim is made.
 - [x] Organizer verification/rejection with authorized verification signal and confidence update
 - [x] Peer confirmation service with eligibility, self/duplicate prevention, and configurable threshold
 - [x] Attendance confidence/status is recalculated from weighted GPS, QR, peer and organizer signals with explicit organizer rejection precedence
-- [x] Duplicate QR scans/check-ins, time windows, geofence, low-accuracy, reciprocal-peer and repeated-peer review flags are implemented and tested; impossible-location and broader repeated-pattern analytics remain pending
+- [x] Duplicate QR scans/check-ins, time windows, geofence, low-accuracy, reciprocal-peer and repeated-peer review flags are implemented and tested
+- [x] Conservative, idempotent impossible-location transition review flags use valid GPS verification history, preserve attendance state, and include false-positive coverage
 - [x] GPS fallbacks: QR and organizer verification
 - [x] Location permission handling provides denied, timeout, unavailable and low-accuracy paths with QR/organizer fallbacks
 - [x] Attendance UI explains location purpose, requests it only on user action and does not continuously track
