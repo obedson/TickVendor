@@ -112,8 +112,8 @@ integrated product evidence. TickVendor is not specification-complete or product
 - [ ] Make task verification, its audit record, notification, and reward insertion one atomic
   transaction; the current reward helper commits independently before the surrounding task flow.
 - [x] Enforce hidden/invite-only ticket visibility during ordering.
-- [ ] Enrich My Tickets with event,
-  date, venue, ticket-type data and upcoming/used/cancelled grouping.
+- [x] Enrich My Tickets with event, date/time, venue, ticket-type, status, QR and order data plus
+  upcoming/used/cancelled grouping.
 - [x] Enforce task assignee and event tenant membership.
 - [ ] Add task/assignment browse APIs and task
   attachments, implement overdue and `verification_required` behavior, and resolve configured task

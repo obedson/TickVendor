@@ -58,6 +58,15 @@ class TicketResponse(BaseModel):
     used_at: datetime | None
 
 
+class TicketWalletResponse(TicketResponse):
+    event_title: str
+    event_starts_at: datetime
+    venue_name: str | None
+    venue_address: str | None
+    ticket_type_name: str
+    group: str
+
+
 class TicketValidationRequest(BaseModel):
     qr_token: str = Field(min_length=32, max_length=128)
 

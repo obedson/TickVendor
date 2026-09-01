@@ -9,15 +9,15 @@ from sqlalchemy.orm import Session
 
 from src.api.auth import get_current_user
 from src.database import get_db
-from src.models import Ticket, User
+from src.models import Event, Ticket, TicketStatus, TicketType, User
 from src.schemas.ticket import (
     OrderCreate,
     OrderResponse,
-    TicketResponse,
     TicketTypeCreate,
     TicketTypeResponse,
     TicketValidationRequest,
     TicketValidationResponse,
+    TicketWalletResponse,
 )
 from src.services.ticket import create_order, create_ticket_type, validate_ticket
 
@@ -40,11 +40,26 @@ def order_tickets(
     return create_order(db, event_id, payload, current_user)
 
 
-@router.get("/tickets/me", response_model=list[TicketResponse])
+@router.get("/tickets/me", response_model=list[TicketWalletResponse])
 def ticket_wallet(
     db: Annotated[Session, Depends(get_db)], current_user: Annotated[User, Depends(get_current_user)],
 ):
-    return list(db.scalars(select(Ticket).where(Ticket.attendee_id == current_user.id).order_by(Ticket.created_at.desc())))
+    rows = db.execute(select(Ticket, Event, TicketType).join(Event, Event.id == Ticket.event_id)
+                      .join(TicketType, TicketType.id == Ticket.ticket_type_id)
+                      .where(Ticket.attendee_id == current_user.id)
+                      .order_by(Ticket.created_at.desc()))
+    result = []
+    for ticket, event, ticket_type in rows:
+        group = "cancelled" if ticket.status in {TicketStatus.CANCELLED, TicketStatus.REFUNDED} else \
+            "used" if ticket.status in {TicketStatus.USED, TicketStatus.EXPIRED} else "upcoming"
+        result.append(TicketWalletResponse.model_validate({
+            **{key: getattr(ticket, key) for key in ("id", "public_id", "qr_token", "event_id", "ticket_type_id", "attendee_id", "order_id", "status", "used_at")},
+            "event_title": event.title, "event_starts_at": event.starts_at,
+            "venue_name": event.venue.name if event.venue else None,
+            "venue_address": event.venue.address if event.venue else None,
+            "ticket_type_name": ticket_type.name, "group": group,
+        }))
+    return result
 
 
 @router.post("/events/{event_id}/tickets/validate", response_model=TicketValidationResponse)
