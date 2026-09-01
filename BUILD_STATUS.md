@@ -111,8 +111,8 @@ integrated product evidence. TickVendor is not specification-complete or product
 - [ ] Complete configurable attendee selection rules and organizer override policy.
 - [x] Award attendance Impact Points idempotently after check-in and resolve the configured central
   PointRule; concurrent Impact Point key races return the existing transaction.
-- [ ] Make task verification, its audit record, notification, and reward insertion one atomic
-  transaction; the current reward helper commits independently before the surrounding task flow.
+- [x] Task verification, its audit record, notification, and reward insertion share one controlled
+  database commit; recognition evaluation runs only after that durable transition.
 - [x] Enforce hidden/invite-only ticket visibility during ordering.
 - [x] Enrich My Tickets with event, date/time, venue, ticket-type, status, QR and order data plus
   upcoming/used/cancelled grouping.

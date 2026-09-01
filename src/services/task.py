@@ -90,17 +90,17 @@ def verify_task(db: Session, assignment: TaskAssignment, verifier: User, approve
             db, user_id=assignment.assignee_id, community_id=task.community_id,
             source_type="task_completion", source_id=assignment.id,
             idempotency_key=f"task:{assignment.id}:verified", reason=f"Verified task: {task.title}",
-            task_id=task.id, event_id=task.event_id,
+            task_id=task.id, event_id=task.event_id, commit=False,
         )
-    db.commit()
     audit(db, actor_id=verifier.id, community_id=task.community_id,
           action="task.verified" if approve else "task.rejected",
           target_type="task_assignment", target_id=assignment.id,
-          metadata={"task_id": str(task.id), "assignee_id": str(assignment.assignee_id)})
+          metadata={"task_id": str(task.id), "assignee_id": str(assignment.assignee_id)}, commit=False)
     notify(db, assignment.assignee_id, "task_verified" if approve else "task_rejected",
            "Task verified" if approve else "Task needs attention",
            "Your task was verified." if approve else "Your task submission was not approved.",
-           {"task_id": str(task.id), "assignment_id": str(assignment.id)})
+           {"task_id": str(task.id), "assignment_id": str(assignment.id)}, commit=False)
+    db.commit()
     if approve:
         evaluate_recognition(db, assignment.assignee_id, task.community_id)
     return assignment

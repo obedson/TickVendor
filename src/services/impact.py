@@ -11,6 +11,7 @@ from src.models import ImpactTransaction, ImpactTransactionStatus, PointRule
 def award_points(
     db: Session, *, user_id, community_id, source_type: str, source_id,
     idempotency_key: str, reason: str, event_id=None, task_id=None, points_override: int | None = None,
+    commit: bool = True,
 ) -> ImpactTransaction:
     existing = db.scalar(select(ImpactTransaction).where(
         ImpactTransaction.idempotency_key == idempotency_key
@@ -32,9 +33,13 @@ def award_points(
     )
     db.add(transaction)
     try:
-        db.commit()
+        if commit:
+            db.commit()
+        else:
+            db.flush()
     except IntegrityError:
-        db.rollback()
+        if commit:
+            db.rollback()
         existing = db.scalar(select(ImpactTransaction).where(
             ImpactTransaction.idempotency_key == idempotency_key,
         ))

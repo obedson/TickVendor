@@ -20,6 +20,7 @@ def notify(
     email_sender: EmailSender | None = None,
     push_sender: PushSender | None = None,
     deduplication_key: str | None = None,
+    commit: bool = True,
 ):
     if deduplication_key:
         existing = db.query(Notification).filter_by(deduplication_key=deduplication_key).one_or_none()
@@ -39,13 +40,17 @@ def notify(
             (email_sender or get_email_sender()).send(user.email, title, message)
     if preference and preference.push_enabled:
         (push_sender or get_push_sender()).send(user_id, title, message, payload or {})
-    db.commit()
+    if commit:
+        db.commit()
     return item
 
 
 def audit(db: Session, *, actor_id, action: str, target_type: str, target_id=None,
-          community_id=None, metadata=None):
+          community_id=None, metadata=None, commit: bool = True):
     item = AuditLog(actor_id=actor_id, action=action, target_type=target_type,
                     target_id=target_id, community_id=community_id,
                     metadata_json=metadata or {}, occurred_at=datetime.now(UTC))
-    db.add(item); db.commit(); return item
+    db.add(item)
+    if commit:
+        db.commit()
+    return item
