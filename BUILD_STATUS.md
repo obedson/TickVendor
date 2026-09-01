@@ -58,6 +58,11 @@ integrated product evidence. TickEven is not specification-complete or productio
   seeds, payment providers/webhooks, geolocation, PWA, recognition/admin configuration, and deployment.
 - [ ] Add browser/E2E coverage for the participant, organizer, and community-administrator journeys;
   current frontend checks are source/runtime policy scripts rather than browser interaction tests.
+- [ ] Provide the complete development/demo seed dataset required by the specification (users,
+  organizer, community, events, tickets, tasks, badges, ranks, milestones, and activities), clearly
+  separated from production seeds; current seeds primarily cover configurable business rules.
+- [ ] Replace local filesystem-only image storage with configured production object storage and
+  verify upload delivery/authorization in the deployed environment.
 - [ ] Verify PostgreSQL migration/application behavior, production deployment, HTTPS/TLS, CORS,
   monitoring/error tracking, and live Paystack/Flutterwave/Stripe/email/push providers.
 
