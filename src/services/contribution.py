@@ -18,6 +18,7 @@ from src.models import (
 )
 from src.services.impact import award_points
 from src.services.notification import audit
+from src.services.recognition import evaluate_recognition
 
 
 def record_contribution(db: Session, contributor: User, **values) -> Contribution:
@@ -64,4 +65,5 @@ def verify_contribution(db: Session, contribution: Contribution, verifier: User,
                 reason=f"Verified contribution on {datetime.now(UTC).date()}",
                 points_override=points,
             )
+            evaluate_recognition(db, contribution.contributor_id, contribution.community_id)
     return contribution

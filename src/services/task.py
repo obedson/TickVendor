@@ -20,6 +20,7 @@ from src.models import (
 )
 from src.services.impact import award_points
 from src.services.notification import audit, notify
+from src.services.recognition import evaluate_recognition
 
 
 def create_task(db: Session, community_id, creator: User, **values) -> Task:
@@ -100,4 +101,6 @@ def verify_task(db: Session, assignment: TaskAssignment, verifier: User, approve
            "Task verified" if approve else "Task needs attention",
            "Your task was verified." if approve else "Your task submission was not approved.",
            {"task_id": str(task.id), "assignment_id": str(assignment.id)})
+    if approve:
+        evaluate_recognition(db, assignment.assignee_id, task.community_id)
     return assignment

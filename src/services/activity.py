@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from src.authorization import require_community_role
 from src.models import Activity, ActivityStatus, MembershipRole, User
 from src.services.impact import award_points
+from src.services.recognition import evaluate_recognition
 
 
 def record_activity(db: Session, user: User, **values) -> Activity:
@@ -34,4 +35,5 @@ def verify_activity(db: Session, activity: Activity, verifier: User, approve: bo
             reason=f"Verified activity: {activity.activity_type}",
             event_id=activity.event_id,
         )
+        evaluate_recognition(db, activity.user_id, activity.community_id)
     return activity
