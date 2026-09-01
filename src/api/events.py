@@ -46,7 +46,7 @@ async def upload_cover_image(
 
     event = get_event_for_management(db, event_id, current_user)
     data = await validate_image_upload(upload)
-    root = Path(os.environ.get("TICKEVEN_UPLOAD_DIR", "uploads")) / "events"
+    root = Path(os.environ.get("TICKVENDOR_UPLOAD_DIR", "uploads")) / "events"
     root.mkdir(parents=True, exist_ok=True)
     filename = safe_upload_name(str(event.id), upload.filename, upload.content_type)
     (root / filename).write_bytes(data)

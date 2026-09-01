@@ -4,14 +4,14 @@
 
 You are a senior product architect, UX engineer, full-stack software engineer, security engineer, and DevOps engineer.
 
-Build a complete, production-ready web application called **TickEven**.
+Build a complete, production-ready web application called **TickVendor**.
 
-**Brand:** TickEven
-**Domain:** tickeven.com
+**Brand:** TickVendor
+**Domain:** tickvendor.com
 **Core positioning:** Ticketing + Events + Community Engagement
 **Core idea:** Discover. Attend. Participate. Achieve.
 
-TickEven is a lightweight event ticketing, event management, attendance verification, community engagement, contribution, milestone, rank, and badge platform.
+TickVendor is a lightweight event ticketing, event management, attendance verification, community engagement, contribution, milestone, rank, and badge platform.
 
 The platform must be designed as **one coherent ecosystem**, not as separate applications.
 
@@ -19,7 +19,7 @@ The platform must be designed as **one coherent ecosystem**, not as separate app
 
 # 1. PRODUCT VISION
 
-TickEven allows people and organizations to:
+TickVendor allows people and organizations to:
 
 * Discover events
 * Create and manage events
@@ -62,7 +62,7 @@ The platform should work for:
 
 # 2. BRAND CONCEPT
 
-TickEven represents:
+TickVendor represents:
 
 **Tick + Events**
 
@@ -1498,7 +1498,7 @@ Do not cache sensitive information insecurely.
 
 # 49. PWA
 
-Make TickEven installable as a Progressive Web App.
+Make TickVendor installable as a Progressive Web App.
 
 Include:
 
@@ -1891,7 +1891,7 @@ Do not overuse gradients, shadows or animations.
 
 Create a modern identity around the name:
 
-**TickEven**
+**TickVendor**
 
 Possible visual concept:
 
@@ -1969,7 +1969,7 @@ Financial contribution is only one dimension.
 
 # 69. IMPORTANT PRODUCT PRINCIPLE
 
-Do not turn TickEven into a complicated gamification platform.
+Do not turn TickVendor into a complicated gamification platform.
 
 The purpose of the achievement system is:
 
@@ -2366,7 +2366,7 @@ If any of these journeys is unnecessarily complicated, simplify the UX.
 
 # FINAL PRODUCT STATEMENT
 
-Build TickEven as a lightweight, scalable platform where:
+Build TickVendor as a lightweight, scalable platform where:
 
 > **Tickets bring people to events.**
 >

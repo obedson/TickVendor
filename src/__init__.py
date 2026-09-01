@@ -1,1 +1,1 @@
-"""TickEven backend package."""
+"""TickVendor backend package."""

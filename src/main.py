@@ -91,7 +91,7 @@ def create_app() -> FastAPI:
 
     @application.exception_handler(Exception)
     async def unexpected_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-        logging.getLogger("tickeven.errors").exception(
+        logging.getLogger("tickvendor.errors").exception(
             {"event": "unhandled_error", "path": request.url.path}, exc_info=exc
         )
         return JSONResponse(

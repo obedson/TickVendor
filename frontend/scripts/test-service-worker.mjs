@@ -15,12 +15,12 @@ const caches = {
       async put(request) { stored.push(new URL(request.url).pathname); },
     };
   },
-  async keys() { return ['tickeven-shell-v1', 'other-application-cache']; },
+  async keys() { return ['tickvendor-shell-v1', 'tickeven-shell-v2', 'other-application-cache']; },
   async delete(key) { deleted.push(key); },
   async match(request) { return cachedResponses.get(typeof request === 'string' ? request : request.url); },
 };
 const self = {
-  location: {origin: 'https://tickeven.test'},
+  location: {origin: 'https://tickvendor.test'},
   clients: {async claim() {}},
   skipWaiting() {},
   addEventListener(type, handler) { listeners.set(type, handler); },
@@ -40,13 +40,13 @@ async function dispatch(type, request) {
 }
 
 await dispatch('activate');
-assert.deepEqual(deleted, ['tickeven-shell-v1'], 'activation must preserve caches owned by other applications');
+assert.deepEqual(deleted, ['tickvendor-shell-v1', 'tickeven-shell-v2'], 'activation must remove legacy TickEven caches and preserve caches owned by other applications');
 
-await dispatch('fetch', {method: 'GET', url: 'https://tickeven.test/api/v1/events?search=tech'});
+await dispatch('fetch', {method: 'GET', url: 'https://tickvendor.test/api/v1/events?search=tech'});
 await new Promise(resolve => setTimeout(resolve, 0));
 assert.deepEqual(stored, ['/api/v1/events'], 'public event data should be cached');
 
-await dispatch('fetch', {method: 'GET', url: 'https://tickeven.test/api/v1/tickets/me'});
+await dispatch('fetch', {method: 'GET', url: 'https://tickvendor.test/api/v1/tickets/me'});
 await new Promise(resolve => setTimeout(resolve, 0));
 assert.deepEqual(stored, ['/api/v1/events'], 'private ticket data must not be cached by the shared service-worker cache');
 

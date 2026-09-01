@@ -131,10 +131,10 @@ class StripeProvider:
         response = httpx.post("https://api.stripe.com/v1/checkout/sessions", headers=self.headers, data={
             "mode": "payment", "client_reference_id": reference, "customer_email": email,
             "line_items[0][price_data][currency]": currency.lower(),
-            "line_items[0][price_data][product_data][name]": "TickEven ticket",
+            "line_items[0][price_data][product_data][name]": "TickVendor ticket",
             "line_items[0][price_data][unit_amount]": str(int(amount * 100)),
-            "line_items[0][quantity]": "1", "success_url": "https://tickeven.example/payment/success",
-            "cancel_url": "https://tickeven.example/payment/cancel"}, timeout=15)
+            "line_items[0][quantity]": "1", "success_url": "https://tickvendor.com/payment/success",
+            "cancel_url": "https://tickvendor.com/payment/cancel"}, timeout=15)
         response.raise_for_status()
         data = response.json()
         return PaymentInitialization(data["id"], data["url"])

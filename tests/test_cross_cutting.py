@@ -59,7 +59,7 @@ def test_production_rejects_sqlite_database():
 def test_production_accepts_server_database_url():
     production = Settings(
         environment="production",
-        database_url="postgresql+psycopg://user:pass@db/tickeven",
+        database_url="postgresql+psycopg://user:pass@db/tickvendor",
         secret_key="x" * 40,
     )
 

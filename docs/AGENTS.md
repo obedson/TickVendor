@@ -1,6 +1,6 @@
 # TICK EVEN — AUTONOMOUS FULL-PRODUCT BUILD DIRECTIVE
 
-You are the lead engineer responsible for taking this project from its current state to a fully working, production-ready TickEven application.
+You are the lead engineer responsible for taking this project from its current state to a fully working, production-ready TickVendor application.
 
 The product specification that follows this directive is the authoritative product specification.
 
@@ -628,7 +628,7 @@ Avoid frontend-only state pretending that something has been persisted.
 
 # 15. ACHIEVEMENT ENGINE REQUIREMENT
 
-The achievement engine is a critical part of TickEven.
+The achievement engine is a critical part of TickVendor.
 
 It must be designed as a reusable service.
 
@@ -891,7 +891,7 @@ Only mark it complete when the answer is yes.
 
 # 26. DEFINITION OF DONE
 
-The project is complete only when all major requirements in the provided TickEven specification have been implemented and integrated.
+The project is complete only when all major requirements in the provided TickVendor specification have been implemented and integrated.
 
 The final system must provide:
 
@@ -1037,7 +1037,7 @@ Do not claim something is complete if it is not.
 
 **Do not stop after implementing achievements.**
 
-Continue integrating the systems until the complete TickEven specification has been implemented, tested and audited.
+Continue integrating the systems until the complete TickVendor specification has been implemented, tested and audited.
 
 Think of yourself as the engineer who owns the entire delivery of the product.
 

@@ -1,6 +1,6 @@
-# TickEven
+# TickVendor
 
-TickEven combines events, ticketing, verified attendance, community activity, and configurable recognition.
+TickVendor combines events, ticketing, verified attendance, community activity, and configurable recognition.
 
 Local backend setup:
 

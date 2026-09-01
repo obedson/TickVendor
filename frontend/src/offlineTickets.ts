@@ -2,7 +2,7 @@ export type OfflineTicket={public_id:string;qr_token:string;status:string;attend
 export type EncryptedTickets={iv:ArrayBuffer;ciphertext:ArrayBuffer};
 type CryptoProvider=Pick<Crypto,'getRandomValues'|'subtle'>;
 
-const DATABASE='tickeven-private-offline';
+const DATABASE='tickvendor-private-offline';
 const STORE='ticket-wallet';
 const RECORD='current-wallet';
 

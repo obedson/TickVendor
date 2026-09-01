@@ -3,9 +3,9 @@ requires = ["setuptools>=75"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "tickeven"
+name = "tickvendor"
 version = "0.1.0"
-description = "TickEven events, ticketing, and community impact platform"
+description = "TickVendor events, ticketing, and community impact platform"
 requires-python = ">=3.11"
 dependencies = [
   "alembic>=1.14,<2",

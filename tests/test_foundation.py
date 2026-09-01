@@ -28,7 +28,7 @@ def test_shared_api_types_validate_errors_and_pagination():
 def test_settings_load_with_safe_development_defaults():
     from src.config import settings
 
-    assert settings.app_name == "TickEven"
+    assert settings.app_name == "TickVendor"
     assert settings.environment == "development"
     assert settings.database_url.startswith("sqlite:///")
     assert settings.secret_key.get_secret_value()

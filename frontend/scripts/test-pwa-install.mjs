@@ -8,7 +8,7 @@ for (const icon of manifest.icons) await access(new URL(`../public${icon.src}`, 
 
 const app = await readFile(new URL('../src/main.tsx', import.meta.url), 'utf8');
 assert.match(app, /beforeinstallprompt/);
-assert.match(app, /Install TickEven/);
+assert.match(app, /Install TickVendor/);
 assert.match(app, /prompt\(\)/);
 
 console.log('PWA installation assets and prompt passed');

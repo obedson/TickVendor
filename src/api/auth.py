@@ -91,7 +91,7 @@ def register(
     except IntegrityError as exc:
         db.rollback()
         raise HTTPException(status_code=409, detail="Email or username is already registered") from exc
-    email_sender.send_token(user.email, "Verify your TickEven email", verification_token)
+    email_sender.send_token(user.email, "Verify your TickVendor email", verification_token)
     return response
 
 
@@ -167,7 +167,7 @@ def request_password_reset(
     if user is not None and user.is_active:
         token = create_one_time_token(db, user, AuthTokenPurpose.PASSWORD_RESET, hours=1)
         db.commit()
-        email_sender.send_token(user.email, "Reset your TickEven password", token)
+        email_sender.send_token(user.email, "Reset your TickVendor password", token)
     return {"message": "If the account exists, reset instructions were sent."}
 
 

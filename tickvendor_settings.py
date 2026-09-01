@@ -1,13 +1,13 @@
-# TickEven - Complete Application Structure
+# TickVendor - Complete Application Structure
 # This file defines the core project layout
 
 """
-TickEven - Ticketing + Events + Community Engagement Platform
+TickVendor - Ticketing + Events + Community Engagement Platform
 
 Core Philosophy: Discover → Ticket → Attend → Verify → Participate → Contribute → Earn Impact → Reach Milestone → Gain Recognition
 
-Brand: TickEven
-Domain: tickeven.com
+Brand: TickVendor
+Domain: tickvendor.com
 """
 
 import os
@@ -37,7 +37,7 @@ load_env()
 # DATABASE SETTINGS
 # ============================================================
 
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./tickeven.db")
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./tickvendor.db")
 DATABASE_POOL_SIZE = int(os.getenv("DATABASE_POOL_SIZE", "5"))
 SQLITE_ECHO = os.getenv("SQLITE_ECHO", "false").lower() == "true"
 
@@ -153,7 +153,7 @@ CURRENCY_SYMBOL = os.getenv("CURRENCY_SYMBOL", "₦")
 # SECURITY SETTINGS
 # ============================================================
 
-SECRET_KEY = os.getenv("SECRET_KEY", "tickeven-development-key-change-in-production")
+SECRET_KEY = os.getenv("SECRET_KEY", "tickvendor-development-key-change-in-production")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
 REFRESH_TOKEN_EXPIRE_DAYS = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "7"))
@@ -210,7 +210,7 @@ DEFAULT_MILESTONE_REQUIREMENTS = {
 # ADMIN SETTINGS
 # ============================================================
 
-ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "admin@tickeven.com")
+ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "admin@tickvendor.com")
 ADMIN_NAME = os.getenv("ADMIN_NAME", "Super Administrator")
 
 # ============================================================
@@ -233,14 +233,14 @@ CORS_ORIGINS = os.getenv(
 # ============================================================
 
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
-LOG_FILE = os.getenv("LOG_FILE", "logs/tickeven.log")
+LOG_FILE = os.getenv("LOG_FILE", "logs/tickvendor.log")
 
 # ============================================================
 # PWA SETTINGS
 # ============================================================
 
-PWA_NAME = os.getenv("PWA_NAME", "TickEven")
-PWA_SHORT_NAME = os.getenv("PWA_SHORT_NAME", "TickEven")
+PWA_NAME = os.getenv("PWA_NAME", "TickVendor")
+PWA_SHORT_NAME = os.getenv("PWA_SHORT_NAME", "TickVendor")
 PWA_DESCRIPTION = os.getenv("PWA_DESCRIPTION", "Discover. Attend. Participate. Achieve.")
 PWA_ORIENTATION = os.getenv("PWA_ORIENTATION", "portrait-primary")
 PWA_BACKGROUND_COLOR = os.getenv("PWA_BACKGROUND_COLOR", "#1a1a2e")

@@ -1,4 +1,4 @@
-# TickEven Build Status
+# TickVendor Build Status
 
 ## Recovery Audit — 2026-08-31
 
@@ -40,7 +40,17 @@ verification. These remain active work; no completion claim is made.
 ## Final Specification Audit — 2026-09-01
 
 The checklist below corrects earlier backend-capability claims that were broader than the
-integrated product evidence. TickEven is not specification-complete or production-ready.
+integrated product evidence. TickVendor is not specification-complete or production-ready.
+
+## Product Identity Decision — TickVendor
+
+- [x] Active product branding, application/package metadata, PWA identity, configuration defaults,
+  documentation, examples, email subjects, cache namespaces, and canonical URLs use TickVendor and
+  `https://tickvendor.com` (with `https://www.tickvendor.com` allowed for production CORS).
+- [x] Historical recovery text retains the former `src.config.tickeven_settings` identifier because
+  it documents the exact pre-repair broken import. Legacy installer paths retain the old repository
+  directory name because they are isolated historical machine-specific artifacts, not active product
+  identifiers; Git history, Alembic revision IDs, and database objects were not rewritten.
 
 - [ ] Complete the participant frontend journeys: authentication, event detail/ticket acquisition,
   check-in result, peer confirmation, tasks, contributions, achievements, milestones, ranks,

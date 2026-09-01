@@ -8,7 +8,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    """TickEven settings loaded from environment variables and ``.env``."""
+    """TickVendor settings loaded from environment variables and ``.env``."""
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -17,21 +17,27 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    app_name: str = "TickEven"
+    app_name: str = "TickVendor"
     environment: Literal["development", "test", "staging", "production"] = "development"
     debug: bool = False
     api_v1_prefix: str = "/api/v1"
+    canonical_url: str = "https://tickvendor.com"
 
-    database_url: str = "sqlite:///./tickeven.db"
+    database_url: str = "sqlite:///./tickvendor.db"
     database_echo: bool = False
 
-    secret_key: SecretStr = SecretStr("tickeven-development-only-secret")
+    secret_key: SecretStr = SecretStr("tickvendor-development-only-secret")
     access_token_expire_minutes: int = Field(default=30, ge=5, le=1440)
     refresh_token_expire_days: int = Field(default=7, ge=1, le=90)
     bcrypt_rounds: int = Field(default=12, ge=12, le=16)
 
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
-    cors_origins: list[str] = ["http://localhost:3000", "http://localhost:5173"]
+    cors_origins: list[str] = [
+        "http://localhost:3000",
+        "http://localhost:5173",
+        "https://tickvendor.com",
+        "https://www.tickvendor.com",
+    ]
 
     payment_provider: Literal["paystack", "flutterwave", "stripe", "test"] = "paystack"
     paystack_secret_key: SecretStr | None = None

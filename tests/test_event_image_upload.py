@@ -7,7 +7,7 @@ from tests.test_events import setup_client
 
 def test_event_cover_upload_validates_content_and_ownership(tmp_path, monkeypatch):
     client, engine, _sessions, (community_id, organizer_id, outsider_id) = setup_client(tmp_path)
-    monkeypatch.setenv("TICKEVEN_UPLOAD_DIR", str(tmp_path / "uploads"))
+    monkeypatch.setenv("TICKVENDOR_UPLOAD_DIR", str(tmp_path / "uploads"))
     now = datetime.now(UTC) + timedelta(days=1)
     payload = {"community_id": str(community_id), "title": "Image Event",
                "description": "Event with a safe cover image", "category": "technology",

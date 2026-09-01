@@ -63,7 +63,7 @@ def test_event_create_publish_discover_update_and_cross_tenant_denial(tmp_path):
     now = datetime.now(UTC) + timedelta(days=1)
     payload = {
         "community_id": str(community_id),
-        "title": "TickEven Summit",
+        "title": "TickVendor Summit",
         "description": "A detailed technology community event.",
         "category": "technology",
         "starts_at": now.isoformat(),
