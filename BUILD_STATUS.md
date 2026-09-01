@@ -192,7 +192,7 @@ verification. These remain active work; no completion claim is made.
 - [x] Organizer dashboard API covers upcoming/total events, tickets, revenue, registrations, attendance/verification, pending tasks, contributions, engagement, top participants and achievement distribution
 
 ### Community Dashboard
-- [ ] Tenant-scoped analytics API now covers members, events, tickets, attendance, tasks, contributions, revenue and Impact Points; distributions/trends/retention pending
+- [x] Tenant-scoped community analytics covers members/active members, events, tickets, attendance, tasks, contributions, revenue, Impact Points, rank/badge distributions, participation trends and 30-day retention
 
 ### Notifications
 - [x] Notification schema (in-app payload and read state)

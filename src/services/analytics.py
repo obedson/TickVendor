@@ -1,5 +1,7 @@
 """Tenant-scoped analytics aggregation service."""
 
+from datetime import UTC, datetime, timedelta
+
 from fastapi import HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -17,6 +19,7 @@ from src.models import (
     ImpactTransactionStatus,
     Membership,
     MembershipRole,
+    MembershipStatus,
     Milestone,
     MilestoneAward,
     Order,
@@ -28,15 +31,55 @@ from src.models import (
     Ticket,
     User,
 )
+from src.services.recognition import current_rank
 
 
 def community_summary(db: Session, community_id, user: User) -> dict[str, object]:
     require_community_role(db, community_id, user, MembershipRole.ADMIN)
     community = db.get(Community, community_id)
     event_ids = select(Event.id).where(Event.community_id == community_id)
+    active_user_ids = list(db.scalars(select(Membership.user_id).where(
+        Membership.community_id == community_id,
+        Membership.status == MembershipStatus.ACTIVE,
+    )))
+    badge_rows = db.execute(
+        select(Badge.name, func.count(BadgeAward.id))
+        .join(BadgeAward, BadgeAward.badge_id == Badge.id)
+        .where(Badge.community_id == community_id, BadgeAward.revoked_at.is_(None))
+        .group_by(Badge.id, Badge.name)
+        .order_by(Badge.name)
+    ).all()
+    rank_counts: dict[str, int] = {}
+    for member_id in active_user_ids:
+        rank = current_rank(db, member_id, community_id)
+        if rank is not None:
+            rank_counts[rank.name] = rank_counts.get(rank.name, 0) + 1
+    attendance_rows = db.execute(
+        select(func.strftime("%Y-%m", Attendance.checked_in_at), func.count())
+        .where(
+            Attendance.event_id.in_(event_ids),
+            Attendance.checked_in_at.is_not(None),
+            Attendance.status.notin_([AttendanceStatus.NOT_CHECKED_IN, AttendanceStatus.REJECTED]),
+        )
+        .group_by(func.strftime("%Y-%m", Attendance.checked_in_at))
+        .order_by(func.strftime("%Y-%m", Attendance.checked_in_at))
+    ).all()
+    cutoff = datetime.now(UTC) - timedelta(days=30)
+    eligible_ids = list(db.scalars(select(Membership.user_id).where(
+        Membership.community_id == community_id,
+        Membership.status == MembershipStatus.ACTIVE,
+        Membership.joined_at <= cutoff,
+    )))
+    retained = db.scalar(select(func.count(func.distinct(Attendance.user_id))).where(
+        Attendance.user_id.in_(eligible_ids),
+        Attendance.event_id.in_(event_ids),
+        Attendance.checked_in_at >= cutoff,
+        Attendance.status.notin_([AttendanceStatus.NOT_CHECKED_IN, AttendanceStatus.REJECTED]),
+    )) if eligible_ids else 0
     return {
         "community_id": str(community.id),
         "members": db.scalar(select(func.count()).select_from(Membership).where(Membership.community_id == community_id)),
+        "active_members": len(active_user_ids),
         "events": db.scalar(select(func.count()).select_from(Event).where(Event.community_id == community_id)),
         "tickets": db.scalar(select(func.count()).select_from(Ticket).where(Ticket.event_id.in_(event_ids))),
         "attendance": db.scalar(select(func.count()).select_from(Attendance).where(Attendance.event_id.in_(event_ids))),
@@ -48,6 +91,18 @@ def community_summary(db: Session, community_id, user: User) -> dict[str, object
         "revenue": str(db.scalar(select(func.coalesce(func.sum(Payment.amount), 0))
             .join(Order, Payment.order_id == Order.id).join(Event, Order.event_id == Event.id)
             .where(Event.community_id == community_id, Payment.status == PaymentStatus.SUCCESSFUL))),
+        "badge_distribution": [{"name": name, "awards": awards} for name, awards in badge_rows],
+        "rank_distribution": [
+            {"name": name, "members": members} for name, members in sorted(rank_counts.items())
+        ],
+        "participation_trends": [
+            {"period": period, "attendances": count} for period, count in attendance_rows
+        ],
+        "retention": {
+            "eligible_members": len(eligible_ids),
+            "retained_members": retained,
+            "rate": round(retained / len(eligible_ids), 4) if eligible_ids else 0.0,
+        },
     }
 
 
