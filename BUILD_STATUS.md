@@ -212,7 +212,7 @@ verification. These remain active work; no completion claim is made.
 - [x] Platform administrators can add/edit categories through validated, role-protected APIs
 
 ### Community System
-- [ ] Communities/organizations with: name, logo, description, members, administrators, events, tasks, activities, contribution records, rank configuration, badge configuration, milestones
+- [x] Tenant-authorized community detail exposes name, logo, description and isolated aggregate counts for members/admins, events, tasks, activities, contributions, ranks, badges and milestones
 - [x] Users can belong to multiple communities through unique community/user memberships
 - [x] Community data isolation enforced in authorization/services with cross-tenant negative tests
 

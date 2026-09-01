@@ -44,4 +44,32 @@ def test_search_returns_organizers_and_only_authorized_tasks(tmp_path):
     assert member_result.json()['tasks'][0]['title'] == 'Welcome desk'
     outsider_result = client.get('/api/v1/search', params={'q': 'Welcome'}, headers=headers(outsider_id))
     assert outsider_result.json()['tasks'] == []
+    community_result = client.get(
+        f'/api/v1/communities/{community.id}',
+        headers=headers(member_id),
+    )
+    assert community_result.status_code == 200, community_result.text
+    assert community_result.json() == {
+        'id': str(community.id),
+        'name': 'Search Community',
+        'slug': 'search-community',
+        'logo_url': None,
+        'description': None,
+        'counts': {
+            'members': 2,
+            'administrators': 1,
+            'events': 0,
+            'tasks': 1,
+            'activities': 0,
+            'contributions': 0,
+            'ranks': 0,
+            'badges': 0,
+            'milestones': 0,
+        },
+    }
+    outsider_community = client.get(
+        f'/api/v1/communities/{community.id}',
+        headers=headers(outsider_id),
+    )
+    assert outsider_community.status_code == 403
     engine.dispose()
