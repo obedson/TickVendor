@@ -30,6 +30,7 @@ from src.schemas.attendance import AttendanceCheckIn
 from src.services.event import as_utc
 from src.services.impact import award_points
 from src.services.notification import audit
+from src.services.recognition import evaluate_recognition
 
 
 def haversine_meters(lat1: Decimal, lon1: Decimal, lat2: Decimal, lon2: Decimal) -> float:
@@ -64,6 +65,26 @@ def calculate_attendance_confidence(db: Session, attendance: Attendance) -> Atte
         attendance.status = AttendanceStatus.CHECKED_IN
     db.commit()
     return attendance
+
+
+def award_qualified_attendance(db: Session, attendance: Attendance) -> None:
+    event = db.get(Event, attendance.event_id)
+    valid = {signal.method for signal in db.scalars(select(AttendanceVerification).where(
+        AttendanceVerification.attendance_id == attendance.id,
+        AttendanceVerification.is_valid.is_(True),
+    ))}
+    required = {VerificationMethod(method) for method in event.required_verification_methods}
+    if attendance.status == AttendanceStatus.REJECTED or not required.issubset(valid):
+        return
+    if db.scalar(select(PointRule.id).where(
+        PointRule.source_type == "attendance", PointRule.is_active.is_(True),
+        (PointRule.community_id == event.community_id) | PointRule.community_id.is_(None),
+    )) is not None:
+        award_points(db, user_id=attendance.user_id, community_id=event.community_id,
+                     source_type="attendance", source_id=attendance.id,
+                     idempotency_key=f"attendance:{attendance.id}:verified",
+                     reason=f"Attendance verified: {event.title}", event_id=event.id)
+    evaluate_recognition(db, attendance.user_id, event.community_id)
 
 
 def evaluate_attendance_abuse(db: Session, attendance: Attendance) -> Attendance:
@@ -159,16 +180,7 @@ def check_in(db: Session, event: Event, user: User, payload: AttendanceCheckIn) 
     db.commit()
     if event.geofence_enabled:
         calculate_attendance_confidence(db, attendance)
-    if attendance.status != AttendanceStatus.REJECTED and db.scalar(select(PointRule.id).where(
-        PointRule.source_type == "attendance", PointRule.is_active.is_(True),
-        (PointRule.community_id == event.community_id) | PointRule.community_id.is_(None),
-    )) is not None:
-        award_points(
-            db, user_id=user.id, community_id=event.community_id,
-            source_type="attendance", source_id=attendance.id,
-            idempotency_key=f"attendance:{attendance.id}:verified",
-            reason=f"Attendance recorded: {event.title}", event_id=event.id,
-        )
+    award_qualified_attendance(db, attendance)
     evaluate_attendance_abuse(db, attendance)
     return attendance
 
@@ -238,6 +250,7 @@ def confirm_peer(db: Session, event: Event, confirmer: User, subject_id, confirm
     db.commit()
     if confirmed and count >= event.confirmations_required:
         calculate_attendance_confidence(db, subject)
+        award_qualified_attendance(db, subject)
     return confirmation
 
 
@@ -252,6 +265,7 @@ def organizer_verify(db: Session, attendance: Attendance, organizer: User, appro
     ))
     db.commit()
     calculate_attendance_confidence(db, attendance)
+    award_qualified_attendance(db, attendance)
     audit(db, actor_id=organizer.id, community_id=event.community_id,
           action="attendance.override", target_type="attendance", target_id=attendance.id,
           metadata={"approved": approve, "reason": reason})
@@ -294,4 +308,5 @@ def qr_verify(db: Session, attendance: Attendance, ticket: Ticket, verifier: Use
     ))
     db.commit()
     calculate_attendance_confidence(db, attendance)
+    award_qualified_attendance(db, attendance)
     return attendance
