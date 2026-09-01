@@ -51,6 +51,9 @@ integrated product evidence. TickEven is not specification-complete or productio
 - [ ] Complete server-side admin configuration APIs for point rules, attendance/verification rules,
   contribution bands/caps, notification rules, and leaderboard visibility; current admin routes
   chiefly cover milestones, ranks, badges, achievement rules, memberships, and category management.
+- [ ] Add community/organization creation and editing, member management, logo management, audit-log
+  query/review, and authorized manual-point-adjustment APIs; current capabilities are schemas,
+  read-only community detail/analytics, audit writes, or direct service primitives.
 - [ ] Integrate `evaluate_recognition` into verified business transitions or a durable job so
   milestone/badge rewards and notifications happen automatically; add end-to-end recognition tests.
 - [ ] Implement automatic `AchievementRule.reward_definition` execution (badge and Impact Point
@@ -58,6 +61,12 @@ integrated product evidence. TickEven is not specification-complete or productio
   condition trees but does not execute configured achievement-rule rewards.
 - [ ] Persist or expose rank progression/history if rank-change recognition is required; current
   rank is calculated on profile reads rather than awarded through an automatic workflow.
+- [ ] Make profile rank reporting use the complete configured rank qualification service, add profile
+  and privacy-setting updates, and define/enforce public/member/private field visibility consistently.
+- [ ] Expose leaderboards through tenant-authorized APIs and support configured period/event scope and
+  administration; current leaderboard behavior is a directly tested service only.
+- [ ] Operationally schedule notification generation; `generate_scheduled_notifications` is currently
+  invoked only by tests and no worker/startup command runs it.
 - [ ] Provide production email and push senders; current defaults are in-memory adapters only.
 - [ ] Strengthen live payment verification so provider responses return and validate authoritative
   amount, currency, reference, and status; current adapters return only a status boolean and the
@@ -67,6 +76,25 @@ integrated product evidence. TickEven is not specification-complete or productio
 - [ ] Accept and verify each provider's real webhook signature header (`x-paystack-signature`,
   Flutterwave `verif-hash`/configured signature header, and `Stripe-Signature`); the current route
   exposes only the generic `X-Payment-Signature` header and is not live-provider compatible as-is.
+- [ ] Validate provider webhook event type/payment status before activation; a correctly signed event
+  with a known reference currently proceeds to provider verification regardless of event type.
+- [ ] Scope payment-initialization idempotency to the same order/user/provider/amount/currency and
+  return the original checkout without reinitializing the live provider; reject key conflicts.
+- [ ] Require organizer/event-staff authorization for QR attendance verification and expose an
+  authorized organizer approval/rejection API.
+- [ ] Enforce event attendance-method configuration (`peer_confirmation_enabled`,
+  `qr_attendance_enabled`, `organizer_verification_enabled`) and complete configurable peer limits,
+  deadlines, eligibility, attendee selection, and required verification combinations.
+- [ ] Award attendance Impact Points idempotently after configured verification and make task
+  verification plus reward posting atomic/retry-safe; handle concurrent Impact Point key races by
+  returning the existing transaction rather than surfacing an integrity error.
+- [ ] Enforce hidden/invite-only ticket visibility during ordering and enrich My Tickets with event,
+  date, venue, ticket-type data and upcoming/used/cancelled grouping.
+- [ ] Enforce task assignee and event tenant membership, add task/assignment browse APIs and task
+  attachments, implement overdue and `verification_required` behavior, and resolve configured task
+  reward values consistently with central PointRule policy.
+- [ ] Add an organizer attendance-abuse review workflow and broader repeated-suspicious-signal
+  aggregation; duplicate check-ins currently return the existing row without a review signal.
 - [ ] Add production-grade distributed rate limiting for horizontally scaled deployment.
 - [ ] Expand README/project documentation to cover architecture, API/authentication, migrations and
   seeds, payment providers/webhooks, geolocation, PWA, recognition/admin configuration, and deployment.
