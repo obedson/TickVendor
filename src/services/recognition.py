@@ -33,17 +33,36 @@ from src.services.impact import award_points
 from src.services.notification import audit, notify
 
 
+def longest_consecutive_days(values) -> int:
+    days = sorted({value.date() for value in values})
+    longest = current = 0
+    previous = None
+    for day in days:
+        current = current + 1 if previous and (day - previous).days == 1 else 1
+        longest = max(longest, current)
+        previous = day
+    return longest
+
+
 def user_metrics(db: Session, user_id, community_id) -> dict[str, int]:
+    attendance_count = db.scalar(select(func.count()).select_from(Attendance).where(
+        Attendance.user_id == user_id,
+        Attendance.event_id.in_(select(Event.id).where(Event.community_id == community_id)),
+        Attendance.status.notin_([AttendanceStatus.NOT_CHECKED_IN, AttendanceStatus.REJECTED]),
+    ))
+    activity_dates = db.scalars(select(Activity.occurred_at).where(
+        Activity.user_id == user_id,
+        Activity.community_id == community_id,
+        Activity.status == ActivityStatus.VERIFIED,
+    )).all()
     return {
         "impact_points": db.scalar(select(func.coalesce(func.sum(ImpactTransaction.points), 0)).where(
             ImpactTransaction.user_id == user_id, ImpactTransaction.community_id == community_id,
             ImpactTransaction.status == ImpactTransactionStatus.POSTED,
         )),
-        "attendance_count": db.scalar(select(func.count()).select_from(Attendance).where(
-            Attendance.user_id == user_id,
-            Attendance.event_id.in_(select(Event.id).where(Event.community_id == community_id)),
-            Attendance.status.notin_([AttendanceStatus.NOT_CHECKED_IN, AttendanceStatus.REJECTED]),
-        )),
+        "attendance_count": attendance_count,
+        "event_participation": attendance_count,
+        "consecutive_activities": longest_consecutive_days(activity_dates),
         "task_count": db.scalar(select(func.count()).select_from(TaskAssignment).where(
             TaskAssignment.assignee_id == user_id,
             TaskAssignment.task_id.in_(select(Task.id).where(Task.community_id == community_id)),
