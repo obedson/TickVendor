@@ -56,6 +56,11 @@ integrated product evidence. TickEven is not specification-complete or productio
 - [ ] Persist or expose rank progression/history if rank-change recognition is required; current
   rank is calculated on profile reads rather than awarded through an automatic workflow.
 - [ ] Provide production email and push senders; current defaults are in-memory adapters only.
+- [ ] Strengthen live payment verification so provider responses return and validate authoritative
+  amount, currency, reference, and status; current adapters return only a status boolean and the
+  service compares order values only against the locally created Payment row.
+- [ ] Integrate provider-side refunds for paid orders and reconcile webhook/provider refund state;
+  current refund logic transitions local Payment/Ticket/Order records only.
 - [ ] Add production-grade distributed rate limiting for horizontally scaled deployment.
 - [ ] Expand README/project documentation to cover architecture, API/authentication, migrations and
   seeds, payment providers/webhooks, geolocation, PWA, recognition/admin configuration, and deployment.
