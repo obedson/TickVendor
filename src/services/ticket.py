@@ -23,8 +23,8 @@ from src.models import (
     Ticket,
     TicketStatus,
     TicketType,
-    User,
     TicketVisibility,
+    User,
 )
 from src.schemas.ticket import OrderCreate, TicketTypeCreate
 from src.services.event import as_utc
