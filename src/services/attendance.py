@@ -130,6 +130,15 @@ def confirm_peer(db: Session, event: Event, confirmer: User, subject_id, confirm
         confirmation.suspicious = True
         subject.flagged_for_review = True
         subject.review_reason = "Reciprocal peer confirmations require organizer review"
+    recent_confirmations = db.query(PeerConfirmation).filter_by(
+        event_id=event.id,
+        confirmer_id=confirmer.id,
+        decision=PeerConfirmationDecision.CONFIRMED,
+    ).count()
+    if confirmed and recent_confirmations >= 3:
+        confirmation.suspicious = True
+        subject.flagged_for_review = True
+        subject.review_reason = "Repeated peer confirmations require organizer review"
     db.add(confirmation)
     try:
         db.flush()

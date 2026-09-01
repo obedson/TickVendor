@@ -82,3 +82,39 @@ def test_reciprocal_peer_confirmation_is_flagged_not_auto_rejected(tmp_path):
         assert subject.flagged_for_review
         assert subject.status == AttendanceStatus.PEER_VERIFIED
     engine.dispose()
+
+
+def test_repeated_peer_confirmations_are_flagged_for_review(tmp_path):
+    engine = create_engine(f"sqlite:///{tmp_path / 'repeated-peer-abuse.db'}")
+    Base.metadata.create_all(engine)
+    with Session(engine, expire_on_commit=False) as session:
+        _owner, _community, event = create_event_context(session)
+        confirmer = User(email="repeat-peer@example.com", password_hash="hash")
+        subjects = [
+            User(email=f"repeat-subject-{index}@example.com", password_hash="hash")
+            for index in range(4)
+        ]
+        session.add_all([confirmer, *subjects])
+        session.flush()
+        session.add_all(
+            Attendance(
+                event_id=event.id,
+                user_id=user.id,
+                status=AttendanceStatus.CHECKED_IN,
+            )
+            for user in [confirmer, *subjects]
+        )
+        session.commit()
+
+        confirmations = [
+            confirm_peer(session, event, confirmer, subject.id, True)
+            for subject in subjects
+        ]
+
+        assert not any(item.suspicious for item in confirmations[:3])
+        assert confirmations[3].suspicious
+        reviewed = session.query(Attendance).filter_by(user_id=subjects[3].id).one()
+        assert reviewed.flagged_for_review
+        assert "repeated" in reviewed.review_reason.lower()
+        assert reviewed.status == AttendanceStatus.PEER_VERIFIED
+    engine.dispose()
