@@ -21,3 +21,8 @@ class PeerConfirmationInput(BaseModel):
 class QRAttendanceInput(BaseModel):
     attendance_id: UUID
     ticket_id: UUID
+
+
+class OrganizerAttendanceInput(BaseModel):
+    approve: bool
+    reason: str = Field(min_length=2, max_length=500)

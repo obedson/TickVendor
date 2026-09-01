@@ -9,8 +9,13 @@ from sqlalchemy.orm import Session
 from src.api.auth import get_current_user
 from src.database import get_db
 from src.models import Attendance, Event, Ticket, User
-from src.schemas.attendance import AttendanceCheckIn, PeerConfirmationInput, QRAttendanceInput
-from src.services.attendance import check_in, confirm_peer, qr_verify
+from src.schemas.attendance import (
+    AttendanceCheckIn,
+    OrganizerAttendanceInput,
+    PeerConfirmationInput,
+    QRAttendanceInput,
+)
+from src.services.attendance import check_in, confirm_peer, organizer_verify, qr_verify
 
 router = APIRouter(prefix="/events/{event_id}/attendance", tags=["attendance"])
 
@@ -53,4 +58,19 @@ def qr_attendance(
     if attendance is None or attendance.event_id != event_id or ticket is None:
         raise HTTPException(status_code=404, detail="Attendance or ticket not found")
     updated = qr_verify(db, attendance, ticket, user)
+    return {"status": updated.status.value, "confidence_score": str(updated.confidence_score)}
+
+
+@router.post("/{attendance_id}/organizer-review")
+def organizer_attendance_review(
+    event_id: UUID,
+    attendance_id: UUID,
+    payload: OrganizerAttendanceInput,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
+):
+    attendance = db.get(Attendance, attendance_id)
+    if attendance is None or attendance.event_id != event_id:
+        raise HTTPException(status_code=404, detail="Attendance not found")
+    updated = organizer_verify(db, attendance, user, payload.approve, payload.reason)
     return {"status": updated.status.value, "confidence_score": str(updated.confidence_score)}

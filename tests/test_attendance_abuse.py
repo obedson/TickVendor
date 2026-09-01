@@ -63,7 +63,10 @@ def test_duplicate_qr_verification_is_flagged_for_review(tmp_path):
     engine = create_engine(f"sqlite:///{tmp_path / 'duplicate-qr.db'}")
     Base.metadata.create_all(engine)
     with Session(engine, expire_on_commit=False) as session:
-        attendee, _community, event = create_event_context(session)
+        attendee, community, event = create_event_context(session)
+        from src.models import Membership, MembershipRole
+        session.add(Membership(community_id=community.id, user_id=attendee.id,
+                               role=MembershipRole.ORGANIZER))
         attendance = Attendance(event_id=event.id, user_id=attendee.id, status=AttendanceStatus.CHECKED_IN)
         session.add(attendance); session.flush()
         from src.models import Ticket, TicketStatus, TicketType
@@ -141,6 +144,7 @@ def test_reciprocal_peer_confirmation_is_flagged_not_auto_rejected(tmp_path):
     Base.metadata.create_all(engine)
     with Session(engine, expire_on_commit=False) as session:
         _owner, _community, event = create_event_context(session)
+        event.peer_confirmation_enabled = True
         first = User(email="first-peer@example.com", password_hash="hash")
         second = User(email="second-peer@example.com", password_hash="hash")
         session.add_all([first, second]); session.flush()
@@ -166,6 +170,7 @@ def test_repeated_peer_confirmations_are_flagged_for_review(tmp_path):
     Base.metadata.create_all(engine)
     with Session(engine, expire_on_commit=False) as session:
         _owner, _community, event = create_event_context(session)
+        event.peer_confirmation_enabled = True
         confirmer = User(email="repeat-peer@example.com", password_hash="hash")
         subjects = [
             User(email=f"repeat-subject-{index}@example.com", password_hash="hash")

@@ -101,8 +101,8 @@ integrated product evidence. TickVendor is not specification-complete or product
   activation; optional/future provider webhook headers are outside the V1 release boundary.
 - [x] Payment initialization idempotency is scoped to the same order/user relationship, provider,
   amount, and currency; valid replay returns the stored checkout and conflicts are rejected.
-- [ ] Require organizer/event-staff authorization for QR attendance verification and expose an
-  authorized organizer approval/rejection API.
+- [x] QR attendance verification requires organizer/admin/event-staff authorization and an
+  authorized organizer approval/rejection API enforces event/tenant scope.
 - [ ] Enforce event attendance-method configuration (`peer_confirmation_enabled`,
   `qr_attendance_enabled`, `organizer_verification_enabled`) and complete configurable peer limits,
   deadlines, eligibility, attendee selection, and required verification combinations.

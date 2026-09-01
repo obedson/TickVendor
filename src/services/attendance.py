@@ -15,9 +15,11 @@ from src.models import (
     AttendanceStatus,
     AttendanceVerification,
     Event,
+    EventStaff,
     MembershipRole,
     PeerConfirmation,
     PeerConfirmationDecision,
+    PlatformRole,
     Ticket,
     TicketStatus,
     User,
@@ -154,6 +156,8 @@ def check_in(db: Session, event: Event, user: User, payload: AttendanceCheckIn) 
 
 
 def confirm_peer(db: Session, event: Event, confirmer: User, subject_id, confirmed: bool):
+    if not event.peer_confirmation_enabled:
+        raise HTTPException(status_code=409, detail="Peer confirmation is disabled")
     confirmer_attendance = db.scalar(select(Attendance).where(
         Attendance.event_id == event.id, Attendance.user_id == confirmer.id,
         Attendance.status.notin_([AttendanceStatus.NOT_CHECKED_IN, AttendanceStatus.REJECTED]),
@@ -212,6 +216,8 @@ def confirm_peer(db: Session, event: Event, confirmer: User, subject_id, confirm
 
 def organizer_verify(db: Session, attendance: Attendance, organizer: User, approve: bool, reason: str):
     event = db.get(Event, attendance.event_id)
+    if not event.organizer_verification_enabled:
+        raise HTTPException(status_code=409, detail="Organizer verification is disabled")
     require_community_role(db, event.community_id, organizer, MembershipRole.ORGANIZER)
     db.add(AttendanceVerification(
         attendance_id=attendance.id, method=VerificationMethod.ORGANIZER,
@@ -226,6 +232,19 @@ def organizer_verify(db: Session, attendance: Attendance, organizer: User, appro
 
 
 def qr_verify(db: Session, attendance: Attendance, ticket: Ticket, verifier: User) -> Attendance:
+    event = db.get(Event, attendance.event_id)
+    if not event.qr_attendance_enabled:
+        raise HTTPException(status_code=409, detail="QR attendance verification is disabled")
+    require_community_role(db, event.community_id, verifier, MembershipRole.ORGANIZER)
+    if verifier.role != PlatformRole.SUPER_ADMIN and event.organizer_id != verifier.id:
+        staff = db.scalar(select(EventStaff).where(
+            EventStaff.event_id == event.id,
+            EventStaff.user_id == verifier.id,
+            EventStaff.is_active.is_(True),
+        ))
+        membership = require_community_role(db, event.community_id, verifier, MembershipRole.ORGANIZER)
+        if staff is None and membership.role != MembershipRole.ADMIN:
+            raise HTTPException(status_code=403, detail="QR attendance verification permission required")
     if ticket.event_id != attendance.event_id or ticket.attendee_id != attendance.user_id:
         raise HTTPException(status_code=403, detail="Ticket does not match attendance")
     if ticket.status not in {TicketStatus.ACTIVE, TicketStatus.USED}:
