@@ -19,4 +19,4 @@ Frontend:
 
 Configuration is documented in `.env.example`. SQLite is allowed only for development/test. Staging and production require a server database URL and strong `SECRET_KEY`. Apply Alembic migrations before startup.
 
-Live payment provider and production email delivery require external credentials; deterministic adapters cover local development and tests.
+Paystack is the required V1 payment provider. Set `PAYSTACK_SECRET_KEY` and `PAYSTACK_WEBHOOK_SECRET`, configure Paystack to send `charge.success` webhooks to `/api/v1/payments/webhooks/paystack`, and verify the sandbox flow before release. Stripe and Flutterwave adapters are optional/future. Production email delivery also requires external credentials; deterministic adapters cover local development and tests.

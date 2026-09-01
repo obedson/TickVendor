@@ -379,13 +379,13 @@ Prevent duplicate ticket use.
 
 Build the system so that payment providers can be integrated cleanly.
 
-The architecture should support providers such as:
+V1 requires Paystack. The architecture may support additional providers later:
 
-* Paystack
-* Flutterwave
-* Stripe
+* Paystack — required for V1
+* Flutterwave — optional/future
+* Stripe — optional/future
 
-For the Nigerian market, prioritize Paystack/Flutterwave integration architecture.
+For V1, production configuration, documentation, and release verification target Paystack.
 
 Do not store raw card information.
 

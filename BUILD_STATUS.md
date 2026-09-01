@@ -52,6 +52,21 @@ integrated product evidence. TickVendor is not specification-complete or product
   directory name because they are isolated historical machine-specific artifacts, not active product
   identifiers; Git history, Alembic revision IDs, and database objects were not rewritten.
 
+## V1 Payment Decision — Paystack
+
+- [x] Paystack is TickVendor's required and default V1 production provider. Stripe and Flutterwave
+  remain isolated optional/future adapters and are not V1 release blockers.
+- [x] Paystack initialization uses minor currency units; authoritative verification validates the
+  provider reference, amount, currency, and successful status before order/ticket activation.
+- [x] Payment initialization replay is scoped to the same order/provider/amount/currency, reuses the
+  stored checkout URL without another provider call, and rejects conflicting key reuse.
+- [x] The webhook endpoint accepts Paystack's real `x-paystack-signature`, verifies HMAC-SHA512,
+  ignores non-`charge.success` events, and preserves successful-payment replay idempotency.
+- [ ] Exercise Paystack initialization, verification, webhook replay, failure, and refund behavior
+  with real Paystack test credentials; automated tests use deterministic HTTP/provider fakes.
+- [ ] Implement Paystack provider-side refund initiation and reconciliation before enabling paid
+  refunds in production.
+
 - [ ] Complete the participant frontend journeys: authentication, event detail/ticket acquisition,
   check-in result, peer confirmation, tasks, contributions, achievements, milestones, ranks,
   community selection, profile/privacy settings, and meaningful empty/error states.
@@ -78,18 +93,14 @@ integrated product evidence. TickVendor is not specification-complete or product
 - [ ] Operationally schedule notification generation; `generate_scheduled_notifications` is currently
   invoked only by tests and no worker/startup command runs it.
 - [ ] Provide production email and push senders; current defaults are in-memory adapters only.
-- [ ] Strengthen live payment verification so provider responses return and validate authoritative
-  amount, currency, reference, and status; current adapters return only a status boolean and the
-  service compares order values only against the locally created Payment row.
+- [x] Provider verification returns authoritative amount, currency, reference, and status and the
+  payment service rejects mismatches before activation (deterministic contracts verified locally).
 - [ ] Integrate provider-side refunds for paid orders and reconcile webhook/provider refund state;
   current refund logic transitions local Payment/Ticket/Order records only.
-- [ ] Accept and verify each provider's real webhook signature header (`x-paystack-signature`,
-  Flutterwave `verif-hash`/configured signature header, and `Stripe-Signature`); the current route
-  exposes only the generic `X-Payment-Signature` header and is not live-provider compatible as-is.
-- [ ] Validate provider webhook event type/payment status before activation; a correctly signed event
-  with a known reference currently proceeds to provider verification regardless of event type.
-- [ ] Scope payment-initialization idempotency to the same order/user/provider/amount/currency and
-  return the original checkout without reinitializing the live provider; reject key conflicts.
+- [x] Paystack webhooks accept the real signature header and validate `charge.success` before
+  activation; optional/future provider webhook headers are outside the V1 release boundary.
+- [x] Payment initialization idempotency is scoped to the same order/user relationship, provider,
+  amount, and currency; valid replay returns the stored checkout and conflicts are rejected.
 - [ ] Require organizer/event-staff authorization for QR attendance verification and expose an
   authorized organizer approval/rejection API.
 - [ ] Enforce event attendance-method configuration (`peer_confirmation_enabled`,
@@ -116,7 +127,8 @@ integrated product evidence. TickVendor is not specification-complete or product
 - [ ] Replace local filesystem-only image storage with configured production object storage and
   verify upload delivery/authorization in the deployed environment.
 - [ ] Verify PostgreSQL migration/application behavior, production deployment, HTTPS/TLS, CORS,
-  monitoring/error tracking, and live Paystack/Flutterwave/Stripe/email/push providers.
+  monitoring/error tracking, and live Paystack/email/push providers. Optional Stripe/Flutterwave
+  verification is future work and does not block V1.
 
 ## Implementation Checklist — Grouped by Dependency-Aware Subsystem
 
@@ -164,7 +176,7 @@ integrated product evidence. TickVendor is not specification-complete or product
 - [x] Ticket lifecycle states implemented: reserved, pending payment, paid, active, used, cancelled, refunded, expired
 - [x] Duplicate ticket use prevention and staff/tenant-authorized validation
 - [x] Idempotent order creation, free-ticket activation, inventory/max-per-user enforcement
-- [x] Payment provider contract, test adapter, Paystack/Flutterwave/Stripe HTTP adapters, initialization/verification APIs and signed idempotent webhook path (live verification externally blocked)
+- [x] V1 Paystack contract and HTTP adapter, initialization/authoritative verification APIs, real signed idempotent webhook path, plus isolated optional Stripe/Flutterwave adapters (live verification externally blocked)
 - [x] Payment state enforcement and server-side amount/currency/provider verification
 - [x] Ticket activation upon verified payment confirmation
 - [x] Ticket activation flow for free and provider-verified paid orders
