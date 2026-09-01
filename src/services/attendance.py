@@ -40,6 +40,7 @@ def haversine_meters(lat1: Decimal, lon1: Decimal, lat2: Decimal, lon2: Decimal)
 
 
 def calculate_attendance_confidence(db: Session, attendance: Attendance) -> Attendance:
+    event = db.get(Event, attendance.event_id)
     signals = list(db.scalars(select(AttendanceVerification).where(
         AttendanceVerification.attendance_id == attendance.id
     )))
@@ -50,6 +51,7 @@ def calculate_attendance_confidence(db: Session, attendance: Attendance) -> Atte
         db.commit()
         return attendance
     valid = {signal.method for signal in signals if signal.is_valid}
+    required = {VerificationMethod(method) for method in event.required_verification_methods}
     weights = {VerificationMethod.GPS: Decimal(40), VerificationMethod.QR: Decimal(50),
                VerificationMethod.PEER: Decimal(30), VerificationMethod.ORGANIZER: Decimal(100)}
     attendance.confidence_score = min(Decimal(100), sum((weights[item] for item in valid), Decimal(0)))
@@ -57,8 +59,9 @@ def calculate_attendance_confidence(db: Session, attendance: Attendance) -> Atte
                   (VerificationMethod.QR, AttendanceStatus.QR_VERIFIED),
                   (VerificationMethod.GPS, AttendanceStatus.GPS_VERIFIED),
                   (VerificationMethod.PEER, AttendanceStatus.PEER_VERIFIED))
-    attendance.status = next((status for method, status in precedence if method in valid),
-                             AttendanceStatus.CHECKED_IN)
+    attendance.status = next((status for method, status in precedence if method in valid), AttendanceStatus.CHECKED_IN)
+    if required and not required.issubset(valid):
+        attendance.status = AttendanceStatus.CHECKED_IN
     db.commit()
     return attendance
 
@@ -173,6 +176,9 @@ def check_in(db: Session, event: Event, user: User, payload: AttendanceCheckIn) 
 def confirm_peer(db: Session, event: Event, confirmer: User, subject_id, confirmed: bool):
     if not event.peer_confirmation_enabled:
         raise HTTPException(status_code=409, detail="Peer confirmation is disabled")
+    now = datetime.now(UTC)
+    if event.peer_confirmation_deadline and now > as_utc(event.peer_confirmation_deadline):
+        raise HTTPException(status_code=409, detail="Peer confirmation deadline has passed")
     confirmer_attendance = db.scalar(select(Attendance).where(
         Attendance.event_id == event.id, Attendance.user_id == confirmer.id,
         Attendance.status.notin_([AttendanceStatus.NOT_CHECKED_IN, AttendanceStatus.REJECTED]),
@@ -182,6 +188,12 @@ def confirm_peer(db: Session, event: Event, confirmer: User, subject_id, confirm
     ))
     if confirmer.id == subject_id or confirmer_attendance is None or subject is None:
         raise HTTPException(status_code=403, detail="Peer confirmation is not permitted")
+    submitted_count = db.scalar(select(func.count()).select_from(PeerConfirmation).where(
+        PeerConfirmation.event_id == event.id,
+        PeerConfirmation.confirmer_id == confirmer.id,
+    )) or 0
+    if event.max_peer_confirmations is not None and submitted_count >= event.max_peer_confirmations:
+        raise HTTPException(status_code=409, detail="Peer confirmation limit reached")
     confirmation = PeerConfirmation(
         event_id=event.id, confirmer_id=confirmer.id, subject_id=subject_id,
         decision=PeerConfirmationDecision.CONFIRMED if confirmed else PeerConfirmationDecision.CANNOT_CONFIRM,

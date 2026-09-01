@@ -103,6 +103,9 @@ class Event(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     confirmations_required: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     organizer_verification_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     qr_attendance_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    max_peer_confirmations: Mapped[int | None] = mapped_column(Integer)
+    peer_confirmation_deadline: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    required_verification_methods: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
 
     venue: Mapped[Venue | None] = relationship()
     staff: Mapped[list[EventStaff]] = relationship(

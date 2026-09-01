@@ -106,8 +106,9 @@ integrated product evidence. TickVendor is not specification-complete or product
   authorized organizer approval/rejection API enforces event/tenant scope.
 - [x] Enforce event attendance-method configuration (`peer_confirmation_enabled`,
   `qr_attendance_enabled`, `organizer_verification_enabled`) at service boundaries.
-- [ ] Complete configurable peer limits, deadlines, eligibility, attendee selection, and required
-  verification combinations.
+- [x] Enforce configurable peer confirmation deadline and per-confirmer maximum, self/duplicate
+  prevention, valid-attendee eligibility, and configurable required verification-method combinations.
+- [ ] Complete configurable attendee selection rules and organizer override policy.
 - [x] Award attendance Impact Points idempotently after check-in and resolve the configured central
   PointRule; concurrent Impact Point key races return the existing transaction.
 - [ ] Make task verification, its audit record, notification, and reward insertion one atomic
