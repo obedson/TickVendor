@@ -44,6 +44,7 @@ from src.models.organization import Organization
 from src.models.payment import Payment, PaymentStatus
 from src.models.preference import NotificationPreference
 from src.models.rank import Rank, RankProgression, RankRequirement
+from src.models.scheduled_notification import ScheduledNotification, ScheduledNotificationStatus
 from src.models.task import (
     Task,
     TaskAssignment,
@@ -112,6 +113,8 @@ __all__ = [
     "Rank",
     "RankProgression",
     "RankRequirement",
+    "ScheduledNotification",
+    "ScheduledNotificationStatus",
     "Task",
     "TaskAssignment",
     "TaskAssignmentStatus",

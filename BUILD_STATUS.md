@@ -110,8 +110,10 @@ integrated product evidence. TickVendor is not specification-complete or product
 - [x] Expose enabled community leaderboards through tenant-authorized APIs with configured metric,
   period, bounded limit, privacy filtering, and deterministic score/user ordering.
 - [ ] Add event/time-window query semantics and authorized leaderboard configuration administration.
-- [ ] Operationally schedule notification generation; `generate_scheduled_notifications` is currently
-  invoked only by tests and no worker/startup command runs it.
+- [x] Add durable scheduled notification work items and a locally executable worker with conditional
+  claiming, preference suppression, bounded retry/backoff, terminal failure state, and deterministic
+  local delivery idempotency. SQLite claim behavior is locally verified; PostgreSQL multi-worker
+  concurrency and provider-accepted-before-crash delivery remain live/external verification.
 - [ ] Provide production email and push senders; current defaults are in-memory adapters only.
 - [x] Provider verification returns authoritative amount, currency, reference, and status and the
   payment service rejects mismatches before activation (deterministic contracts verified locally).
