@@ -104,6 +104,8 @@ integrated product evidence. TickVendor is not specification-complete or product
   from authoritative backend state. Duplicate reward replay remains covered by backend tests.
 - [x] Add role-aware organizer dashboard navigation and real dashboard metrics from the organizer
   summary API; participant navigation remains unchanged and dashboard access remains backend-authorized.
+- [x] Organizer Playwright coverage verifies an organizer can open the real dashboard metrics while
+  participant sessions do not receive organizer-dashboard navigation.
 - [ ] Complete the remaining participant frontend journeys: ticket acquisition, check-in result,
   peer confirmation, tasks, contributions, achievements, milestones, ranks, community selection,
   profile editing/privacy controls, and complete loading/error states.

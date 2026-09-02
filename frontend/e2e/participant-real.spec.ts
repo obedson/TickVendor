@@ -5,7 +5,7 @@ test('real participant can acquire a free ticket and retain its QR wallet', asyn
   await page.getByLabel('Email').fill('e2e-participant@example.com');
   await page.getByLabel('Password').fill('e2e-password-123');
   await page.getByRole('button', { name: 'Sign in' }).click();
-  await expect(page.getByRole('heading', { name: 'E2E Community Meetup' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'E2E Community Meetup' }).first()).toBeVisible();
 
   await page.getByRole('button', { name: 'View event' }).click();
   await expect(page.getByRole('heading', { name: 'Free admission' })).toBeVisible();
@@ -13,13 +13,13 @@ test('real participant can acquire a free ticket and retain its QR wallet', asyn
   await expect(page.getByText('Ticket confirmed. Open My tickets to view it.')).toBeVisible();
 
   await page.getByRole('button', { name: 'My tickets' }).click();
-  await expect(page.getByRole('heading', { name: 'E2E Community Meetup' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'E2E Community Meetup' }).first()).toBeVisible();
   await expect(page.getByAltText(/Entrance QR code/)).toBeVisible();
   await expect(page.getByText('Status: active')).toBeVisible();
 
   await page.reload();
   await page.getByRole('button', { name: 'My tickets' }).click();
-  await expect(page.getByRole('heading', { name: 'E2E Community Meetup' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'E2E Community Meetup' }).first()).toBeVisible();
   await expect(page.getByAltText(/Entrance QR code/)).toBeVisible();
 
   await page.getByRole('button', { name: 'Attendance' }).click();
@@ -57,6 +57,7 @@ test('real participant can acquire a free ticket and retain its QR wallet', asyn
   });
   expect((await verifiedAssignment.json())[0].status).toBe('verified');
 
+  await page.reload();
   await page.reload();
   await page.getByRole('button', { name: 'Tasks' }).click();
   await expect(page.getByText('Status: verified')).toBeVisible({ timeout: 10_000 });
