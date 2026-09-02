@@ -47,6 +47,17 @@ def my_assignments(db: Annotated[Session, Depends(get_db)], user: Annotated[User
             for item in db.scalars(select(TaskAssignment).where(TaskAssignment.assignee_id == user.id))]
 
 
+@router.get("/task-assignments/me/details")
+def my_assignment_details(db: Annotated[Session, Depends(get_db)], user: Annotated[User, Depends(get_current_user)]):
+    rows = db.execute(select(TaskAssignment, Task).join(Task, Task.id == TaskAssignment.task_id)
+                      .where(TaskAssignment.assignee_id == user.id).order_by(TaskAssignment.created_at))
+    return [{"id": str(assignment.id), "task_id": str(task.id), "title": task.title,
+             "description": task.description, "due_at": task.due_at,
+             "status": assignment.status.value, "verification_required": task.verification_required,
+             "impact_point_reward": task.impact_point_reward, "attachments": task.attachments}
+            for assignment, task in rows]
+
+
 @router.post("/task-assignments/{assignment_id}/accept")
 def accept(assignment_id: UUID, db: Annotated[Session, Depends(get_db)],
            user: Annotated[User, Depends(get_current_user)]):
