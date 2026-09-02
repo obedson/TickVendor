@@ -77,6 +77,8 @@ integrated product evidence. TickVendor is not specification-complete or product
   APIs with input validation and audit-backed mutations.
 - [ ] Complete remaining server-side configuration APIs for attendance/verification rules,
   contribution bands/caps, notification rules, and leaderboard visibility.
+- [x] Add community-scoped contribution reward-band create/update APIs with amount-range, overlap,
+  reward/cap validation, tenant authorization, enable/disable handling and audit records.
 - [x] Add community/organization creation/editing, logo metadata, membership listing/invitation,
   role/status management, tenant authorization, profile-privacy filtering, and privileged audit
   records through product-facing community APIs.

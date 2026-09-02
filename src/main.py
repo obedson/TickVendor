@@ -19,6 +19,7 @@ from src.api.attendance_configuration import router as attendance_configuration_
 from src.api.auth import router as auth_router
 from src.api.communities import router as communities_router
 from src.api.community_management import router as community_management_router
+from src.api.contribution_configuration import router as contribution_configuration_router
 from src.api.events import router as events_router
 from src.api.leaderboard_configuration import router as leaderboard_configuration_router
 from src.api.leaderboards import router as leaderboards_router
@@ -50,6 +51,7 @@ def create_app() -> FastAPI:
     application.include_router(attendance_router, prefix=settings.api_v1_prefix)
     application.include_router(attendance_configuration_router, prefix=settings.api_v1_prefix)
     application.include_router(communities_router, prefix=settings.api_v1_prefix)
+    application.include_router(contribution_configuration_router, prefix=settings.api_v1_prefix)
     application.include_router(community_management_router, prefix=settings.api_v1_prefix)
     application.include_router(events_router, prefix=settings.api_v1_prefix)
     application.include_router(notifications_router, prefix=settings.api_v1_prefix)
