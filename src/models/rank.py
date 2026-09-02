@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from sqlalchemy import Boolean, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.database import Base
@@ -31,3 +31,13 @@ class RankRequirement(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     requirement_type: Mapped[str] = mapped_column(String(40), nullable=False)
     reference_id: Mapped[Any | None] = mapped_column(GUID())
     threshold: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+
+
+class RankProgression(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "rank_progressions"
+    __table_args__ = (UniqueConstraint("rank_id", "user_id", name="uq_rank_progression_rank_user"),)
+
+    rank_id: Mapped[Any] = mapped_column(GUID(), ForeignKey("ranks.id", ondelete="CASCADE"), nullable=False)
+    user_id: Mapped[Any] = mapped_column(GUID(), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    community_id: Mapped[Any] = mapped_column(GUID(), ForeignKey("communities.id", ondelete="CASCADE"), nullable=False)
+    achieved_at: Mapped[Any] = mapped_column(DateTime(timezone=True), nullable=False)

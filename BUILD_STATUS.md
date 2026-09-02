@@ -85,8 +85,9 @@ integrated product evidence. TickVendor is not specification-complete or product
 - [x] Execute active `AchievementRule.reward_definition` Impact Point and badge rewards through a
   persisted per-rule/user award, stable idempotency keys, tenant isolation, audit and deduplicated
   notification; malformed definitions fail safely before commit.
-- [ ] Persist or expose rank progression/history if rank-change recognition is required; current
-  rank is calculated on profile reads rather than awarded through an automatic workflow.
+- [x] Rank progression history persists qualifying rank achievements with tenant/user/rank
+  uniqueness, deterministic reevaluation behavior, and profile exposure; downward punitive changes
+  are not introduced.
 - [ ] Make profile rank reporting use the complete configured rank qualification service, add profile
   and privacy-setting updates, and define/enforce public/member/private field visibility consistently.
 - [ ] Expose leaderboards through tenant-authorized APIs and support configured period/event scope and

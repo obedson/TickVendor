@@ -25,6 +25,7 @@ from src.models import (
     PeerConfirmation,
     PeerConfirmationDecision,
     Rank,
+    RankProgression,
     RankRequirement,
     Task,
     TaskAssignment,
@@ -150,6 +151,32 @@ def current_rank(db: Session, user_id, community_id) -> Rank | None:
         if qualified:
             return rank
     return None
+
+
+def evaluate_rank_progression(db: Session, user_id, community_id) -> Rank | None:
+    rank = current_rank(db, user_id, community_id)
+    if rank is None:
+        return None
+    existing = db.scalar(select(RankProgression.id).where(
+        RankProgression.rank_id == rank.id, RankProgression.user_id == user_id,
+    ))
+    if existing:
+        return rank
+    highest = db.scalar(select(func.max(Rank.sort_order)).join(
+        RankProgression, RankProgression.rank_id == Rank.id,
+    ).where(RankProgression.user_id == user_id, RankProgression.community_id == community_id))
+    if highest is not None and highest >= rank.sort_order:
+        return rank
+    progression = RankProgression(rank_id=rank.id, user_id=user_id, community_id=community_id,
+                                  achieved_at=datetime.now(UTC))
+    db.add(progression); db.flush()
+    audit(db, actor_id=None, community_id=community_id, action="rank.achieved",
+          target_type="rank_progression", target_id=progression.id,
+          metadata={"rank_id": str(rank.id), "user_id": str(user_id)}, commit=False)
+    notify(db, user_id, "rank_achieved", "New rank achieved", f"You reached {rank.name}.",
+           {"rank_id": str(rank.id)}, deduplication_key=f"rank:{rank.id}:user:{user_id}", commit=False)
+    db.commit()
+    return rank
 
 
 def award_badge(db: Session, badge: Badge, user_id, idempotency_key: str, *, commit: bool = True) -> BadgeAward:
@@ -298,6 +325,7 @@ def evaluate_recognition(db: Session, user_id, community_id) -> dict[str, int]:
         )
 
     achievement_rules_awarded = evaluate_achievement_rules(db, user_id, community_id, user_metrics(db, user_id, community_id))
+    evaluate_rank_progression(db, user_id, community_id)
     return {
         "milestones_awarded": milestones_awarded,
         "badges_awarded": badges_awarded,

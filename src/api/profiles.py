@@ -23,9 +23,10 @@ from src.models import (
     MilestoneAward,
     ProfileVisibility,
     Rank,
+    RankProgression,
     User,
 )
-from src.services.recognition import user_metrics
+from src.services.recognition import current_rank, user_metrics
 
 router = APIRouter(prefix="/profiles", tags=["profiles"])
 
@@ -79,10 +80,7 @@ def my_profile(
     if membership is None:
         raise HTTPException(status_code=403, detail="Active community membership required")
     metrics = user_metrics(db, user.id, community_id)
-    rank = db.scalar(select(Rank).where(
-        Rank.community_id == community_id, Rank.is_active.is_(True),
-        Rank.minimum_points <= metrics["impact_points"],
-    ).order_by(Rank.minimum_points.desc()))
+    rank = current_rank(db, user.id, community_id)
     next_rank = db.scalar(select(Rank).where(
         Rank.community_id == community_id, Rank.is_active.is_(True),
         Rank.minimum_points > metrics["impact_points"],
@@ -93,6 +91,10 @@ def my_profile(
     milestones = list(db.execute(select(MilestoneAward, Milestone).join(
         Milestone, Milestone.id == MilestoneAward.milestone_id
     ).where(MilestoneAward.user_id == user.id, Milestone.community_id == community_id)))
+    rank_history = list(db.execute(select(RankProgression, Rank).join(
+        Rank, Rank.id == RankProgression.rank_id
+    ).where(RankProgression.user_id == user.id, RankProgression.community_id == community_id)
+      .order_by(RankProgression.achieved_at)))
     timeline = [{"type": "joined_community", "occurred_at": (membership.joined_at or membership.created_at).isoformat()}]
     timeline += [{"type": "badge_awarded", "name": badge.name, "occurred_at": award.awarded_at.isoformat()}
                  for award, badge in badges]
@@ -105,6 +107,8 @@ def my_profile(
             "display_name": user.profile.display_name, "photo_url": user.profile.photo_url,
             "visibility": user.profile.visibility.value, "impact_points": metrics["impact_points"],
             "rank": {"id": str(rank.id), "name": rank.name} if rank else None,
+            "rank_history": [{"name": item.name, "achieved_at": progression.achieved_at.isoformat()}
+                             for progression, item in rank_history],
             "next_rank": ({"id": str(next_rank.id), "name": next_rank.name,
                            "minimum_points": next_rank.minimum_points,
                            "points_remaining": next_rank.minimum_points - metrics["impact_points"]}
