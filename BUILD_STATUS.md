@@ -102,8 +102,9 @@ integrated product evidence. TickVendor is not specification-complete or product
   qualification logic, including non-point requirements.
 - [x] Profile rank reporting uses the complete configured rank qualification service and exposes rank
   history through the authenticated community profile response.
-- [ ] Add profile/privacy update APIs and define/enforce public/member/private field visibility
-  consistently across profile, search, leaderboard and member views.
+- [x] Add authenticated profile metadata/privacy updates and enforce public/member/private visibility
+  for profile retrieval and global search, including owner and shared-community access rules.
+- [ ] Apply the same visibility policy to leaderboard and community member views.
 - [ ] Expose leaderboards through tenant-authorized APIs and support configured period/event scope and
   administration; current leaderboard behavior is a directly tested service only.
 - [ ] Operationally schedule notification generation; `generate_scheduled_notifications` is currently

@@ -5,6 +5,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -27,9 +28,24 @@ from src.models import (
     RankProgression,
     User,
 )
+from src.security import decode_access_token
 from src.services.recognition import current_rank, next_rank, user_metrics
 
 router = APIRouter(prefix="/profiles", tags=["profiles"])
+optional_bearer = HTTPBearer(auto_error=False)
+
+
+def get_optional_user(
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(optional_bearer)],
+    db: Annotated[Session, Depends(get_db)],
+) -> User | None:
+    if credentials is None:
+        return None
+    try:
+        payload = decode_access_token(credentials.credentials)
+        return db.get(User, UUID(payload["sub"]))
+    except (KeyError, ValueError):
+        return None
 
 
 class ProfileUpdateInput(BaseModel):
@@ -144,9 +160,25 @@ def update_my_profile(
 
 
 @router.get("/{user_id}")
-def public_profile(user_id: UUID, db: Annotated[Session, Depends(get_db)]):
+def public_profile(
+    user_id: UUID,
+    db: Annotated[Session, Depends(get_db)],
+    viewer: Annotated[User | None, Depends(get_optional_user)],
+):
     user = db.get(User, user_id)
     if user is None or user.profile.visibility == ProfileVisibility.PRIVATE:
         raise HTTPException(status_code=404, detail="Profile not found")
+    if viewer is not None and viewer.id == user.id:
+        return {"username": user.profile.username, "display_name": user.profile.display_name,
+                "bio": user.profile.bio, "photo_url": user.profile.photo_url}
+    if user.profile.visibility == ProfileVisibility.MEMBERS:
+        shared = db.scalar(select(Membership.id).where(
+            Membership.user_id == viewer.id if viewer else False,
+            Membership.community_id.in_(select(Membership.community_id).where(
+                Membership.user_id == user_id, Membership.status == MembershipStatus.ACTIVE)),
+            Membership.status == MembershipStatus.ACTIVE,
+        ))
+        if shared is None:
+            raise HTTPException(status_code=404, detail="Profile not found")
     return {"username": user.profile.username, "display_name": user.profile.display_name,
             "bio": user.profile.bio, "photo_url": user.profile.photo_url}

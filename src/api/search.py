@@ -37,10 +37,21 @@ def global_search(
     communities = db.scalars(select(Community).where(
         Community.is_public.is_(True), func.lower(Community.name).like(pattern)
     ).limit(20))
-    profiles = db.scalars(select(Profile).where(
-        Profile.visibility != ProfileVisibility.PRIVATE,
+    public_profiles = list(db.scalars(select(Profile).where(
+        Profile.visibility == ProfileVisibility.PUBLIC,
         (func.lower(Profile.username).like(pattern) | func.lower(Profile.display_name).like(pattern)),
-    ).limit(20))
+    ).limit(20)))
+    member_profiles = list(db.scalars(
+        select(Profile).join(Membership, Membership.user_id == Profile.user_id).where(
+            Profile.visibility == ProfileVisibility.MEMBERS,
+            Membership.status == MembershipStatus.ACTIVE,
+            Membership.community_id.in_(select(Membership.community_id).where(
+                Membership.user_id == user.id, Membership.status == MembershipStatus.ACTIVE,
+            )),
+            (func.lower(Profile.username).like(pattern) | func.lower(Profile.display_name).like(pattern)),
+        ).limit(20)
+    ))
+    profiles = {profile.user_id: profile for profile in public_profiles + member_profiles}.values()
     organizers = db.execute(
         select(Profile, Membership.community_id)
         .join(Membership, Membership.user_id == Profile.user_id)
