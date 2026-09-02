@@ -87,6 +87,8 @@ integrated product evidence. TickVendor is not specification-complete or product
   provider redirect parameters.
 - [x] Add Playwright Chromium browser verification with deterministic participant shell and payment
   return scenarios; live backend/provider E2E remains separately unverified.
+- [x] Add an isolated local E2E database seeder/backend process and pass a real browser-backed
+  participant free-ticket acquisition, wallet refresh, and QR persistence journey.
 - [ ] Complete the remaining participant frontend journeys: ticket acquisition, check-in result,
   peer confirmation, tasks, contributions, achievements, milestones, ranks, community selection,
   profile editing/privacy controls, and complete loading/error states.
