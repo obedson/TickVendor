@@ -90,6 +90,8 @@ integrated product evidence. TickVendor is not specification-complete or product
   bounded pagination, deterministic ordering and recursive sensitive-field redaction.
 - [x] Freshly verified audit API access is restricted to community administrators with filter and
   redaction coverage.
+- [x] Add participant ticket catalog and authoritative payment-status API; public ticket inventory
+  excludes hidden/invite-only types and payment status is restricted to the owning user/order.
 - [ ] Integrate `evaluate_recognition` into verified business transitions or a durable job so
   milestone/badge rewards and notifications happen automatically; task/activity/contribution and
   qualifying attendance verification now invoke it, but end-to-end recognition tests remain.

@@ -1,6 +1,7 @@
 """Payment initialization, verification, and signed webhook routes."""
 
 from typing import Annotated
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from sqlalchemy.orm import Session
@@ -65,6 +66,19 @@ def initialize(
         provider_reference=initialized.provider_reference,
         checkout_url=initialized.checkout_url,
     )
+
+
+@router.get("/{payment_id}")
+def payment_status(payment_id: UUID, db: Annotated[Session, Depends(get_db)], user: Annotated[User, Depends(get_current_user)]):
+    payment = db.get(Payment, payment_id)
+    if payment is None:
+        raise HTTPException(status_code=404, detail="Payment not found")
+    order = db.get(Order, payment.order_id)
+    if order is None or order.user_id != user.id:
+        raise HTTPException(status_code=404, detail="Payment not found")
+    return {"payment_id": str(payment.id), "order_id": str(order.id), "order_reference": order.reference,
+            "status": payment.status.value, "order_status": order.status.value,
+            "provider_reference": payment.provider_reference}
 
 
 @router.post("/verify")
