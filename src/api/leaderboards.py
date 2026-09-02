@@ -30,4 +30,5 @@ def community_leaderboard(
     leaderboard = db.scalar(query.order_by(Leaderboard.created_at))
     if leaderboard is None: raise HTTPException(status_code=404, detail="Leaderboard not found")
     return {"id": str(leaderboard.id), "name": leaderboard.name, "metric": leaderboard.metric,
-            "period": leaderboard.period, "entries": leaderboard_entries(db, leaderboard, user, limit)}
+            "period": leaderboard.period, "event_id": str(leaderboard.event_id) if leaderboard.event_id else None,
+            "entries": leaderboard_entries(db, leaderboard, user, limit)}

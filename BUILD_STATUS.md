@@ -112,7 +112,8 @@ integrated product evidence. TickVendor is not specification-complete or product
   period, bounded limit, privacy filtering, and deterministic score/user ordering.
 - [x] Add authorized leaderboard configuration administration with validated metric/period, enabled
   state, bounded limits, tenant scope and audit records.
-- [ ] Add event-scoped and time-window scoring semantics to leaderboard queries.
+- [x] Add event-scoped and weekly/monthly time-window scoring semantics to leaderboard queries with
+  UTC-aware filtering and event/community validation.
 - [x] Add durable scheduled notification work items and a locally executable worker with conditional
   claiming, preference suppression, bounded retry/backoff, terminal failure state, and deterministic
   local delivery idempotency. SQLite claim behavior is locally verified; PostgreSQL multi-worker

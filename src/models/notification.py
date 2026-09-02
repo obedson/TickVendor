@@ -51,6 +51,7 @@ class Leaderboard(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __table_args__ = (UniqueConstraint("community_id", "slug", name="uq_leaderboard_community_slug"),)
 
     community_id: Mapped[Any] = mapped_column(GUID(), ForeignKey("communities.id", ondelete="CASCADE"), nullable=False)
+    event_id: Mapped[Any | None] = mapped_column(GUID(), ForeignKey("events.id", ondelete="CASCADE"))
     name: Mapped[str] = mapped_column(String(160), nullable=False)
     slug: Mapped[str] = mapped_column(String(100), nullable=False)
     metric: Mapped[str] = mapped_column(String(64), nullable=False)
