@@ -90,6 +90,8 @@ integrated product evidence. TickVendor is not specification-complete or product
   and notification.
 - [x] End-to-end attendance recognition test covers geofence evidence, configured qualification,
   attendance points, milestone/badge/AchievementRule rewards, and replay-safe recognition effects.
+- [x] Recognition coverage includes cross-community isolation for AchievementRule evaluation and
+  reward transactions.
 - [x] Rank progression history persists qualifying rank achievements with tenant/user/rank
   uniqueness, deterministic reevaluation behavior, and profile exposure; downward punitive changes
   are not introduced.

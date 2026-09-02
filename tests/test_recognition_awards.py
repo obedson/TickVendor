@@ -142,3 +142,33 @@ def test_attendance_recognition_flow_is_idempotent(tmp_path):
         assert db.query(AchievementAward).filter_by(rule_id=rule.id).count() == 1
         assert db.query(ImpactTransaction).filter_by(source_type="achievement_reward").count() == 1
     engine.dispose()
+
+
+def test_recognition_flow_is_tenant_isolated(tmp_path):
+    engine = create_engine(f"sqlite:///{tmp_path / 'recognition-tenant.db'}")
+    Base.metadata.create_all(engine)
+    with Session(engine, expire_on_commit=False) as db:
+        user, community_a, _event = create_event_context(db)
+        organization = __import__("src.models", fromlist=["Organization"]).Organization(
+            owner_id=user.id, name="Second org", slug="second-org-flow")
+        db.add(organization); db.flush()
+        community_b = __import__("src.models", fromlist=["Community"]).Community(
+            organization_id=organization.id, name="Second community", slug="second-community-flow")
+        db.add(community_b); db.flush()
+        db.add_all([
+            AchievementRule(community_id=community_a.id, name="A rule", slug="a-rule-flow",
+                            condition_tree={"operator": ">=", "metric": "impact_points", "value": 1},
+                            reward_definition={"impact_points": 5}),
+            AchievementRule(community_id=community_b.id, name="B rule", slug="b-rule-flow",
+                            condition_tree={"operator": ">=", "metric": "impact_points", "value": 1},
+                            reward_definition={"impact_points": 9}),
+            ImpactTransaction(idempotency_key="tenant-flow", user_id=user.id, community_id=community_a.id,
+                              points=1, source_type="test", reason="tenant", status=ImpactTransactionStatus.POSTED),
+        ])
+        db.commit()
+        evaluate_recognition(db, user.id, community_a.id)
+        evaluate_recognition(db, user.id, community_b.id)
+        assert db.query(AchievementAward).filter_by(community_id=community_a.id).count() == 1
+        assert db.query(AchievementAward).filter_by(community_id=community_b.id).count() == 0
+        assert db.query(ImpactTransaction).filter_by(source_type="achievement_reward", community_id=community_b.id).count() == 0
+    engine.dispose()
