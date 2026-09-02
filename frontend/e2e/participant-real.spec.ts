@@ -58,3 +58,19 @@ test('participant attendance failure is rendered without duplicate check-in', as
   await page.getByRole('button', { name: 'Check in' }).click();
   await expect(page.getByText(/Attendance status:|Check-in failed/)).toBeVisible();
 });
+
+test('participant can load and submit peer confirmation', async ({ page }) => {
+  await page.goto('/');
+  await page.getByLabel('Email').fill('e2e-participant@example.com');
+  await page.getByLabel('Password').fill('e2e-password-123');
+  await page.getByRole('button', { name: 'Sign in' }).click();
+  await page.getByRole('button', { name: 'View event' }).click();
+  await page.getByRole('button', { name: 'Acquire ticket' }).click();
+  await expect(page.getByText('Ticket confirmed. Open My tickets to view it.')).toBeVisible();
+  await page.getByRole('button', { name: 'Attendance' }).click();
+  await page.getByRole('button', { name: 'Check in' }).click();
+  await expect(page.getByText(/Attendance status:/)).toBeVisible();
+  await expect(page.getByText('No peer confirmations are currently available.')).not.toBeVisible({ timeout: 5_000 });
+  await page.getByRole('button', { name: 'Confirm' }).click();
+  await expect(page.getByText('Peer confirmation recorded.')).toBeVisible();
+});
