@@ -93,6 +93,8 @@ integrated product evidence. TickVendor is not specification-complete or product
   tasks, avoiding the prior placeholder route and proving the seeded backend task surface is reachable.
 - [x] The real participant browser flow now covers free acquisition, QR wallet refresh, attendance,
   task evidence submission, and Impact/Recognition navigation against the isolated local backend.
+- [x] Participant browser acceptance coverage includes deterministic geolocation-denied attendance
+  handling without introducing client-side qualification logic; the complete peer-required path remains open.
 - [ ] Complete the remaining participant frontend journeys: ticket acquisition, check-in result,
   peer confirmation, tasks, contributions, achievements, milestones, ranks, community selection,
   profile editing/privacy controls, and complete loading/error states.
