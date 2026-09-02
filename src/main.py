@@ -13,6 +13,7 @@ from fastapi.responses import JSONResponse
 
 from src.api.admin import category_router
 from src.api.admin import router as admin_router
+from src.api.admin_configuration import router as admin_configuration_router
 from src.api.attendance import router as attendance_router
 from src.api.auth import router as auth_router
 from src.api.communities import router as communities_router
@@ -42,6 +43,7 @@ def create_app() -> FastAPI:
     )
     application.include_router(auth_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_router, prefix=settings.api_v1_prefix)
+    application.include_router(admin_configuration_router, prefix=settings.api_v1_prefix)
     application.include_router(category_router, prefix=settings.api_v1_prefix)
     application.include_router(attendance_router, prefix=settings.api_v1_prefix)
     application.include_router(communities_router, prefix=settings.api_v1_prefix)

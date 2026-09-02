@@ -73,9 +73,10 @@ integrated product evidence. TickVendor is not specification-complete or product
 - [ ] Complete organizer/admin frontend journeys: event creation/edit/publish, ticket setup and
   attendee management, QR scanning, attendance review, task/member/contribution management,
   analytics, audit log, and all data-driven recognition/configuration screens.
-- [ ] Complete server-side admin configuration APIs for point rules, attendance/verification rules,
-  contribution bands/caps, notification rules, and leaderboard visibility; current admin routes
-  chiefly cover milestones, ranks, badges, achievement rules, memberships, and category management.
+- [x] Add tenant-authorized PointRule listing/upsert and append-only manual Impact Point adjustment
+  APIs with input validation and audit-backed mutations.
+- [ ] Complete remaining server-side configuration APIs for attendance/verification rules,
+  contribution bands/caps, notification rules, and leaderboard visibility.
 - [x] Add community/organization creation/editing, logo metadata, membership listing/invitation,
   role/status management, tenant authorization, profile-privacy filtering, and privileged audit
   records through product-facing community APIs.
