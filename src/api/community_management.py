@@ -72,6 +72,16 @@ def _member(db, membership, viewer):
             "photo_url": profile.photo_url}
 
 
+@router.get("/me", include_in_schema=True)
+def my_communities(db: Annotated[Session, Depends(get_db)], user: Annotated[User, Depends(get_current_user)]):
+    memberships = db.scalars(select(Membership).where(
+        Membership.user_id == user.id, Membership.status == MembershipStatus.ACTIVE,
+    ).order_by(Membership.created_at)).all()
+    return [{"id": str(item.community_id), "community": _community(db.get(Community, item.community_id)),
+             "membership": {"id": str(item.id), "role": item.role.value, "status": item.status.value}}
+            for item in memberships]
+
+
 @router.post("", status_code=status.HTTP_201_CREATED)
 def create_community(payload: CommunityCreate, db: Annotated[Session, Depends(get_db)],
                      user: Annotated[User, Depends(get_current_user)]):
