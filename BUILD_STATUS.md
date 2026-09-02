@@ -97,6 +97,8 @@ integrated product evidence. TickVendor is not specification-complete or product
   handling without introducing client-side qualification logic; the complete peer-required path remains open.
 - [x] Isolated participant E2E fixtures now include a second active peer and required peer verification;
   Playwright covers candidate loading and successful confirmation through the real UI/backend.
+- [x] Participant browser regression covers the full local free-ticket path through QR, attendance,
+  task evidence submission and Impact/Recognition, plus geolocation-denied handling and peer confirmation.
 - [ ] Complete the remaining participant frontend journeys: ticket acquisition, check-in result,
   peer confirmation, tasks, contributions, achievements, milestones, ranks, community selection,
   profile editing/privacy controls, and complete loading/error states.
