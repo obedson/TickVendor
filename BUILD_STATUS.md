@@ -70,6 +70,9 @@ integrated product evidence. TickVendor is not specification-complete or product
 - [x] Add the participant frontend shell with real registration/login, session restoration, logout,
   responsive navigation, event search/detail, profile summary, notification view and encrypted ticket
   wallet/QR integration; ticket catalog and free/paid acquisition handoff are now wired to real APIs.
+- [x] Add participant attendance UI using authoritative check-in and peer-candidate/confirmation APIs,
+  with ticket selection, geolocation permission handling, pending/error states and no client-side
+  qualification reimplementation.
 - [ ] Complete the remaining participant frontend journeys: ticket acquisition, check-in result,
   peer confirmation, tasks, contributions, achievements, milestones, ranks, community selection,
   profile editing/privacy controls, and complete loading/error states.
