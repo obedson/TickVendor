@@ -114,6 +114,8 @@ integrated product evidence. TickVendor is not specification-complete or product
   claiming, preference suppression, bounded retry/backoff, terminal failure state, and deterministic
   local delivery idempotency. SQLite claim behavior is locally verified; PostgreSQL multi-worker
   concurrency and provider-accepted-before-crash delivery remain live/external verification.
+- [x] Attendance/verification configuration is exposed through an authorized event-scoped API with
+  validation for methods, geofence radius, peer limits, tenant scope, and audited mutations.
 - [ ] Provide production email and push senders; current defaults are in-memory adapters only.
 - [x] Provider verification returns authoritative amount, currency, reference, and status and the
   payment service rejects mismatches before activation (deterministic contracts verified locally).
