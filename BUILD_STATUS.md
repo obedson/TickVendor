@@ -115,6 +115,8 @@ integrated product evidence. TickVendor is not specification-complete or product
   read-state synchronization and preference controls for in-app, email, push and muted types.
 - [x] Wire the authenticated participant community-context endpoint into a reachable Communities
   view showing active memberships and privacy-safe community metadata.
+- [x] Wrap lazy-loaded payment-return rendering in an explicit loading boundary so status navigation
+  cannot expose a blank screen while the authoritative payment view loads.
 - [x] Add participant ticket catalog and authoritative payment-status API; public ticket inventory
   excludes hidden/invite-only types and payment status is restricted to the owning user/order.
 - [ ] Integrate `evaluate_recognition` into verified business transitions or a durable job so
