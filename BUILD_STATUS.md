@@ -83,6 +83,8 @@ integrated product evidence. TickVendor is not specification-complete or product
   role/status management, tenant authorization, profile-privacy filtering, and privileged audit
   records through product-facing community APIs.
 - [ ] Add audit-log query/review and authorized manual-point-adjustment APIs.
+- [x] Add privileged tenant-scoped audit-log query API with actor/action/target/time filters,
+  bounded pagination, deterministic ordering and recursive sensitive-field redaction.
 - [ ] Integrate `evaluate_recognition` into verified business transitions or a durable job so
   milestone/badge rewards and notifications happen automatically; task/activity/contribution and
   qualifying attendance verification now invoke it, but end-to-end recognition tests remain.
