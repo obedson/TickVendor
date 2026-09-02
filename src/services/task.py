@@ -18,6 +18,7 @@ from src.models import (
     TaskSubmission,
     User,
 )
+from src.services.event import as_utc
 from src.services.impact import award_points
 from src.services.notification import audit, notify
 from src.services.recognition import evaluate_recognition
@@ -71,7 +72,7 @@ def submit_task(db: Session, assignment: TaskAssignment, user: User, evidence_te
         raise HTTPException(status_code=409, detail="Task cannot be submitted in its current state")
     task = db.get(Task, assignment.task_id)
     now = datetime.now(UTC)
-    if task.due_at and now > task.due_at and assignment.status != TaskAssignmentStatus.REJECTED:
+    if task.due_at and now > as_utc(task.due_at) and assignment.status != TaskAssignmentStatus.REJECTED:
         assignment.status = TaskAssignmentStatus.OVERDUE
         db.commit()
         raise HTTPException(status_code=409, detail="Task is overdue")
