@@ -114,6 +114,10 @@ integrated product evidence. TickVendor is not specification-complete or product
   required method selection, peer limits, backend error rendering and authoritative save feedback.
 - [x] Extend organizer event management with edit, draft publishing, and authoritative ticket-type
   inventory display within the managed event workflow.
+- [x] Organizer event management now exposes reachable attendance settings for owned events and
+  saves the existing verification policy through the authorized backend endpoint.
+- [x] Organizer event-management browser coverage verifies owned-event listing, event creation, and
+  attendance-settings save through the real frontend and isolated backend.
 - [ ] Complete the remaining participant frontend journeys: ticket acquisition, check-in result,
   peer confirmation, tasks, contributions, achievements, milestones, ranks, community selection,
   profile editing/privacy controls, and complete loading/error states.
