@@ -106,10 +106,13 @@ integrated product evidence. TickVendor is not specification-complete or product
   history through the authenticated community profile response.
 - [x] Add authenticated profile metadata/privacy updates and enforce public/member/private visibility
   for profile retrieval and global search, including owner and shared-community access rules.
-- [ ] Apply the same visibility policy to leaderboard and community member views.
+- [x] Apply the profile visibility policy to community member views and all exposed leaderboard
+  entries; private profiles are excluded and member listings redact private profile fields.
 - [x] Expose enabled community leaderboards through tenant-authorized APIs with configured metric,
   period, bounded limit, privacy filtering, and deterministic score/user ordering.
-- [ ] Add event/time-window query semantics and authorized leaderboard configuration administration.
+- [x] Add authorized leaderboard configuration administration with validated metric/period, enabled
+  state, bounded limits, tenant scope and audit records.
+- [ ] Add event-scoped and time-window scoring semantics to leaderboard queries.
 - [x] Add durable scheduled notification work items and a locally executable worker with conditional
   claiming, preference suppression, bounded retry/backoff, terminal failure state, and deterministic
   local delivery idempotency. SQLite claim behavior is locally verified; PostgreSQL multi-worker
