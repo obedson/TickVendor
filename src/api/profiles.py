@@ -5,6 +5,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -29,6 +30,14 @@ from src.models import (
 from src.services.recognition import current_rank, next_rank, user_metrics
 
 router = APIRouter(prefix="/profiles", tags=["profiles"])
+
+
+class ProfileUpdateInput(BaseModel):
+    display_name: str | None = Field(default=None, min_length=1, max_length=120)
+    bio: str | None = Field(default=None, max_length=5000)
+    location: str | None = Field(default=None, max_length=255)
+    photo_url: str | None = Field(default=None, max_length=2048)
+    visibility: ProfileVisibility | None = None
 
 
 @router.get("/organizers/{user_id}")
@@ -118,6 +127,20 @@ def my_profile(
             "leadership_activities": metrics["leadership_activities"],
             "engagement_dimensions": dimensions,
             "achievement_timeline": sorted(timeline, key=lambda item: item["occurred_at"])}
+
+
+@router.patch("/me")
+def update_my_profile(
+    payload: ProfileUpdateInput,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
+):
+    for field, value in payload.model_dump(exclude_unset=True).items():
+        setattr(user.profile, field, value)
+    db.commit()
+    return {"id": str(user.id), "username": user.profile.username,
+            "display_name": user.profile.display_name, "visibility": user.profile.visibility.value,
+            "bio": user.profile.bio, "location": user.profile.location, "photo_url": user.profile.photo_url}
 
 
 @router.get("/{user_id}")
