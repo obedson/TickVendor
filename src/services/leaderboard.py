@@ -61,7 +61,8 @@ def leaderboard_entries(db: Session, leaderboard: Leaderboard, viewer: User, lim
         )
         .select_from(scores)
         .join(Profile, Profile.user_id == scores.c.user_id)
-        .order_by(scores.c.score.desc())
+        .where(Profile.visibility != "private")
+        .order_by(scores.c.score.desc(), scores.c.user_id)
         .limit(min(limit, leaderboard.max_entries))
     )
     return [

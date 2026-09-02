@@ -106,8 +106,9 @@ integrated product evidence. TickVendor is not specification-complete or product
 - [x] Add authenticated profile metadata/privacy updates and enforce public/member/private visibility
   for profile retrieval and global search, including owner and shared-community access rules.
 - [ ] Apply the same visibility policy to leaderboard and community member views.
-- [ ] Expose leaderboards through tenant-authorized APIs and support configured period/event scope and
-  administration; current leaderboard behavior is a directly tested service only.
+- [x] Expose enabled community leaderboards through tenant-authorized APIs with configured metric,
+  period, bounded limit, privacy filtering, and deterministic score/user ordering.
+- [ ] Add event/time-window query semantics and authorized leaderboard configuration administration.
 - [ ] Operationally schedule notification generation; `generate_scheduled_notifications` is currently
   invoked only by tests and no worker/startup command runs it.
 - [ ] Provide production email and push senders; current defaults are in-memory adapters only.
