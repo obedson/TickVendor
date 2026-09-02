@@ -88,6 +88,8 @@ integrated product evidence. TickVendor is not specification-complete or product
 - [x] Recognition tests verify combined AchievementRule Impact Point and badge execution is
   idempotent across repeated evaluation, with exactly one award, reward transaction, audit entry,
   and notification.
+- [x] End-to-end attendance recognition test covers geofence evidence, configured qualification,
+  attendance points, milestone/badge/AchievementRule rewards, and replay-safe recognition effects.
 - [x] Rank progression history persists qualifying rank achievements with tenant/user/rank
   uniqueness, deterministic reevaluation behavior, and profile exposure; downward punitive changes
   are not introduced.

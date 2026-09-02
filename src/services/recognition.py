@@ -195,6 +195,13 @@ def award_badge(db: Session, badge: Badge, user_id, idempotency_key: str, *, com
     existing = db.scalar(select(BadgeAward).where(BadgeAward.idempotency_key == idempotency_key))
     if existing:
         return existing
+    existing_badge = db.scalar(select(BadgeAward).where(
+        BadgeAward.badge_id == badge.id,
+        BadgeAward.user_id == user_id,
+        BadgeAward.revoked_at.is_(None),
+    ))
+    if existing_badge:
+        return existing_badge
     award = BadgeAward(
         badge_id=badge.id,
         user_id=user_id,
