@@ -76,9 +76,10 @@ integrated product evidence. TickVendor is not specification-complete or product
 - [ ] Complete server-side admin configuration APIs for point rules, attendance/verification rules,
   contribution bands/caps, notification rules, and leaderboard visibility; current admin routes
   chiefly cover milestones, ranks, badges, achievement rules, memberships, and category management.
-- [ ] Add community/organization creation and editing, member management, logo management, audit-log
-  query/review, and authorized manual-point-adjustment APIs; current capabilities are schemas,
-  read-only community detail/analytics, audit writes, or direct service primitives.
+- [x] Add community/organization creation/editing, logo metadata, membership listing/invitation,
+  role/status management, tenant authorization, profile-privacy filtering, and privileged audit
+  records through product-facing community APIs.
+- [ ] Add audit-log query/review and authorized manual-point-adjustment APIs.
 - [ ] Integrate `evaluate_recognition` into verified business transitions or a durable job so
   milestone/badge rewards and notifications happen automatically; task/activity/contribution and
   qualifying attendance verification now invoke it, but end-to-end recognition tests remain.
