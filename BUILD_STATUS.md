@@ -67,9 +67,12 @@ integrated product evidence. TickVendor is not specification-complete or product
 - [ ] Implement Paystack provider-side refund initiation and reconciliation before enabling paid
   refunds in production.
 
-- [ ] Complete the participant frontend journeys: authentication, event detail/ticket acquisition,
-  check-in result, peer confirmation, tasks, contributions, achievements, milestones, ranks,
-  community selection, profile/privacy settings, and meaningful empty/error states.
+- [x] Add the participant frontend shell with real registration/login, session restoration, logout,
+  responsive navigation, event search/detail, profile summary, notification view and encrypted ticket
+  wallet/QR integration; full acquisition, attendance, task and recognition journeys remain open.
+- [ ] Complete the remaining participant frontend journeys: ticket acquisition, check-in result,
+  peer confirmation, tasks, contributions, achievements, milestones, ranks, community selection,
+  profile editing/privacy controls, and complete loading/error states.
 - [ ] Complete organizer/admin frontend journeys: event creation/edit/publish, ticket setup and
   attendee management, QR scanning, attendance review, task/member/contribution management,
   analytics, audit log, and all data-driven recognition/configuration screens.
