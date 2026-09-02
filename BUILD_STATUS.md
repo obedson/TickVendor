@@ -88,6 +88,9 @@ integrated product evidence. TickVendor is not specification-complete or product
 - [x] Rank progression history persists qualifying rank achievements with tenant/user/rank
   uniqueness, deterministic reevaluation behavior, and profile exposure; downward punitive changes
   are not introduced.
+- [x] Dedicated rank progression tests cover no qualification, initial rank, unchanged reevaluation,
+  upward transition, non-point requirements, duplicate prevention, audit/notification counts, and
+  highest configured ordering behavior.
 - [ ] Make profile rank reporting use the complete configured rank qualification service, add profile
   and privacy-setting updates, and define/enforce public/member/private field visibility consistently.
 - [ ] Expose leaderboards through tenant-authorized APIs and support configured period/event scope and

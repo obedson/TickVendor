@@ -12,15 +12,23 @@ from src.models import (
     ActivityStatus,
     Attendance,
     AttendanceStatus,
+    AuditLog,
     EngagementDimension,
     ImpactTransaction,
     ImpactTransactionStatus,
     Milestone,
     MilestoneRequirement,
+    Notification,
     Rank,
+    RankProgression,
     RankRequirement,
 )
-from src.services.recognition import current_rank, qualified_milestones, user_metrics
+from src.services.recognition import (
+    current_rank,
+    evaluate_rank_progression,
+    qualified_milestones,
+    user_metrics,
+)
 from tests.test_database import create_event_context
 
 
@@ -87,4 +95,58 @@ def test_milestone_metrics_include_event_participation_and_consecutive_activity(
 
         assert metrics["event_participation"] == 2
         assert metrics["consecutive_activities"] == 3
+    engine.dispose()
+
+
+def test_rank_progression_has_no_effect_without_qualification(tmp_path):
+    engine = create_engine(f"sqlite:///{tmp_path / 'rank-none.db'}")
+    Base.metadata.create_all(engine)
+    with Session(engine, expire_on_commit=False) as db:
+        user, community, _event = create_event_context(db)
+        rank = Rank(community_id=community.id, name="Builder", slug="builder-none", minimum_points=100, sort_order=1)
+        db.add(rank); db.flush()
+        db.add(RankRequirement(rank_id=rank.id, requirement_type="task_count", threshold=1)); db.commit()
+        assert evaluate_rank_progression(db, user.id, community.id) is None
+        assert db.query(RankProgression).count() == 0
+        assert db.query(AuditLog).filter_by(action="rank.achieved").count() == 0
+        assert db.query(Notification).filter_by(notification_type="rank_achieved").count() == 0
+    engine.dispose()
+
+
+def test_rank_progression_initial_unchanged_and_upward_are_exactly_once(tmp_path):
+    engine = create_engine(f"sqlite:///{tmp_path / 'rank-history.db'}")
+    Base.metadata.create_all(engine)
+    with Session(engine, expire_on_commit=False) as db:
+        user, community, _event = create_event_context(db)
+        starter = Rank(community_id=community.id, name="Starter", slug="starter-history", minimum_points=0, sort_order=1)
+        builder = Rank(community_id=community.id, name="Builder", slug="builder-history", minimum_points=50, sort_order=2)
+        db.add_all([starter, builder]); db.commit()
+        assert evaluate_rank_progression(db, user.id, community.id).slug == starter.slug
+        evaluate_rank_progression(db, user.id, community.id)
+        assert db.query(RankProgression).count() == 1
+        db.add(ImpactTransaction(idempotency_key="rank-history-points", user_id=user.id, community_id=community.id,
+                                 points=50, source_type="test", reason="rank", status=ImpactTransactionStatus.POSTED))
+        db.commit()
+        assert evaluate_rank_progression(db, user.id, community.id).slug == builder.slug
+        evaluate_rank_progression(db, user.id, community.id)
+        assert db.query(RankProgression).count() == 2
+        assert db.query(AuditLog).filter_by(action="rank.achieved").count() == 2
+        assert db.query(Notification).filter_by(notification_type="rank_achieved").count() == 2
+    engine.dispose()
+
+
+def test_rank_progression_honors_non_point_requirements(tmp_path):
+    engine = create_engine(f"sqlite:///{tmp_path / 'rank-requirements.db'}")
+    Base.metadata.create_all(engine)
+    with Session(engine, expire_on_commit=False) as db:
+        user, community, event = create_event_context(db)
+        rank = Rank(community_id=community.id, name="Service", slug="service-rank", minimum_points=50, sort_order=1)
+        db.add(rank); db.flush()
+        db.add_all([RankRequirement(rank_id=rank.id, requirement_type="attendance_count", threshold=1),
+                    ImpactTransaction(idempotency_key="rank-points", user_id=user.id, community_id=community.id,
+                                      points=100, source_type="test", reason="rank", status=ImpactTransactionStatus.POSTED)])
+        db.commit()
+        assert current_rank(db, user.id, community.id) is None
+        db.add(Attendance(event_id=event.id, user_id=user.id, status=AttendanceStatus.GPS_VERIFIED)); db.commit()
+        assert evaluate_rank_progression(db, user.id, community.id).slug == rank.slug
     engine.dispose()
