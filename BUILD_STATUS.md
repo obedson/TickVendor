@@ -123,6 +123,8 @@ integrated product evidence. TickVendor is not specification-complete or product
 - [x] Task-verification queue denial coverage confirms participant members cannot read organizer review data.
 - [x] Add privacy-aware organizer community member listing with active/inactive controls and
   browser coverage for organizer access.
+- [x] Add organizer attendance abuse-review queue UI with authoritative clear/confirm/reject
+  resolution actions, preserved signal summaries, audit-backed API coverage, and browser access coverage.
 - [ ] Complete the remaining participant frontend journeys: ticket acquisition, check-in result,
   peer confirmation, tasks, contributions, achievements, milestones, ranks, community selection,
   profile editing/privacy controls, and complete loading/error states.
