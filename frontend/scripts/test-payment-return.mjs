@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+const source=fs.readFileSync(new URL('../src/PaymentReturn.tsx',import.meta.url),'utf8');
+const main=fs.readFileSync(new URL('../src/main.tsx',import.meta.url),'utf8');
+assert.match(source,/GET|fetch\(`\/api\/v1\/payments/);
+assert.match(source,/successful/);
+assert.match(source,/pending/);
+assert.match(source,/\['failed','cancelled','refunded'\]/);
+assert.match(source,/attempt>=5/);
+assert.match(source,/setState\(['"]successful['"]\)/);
+assert.match(source,/setState\(['"]failed['"]\)/);
+assert.doesNotMatch(source,/initialize/);
+assert.match(main,/paymentId/);
+assert.doesNotMatch(main,/searchParams\.get\(['"]success/);
+console.log('payment return authoritative status contract passed');
