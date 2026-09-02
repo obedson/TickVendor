@@ -82,6 +82,9 @@ integrated product evidence. TickVendor is not specification-complete or product
 - [x] Participant integration preserves session-scoped credential storage, authoritative payment
   status API support, enriched QR wallet display, attendance/task/recognition/profile navigation,
   and offline-wallet encryption/service-worker policy checks.
+- [x] Add an authoritative payment-return view that queries ownership-protected payment status,
+  distinguishes pending/success/failure/unknown/network states, and bounds polling without trusting
+  provider redirect parameters.
 - [ ] Complete the remaining participant frontend journeys: ticket acquisition, check-in result,
   peer confirmation, tasks, contributions, achievements, milestones, ranks, community selection,
   profile editing/privacy controls, and complete loading/error states.
