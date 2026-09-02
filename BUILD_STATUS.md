@@ -85,6 +85,8 @@ integrated product evidence. TickVendor is not specification-complete or product
 - [x] Add an authoritative payment-return view that queries ownership-protected payment status,
   distinguishes pending/success/failure/unknown/network states, and bounds polling without trusting
   provider redirect parameters.
+- [x] Add Playwright Chromium browser verification with deterministic participant shell and payment
+  return scenarios; live backend/provider E2E remains separately unverified.
 - [ ] Complete the remaining participant frontend journeys: ticket acquisition, check-in result,
   peer confirmation, tasks, contributions, achievements, milestones, ranks, community selection,
   profile editing/privacy controls, and complete loading/error states.
