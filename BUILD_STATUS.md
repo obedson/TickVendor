@@ -73,6 +73,8 @@ integrated product evidence. TickVendor is not specification-complete or product
 - [x] Add participant attendance UI using authoritative check-in and peer-candidate/confirmation APIs,
   with ticket selection, geolocation permission handling, pending/error states and no client-side
   qualification reimplementation.
+- [x] Add participant task navigation and real assignment/task browse plus evidence submission UI;
+  authoritative backend statuses and rewards remain the source of truth.
 - [ ] Complete the remaining participant frontend journeys: ticket acquisition, check-in result,
   peer confirmation, tasks, contributions, achievements, milestones, ranks, community selection,
   profile editing/privacy controls, and complete loading/error states.
