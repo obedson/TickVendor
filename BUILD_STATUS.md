@@ -77,6 +77,8 @@ integrated product evidence. TickVendor is not specification-complete or product
   authoritative backend statuses and rewards remain the source of truth.
 - [x] Add participant Impact/Recognition view for authoritative Impact Points, current/next rank,
   rank history, badges, milestones and privacy-aware leaderboard data.
+- [x] Integrate the participant Tasks, Impact/Recognition and ProfileEditor views into reachable
+  application navigation with real API calls and verified frontend build/lint.
 - [ ] Complete the remaining participant frontend journeys: ticket acquisition, check-in result,
   peer confirmation, tasks, contributions, achievements, milestones, ranks, community selection,
   profile editing/privacy controls, and complete loading/error states.
