@@ -14,6 +14,7 @@ from src.authorization import require_community_role
 from src.database import get_db
 from src.models import (
     Community,
+    Event,
     Membership,
     MembershipRole,
     MembershipStatus,
@@ -80,6 +81,18 @@ def my_communities(db: Annotated[Session, Depends(get_db)], user: Annotated[User
     return [{"id": str(item.community_id), "community": _community(db.get(Community, item.community_id)),
              "membership": {"id": str(item.id), "role": item.role.value, "status": item.status.value}}
             for item in memberships]
+
+
+@router.get("/organizer/events")
+def organizer_events(db: Annotated[Session, Depends(get_db)], user: Annotated[User, Depends(get_current_user)]):
+    rows = db.scalars(select(Event).where(
+        Event.organizer_id == user.id, Event.deleted_at.is_(None),
+    ).order_by(Event.starts_at, Event.created_at)).all()
+    return [{"id": str(event.id), "title": event.title, "description": event.description,
+             "status": event.status.value, "starts_at": event.starts_at, "ends_at": event.ends_at,
+             "category": event.category,
+             "venue": {"name": event.venue.name, "city": event.venue.city} if event.venue else None}
+            for event in rows]
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)

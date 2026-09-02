@@ -59,7 +59,10 @@ test('real participant can acquire a free ticket and retain its QR wallet', asyn
 
   await page.reload();
   await page.reload();
+  const taskRefresh = page.waitForResponse(response => response.url().includes('/task-assignments/me'));
   await page.getByRole('button', { name: 'Tasks' }).click();
+  const taskResponse = await taskRefresh;
+  expect(taskResponse.ok()).toBeTruthy();
   await expect(page.getByText('Status: verified')).toBeVisible({ timeout: 10_000 });
 
   await page.getByRole('button', { name: 'Impact' }).click();
