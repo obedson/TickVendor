@@ -79,6 +79,9 @@ integrated product evidence. TickVendor is not specification-complete or product
   rank history, badges, milestones and privacy-aware leaderboard data.
 - [x] Integrate the participant Tasks, Impact/Recognition and ProfileEditor views into reachable
   application navigation with real API calls and verified frontend build/lint.
+- [x] Participant integration preserves session-scoped credential storage, authoritative payment
+  status API support, enriched QR wallet display, attendance/task/recognition/profile navigation,
+  and offline-wallet encryption/service-worker policy checks.
 - [ ] Complete the remaining participant frontend journeys: ticket acquisition, check-in result,
   peer confirmation, tasks, contributions, achievements, milestones, ranks, community selection,
   profile editing/privacy controls, and complete loading/error states.

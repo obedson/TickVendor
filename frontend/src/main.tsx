@@ -1,11 +1,11 @@
-import{StrictMode,useEffect,useState}from'react';
+import{StrictMode,lazy,useEffect,useState}from'react';
 import{createRoot}from'react-dom/client';
 import{fetchWithRetry}from'./fetchWithRetry';
 import{Notifications}from'./Notifications';
-import{Attendance}from'./Attendance';
-import{Tasks}from'./Tasks';
-import{Recognition}from'./Recognition';
-import{ProfileEditor}from'./ProfileEditor';
+const Attendance=lazy(()=>import('./Attendance').then(module=>({default:module.Attendance})));
+const Tasks=lazy(()=>import('./Tasks').then(module=>({default:module.Tasks})));
+const Recognition=lazy(()=>import('./Recognition').then(module=>({default:module.Recognition})));
+const ProfileEditor=lazy(()=>import('./ProfileEditor').then(module=>({default:module.ProfileEditor})));
 import{cacheTicketWallet,clearCachedTicketWallet,loadCachedTicketWallet,type OfflineTicket}from'./offlineTickets';
 import'./styles.css';
 interface BeforeInstallPromptEvent extends Event{prompt:()=>Promise<void>;userChoice:Promise<{outcome:'accepted'|'dismissed'}>}
