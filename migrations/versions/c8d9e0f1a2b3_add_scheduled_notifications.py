@@ -1,7 +1,7 @@
 """scheduled notification work items
 
 Revision ID: c8d9e0f1a2b3
-Revises: a1b2c3d4e5f6
+Revises: e5f6a7b8c9d0
 """
 from collections.abc import Sequence
 

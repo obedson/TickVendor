@@ -29,9 +29,7 @@ def process_scheduled_notifications(db: Session, sender: ScheduledSender, *, now
         db.commit()
         if claimed != 1:
             continue
-        preference = db.scalar(select(NotificationPreference).where(
-            NotificationPreference.user_id == item.user_id,
-        ))
+        preference = db.scalar(select(NotificationPreference).where(NotificationPreference.user_id == item.user_id))
         if preference and (not preference.in_app_enabled or item.notification_type in preference.muted_types):
             db.execute(update(ScheduledNotification).where(ScheduledNotification.id == item.id).values(
                 status=ScheduledNotificationStatus.DELIVERED, delivered_at=now))

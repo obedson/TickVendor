@@ -113,7 +113,9 @@ integrated product evidence. TickVendor is not specification-complete or product
 - [x] Add durable scheduled notification work items and a locally executable worker with conditional
   claiming, preference suppression, bounded retry/backoff, terminal failure state, and deterministic
   local delivery idempotency. SQLite claim behavior is locally verified; PostgreSQL multi-worker
-  concurrency and provider-accepted-before-crash delivery remain live/external verification.
+  concurrency and provider-accepted-before-crash delivery remain live/external verification. The
+  worker test matrix covers due/future work, replay, preference suppression, retry, terminal failure,
+  and already-processing claims.
 - [x] Attendance/verification configuration is exposed through an authorized event-scoped API with
   validation for methods, geofence radius, peer limits, tenant scope, and audited mutations.
 - [ ] Provide production email and push senders; current defaults are in-memory adapters only.
