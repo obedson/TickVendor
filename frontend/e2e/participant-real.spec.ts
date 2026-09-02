@@ -9,7 +9,7 @@ test('real participant can acquire a free ticket and retain its QR wallet', asyn
 
   await page.getByRole('button', { name: 'View event' }).click();
   await expect(page.getByRole('heading', { name: 'Free admission' })).toBeVisible();
-  await page.getByRole('button', { name: 'Acquire ticket' }).click();
+  await page.getByRole('button', { name: 'Acquire ticket' }).first().click();
   await expect(page.getByText('Ticket confirmed. Open My tickets to view it.')).toBeVisible();
 
   await page.getByRole('button', { name: 'My tickets' }).click();
@@ -35,6 +35,32 @@ test('real participant can acquire a free ticket and retain its QR wallet', asyn
   await page.getByRole('button', { name: 'Submit task' }).click();
   await expect(page.getByText('Submitted for verification.')).toBeVisible();
 
+  const participantToken = await page.evaluate(() => {
+    const session = JSON.parse(sessionStorage.getItem('tickvendor.session') || '{}');
+    return session.access_token;
+  });
+  const assignmentsResponse = await page.request.get('http://127.0.0.1:8000/api/v1/task-assignments/me', {
+    headers: { Authorization: `Bearer ${participantToken}` },
+  });
+  const assignment = (await assignmentsResponse.json())[0];
+  const organizerLogin = await page.request.post('http://127.0.0.1:8000/api/v1/auth/login', {
+    data: { email: 'e2e-organizer@example.com', password: 'e2e-password-123' },
+  });
+  const organizerSession = await organizerLogin.json();
+  const verification = await page.request.post(
+    `http://127.0.0.1:8000/api/v1/task-assignments/${assignment.id}/verify`,
+    { headers: { Authorization: `Bearer ${organizerSession.access_token}` }, data: { approve: true } },
+  );
+  expect(verification.ok()).toBeTruthy();
+  const verifiedAssignment = await page.request.get('http://127.0.0.1:8000/api/v1/task-assignments/me', {
+    headers: { Authorization: `Bearer ${participantToken}` },
+  });
+  expect((await verifiedAssignment.json())[0].status).toBe('verified');
+
+  await page.reload();
+  await page.getByRole('button', { name: 'Tasks' }).click();
+  await expect(page.getByText('Status: verified')).toBeVisible({ timeout: 10_000 });
+
   await page.getByRole('button', { name: 'Impact' }).click();
   await expect(page.getByRole('heading', { name: 'Recognition' })).toBeVisible();
   await expect(page.getByText(/Impact Points/)).toBeVisible();
@@ -46,7 +72,7 @@ test('participant attendance failure is rendered without duplicate check-in', as
   await page.getByLabel('Password').fill('e2e-password-123');
   await page.getByRole('button', { name: 'Sign in' }).click();
   await page.getByRole('button', { name: 'View event' }).click();
-  await page.getByRole('button', { name: 'Acquire ticket' }).click();
+  await page.getByRole('button', { name: 'Acquire ticket' }).first().click();
   await expect(page.getByText('Ticket confirmed. Open My tickets to view it.')).toBeVisible();
   await page.getByRole('button', { name: 'Attendance' }).click();
   await page.evaluate(() => {
@@ -65,7 +91,7 @@ test('participant can load and submit peer confirmation', async ({ page }) => {
   await page.getByLabel('Password').fill('e2e-password-123');
   await page.getByRole('button', { name: 'Sign in' }).click();
   await page.getByRole('button', { name: 'View event' }).click();
-  await page.getByRole('button', { name: 'Acquire ticket' }).click();
+  await page.getByRole('button', { name: 'Acquire ticket' }).first().click();
   await expect(page.getByText('Ticket confirmed. Open My tickets to view it.')).toBeVisible();
   await page.getByRole('button', { name: 'Attendance' }).click();
   await page.getByRole('button', { name: 'Check in' }).click();

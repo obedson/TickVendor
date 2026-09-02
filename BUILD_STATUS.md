@@ -99,6 +99,9 @@ integrated product evidence. TickVendor is not specification-complete or product
   Playwright covers candidate loading and successful confirmation through the real UI/backend.
 - [x] Participant browser regression covers the full local free-ticket path through QR, attendance,
   task evidence submission and Impact/Recognition, plus geolocation-denied handling and peer confirmation.
+- [x] Participant browser acceptance now closes the task reward loop: organizer authorization verifies
+  submitted evidence, participant refreshes the verified assignment, and Impact/Recognition is reloaded
+  from authoritative backend state. Duplicate reward replay remains covered by backend tests.
 - [ ] Complete the remaining participant frontend journeys: ticket acquisition, check-in result,
   peer confirmation, tasks, contributions, achievements, milestones, ranks, community selection,
   profile editing/privacy controls, and complete loading/error states.
