@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-test('real participant can acquire a free ticket and retain its QR wallet', async ({ page }) => {
+test('real participant can acquire a free ticket and retain its QR wallet', async ({ page, browser }) => {
   await page.goto('/');
   await page.getByLabel('Email').fill('e2e-participant@example.com');
   await page.getByLabel('Password').fill('e2e-password-123');
@@ -43,15 +43,20 @@ test('real participant can acquire a free ticket and retain its QR wallet', asyn
     headers: { Authorization: `Bearer ${participantToken}` },
   });
   const assignment = (await assignmentsResponse.json())[0];
-  const organizerLogin = await page.request.post('http://127.0.0.1:8000/api/v1/auth/login', {
-    data: { email: 'e2e-organizer@example.com', password: 'e2e-password-123' },
-  });
-  const organizerSession = await organizerLogin.json();
-  const verification = await page.request.post(
-    `http://127.0.0.1:8000/api/v1/task-assignments/${assignment.id}/verify`,
-    { headers: { Authorization: `Bearer ${organizerSession.access_token}` }, data: { approve: true } },
-  );
-  expect(verification.ok()).toBeTruthy();
+
+  const organizer = await browser.newContext();
+  const organizerPage = await organizer.newPage();
+  await organizerPage.goto('/');
+  await organizerPage.getByLabel('Email').fill('e2e-organizer@example.com');
+  await organizerPage.getByLabel('Password').fill('e2e-password-123');
+  await organizerPage.getByRole('button', { name: 'Sign in' }).click();
+  await organizerPage.getByRole('button', { name: 'Review tasks' }).click();
+  await expect(organizerPage.getByText('Completed the welcome task.')).toBeVisible();
+  await organizerPage.getByRole('button', { name: 'Verify' }).click();
+  await expect(organizerPage.getByText('Task verified.')).toBeVisible();
+  await organizerPage.reload();
+  await organizerPage.getByRole('button', { name: 'Review tasks' }).click();
+  await expect(organizerPage.getByText('No task submissions need review.')).toBeVisible();
   const verifiedAssignment = await page.request.get('http://127.0.0.1:8000/api/v1/task-assignments/me', {
     headers: { Authorization: `Bearer ${participantToken}` },
   });

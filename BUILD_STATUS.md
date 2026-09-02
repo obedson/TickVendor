@@ -125,6 +125,8 @@ integrated product evidence. TickVendor is not specification-complete or product
   browser coverage for organizer access.
 - [x] Add organizer attendance abuse-review queue UI with authoritative clear/confirm/reject
   resolution actions, preserved signal summaries, audit-backed API coverage, and browser access coverage.
+- [x] Upgrade the participant reward-loop browser journey to use separate participant and organizer
+  browser contexts for task verification, including organizer queue replay/refresh safety.
 - [ ] Complete the remaining participant frontend journeys: ticket acquisition, check-in result,
   peer confirmation, tasks, contributions, achievements, milestones, ranks, community selection,
   profile editing/privacy controls, and complete loading/error states.
