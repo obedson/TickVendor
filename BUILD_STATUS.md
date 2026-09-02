@@ -85,6 +85,9 @@ integrated product evidence. TickVendor is not specification-complete or product
 - [x] Execute active `AchievementRule.reward_definition` Impact Point and badge rewards through a
   persisted per-rule/user award, stable idempotency keys, tenant isolation, audit and deduplicated
   notification; malformed definitions fail safely before commit.
+- [x] Recognition tests verify combined AchievementRule Impact Point and badge execution is
+  idempotent across repeated evaluation, with exactly one award, reward transaction, audit entry,
+  and notification.
 - [x] Rank progression history persists qualifying rank achievements with tenant/user/rank
   uniqueness, deterministic reevaluation behavior, and profile exposure; downward punitive changes
   are not introduced.
