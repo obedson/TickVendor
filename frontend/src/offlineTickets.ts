@@ -1,4 +1,4 @@
-export type OfflineTicket={public_id:string;qr_token:string;status:string;attendee_id?:string;event_id?:string;ticket_type_id?:string;used_at?:string|null};
+export type OfflineTicket={public_id:string;qr_token:string;status:string;attendee_id?:string;event_id?:string;ticket_type_id?:string;used_at?:string|null;event_title?:string;event_starts_at?:string;venue_name?:string|null;ticket_type_name?:string};
 export type EncryptedTickets={iv:ArrayBuffer;ciphertext:ArrayBuffer};
 type CryptoProvider=Pick<Crypto,'getRandomValues'|'subtle'>;
 
