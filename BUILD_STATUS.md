@@ -108,6 +108,8 @@ integrated product evidence. TickVendor is not specification-complete or product
   participant sessions do not receive organizer-dashboard navigation.
 - [x] Add organizer-manageable event listing from the ownership-scoped backend API, with status,
   schedule, venue, loading/error/empty states, retry, and a real browser acceptance check.
+- [x] Add organizer event creation using the existing event API, active community context, normalized
+  ISO timestamps, backend validation/error rendering, authoritative refetch, and browser coverage.
 - [ ] Complete the remaining participant frontend journeys: ticket acquisition, check-in result,
   peer confirmation, tasks, contributions, achievements, milestones, ranks, community selection,
   profile editing/privacy controls, and complete loading/error states.

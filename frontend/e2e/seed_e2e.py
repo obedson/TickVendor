@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 import src.models  # noqa: F401,E402
 from src.database import Base  # noqa: E402
 from src.models import (  # noqa: E402
-    Attendance, AttendanceStatus, Community, Event, EventStatus, LocationType, Membership, MembershipRole,
+    Attendance, AttendanceStatus, Community, Event, EventCategory, EventStatus, LocationType, Membership, MembershipRole,
     MembershipStatus, Organization, PlatformRole, PointRule, Profile, Task,
     TaskAssignment, Ticket, TicketStatus, TicketType, TicketVisibility, User,
 )
@@ -46,6 +46,7 @@ def main() -> None:
             profile=Profile(username="e2e-peer", display_name="E2E Peer"),
         )
         db.add_all([participant, organizer, peer]); db.flush()
+        db.add(EventCategory(slug="community", name="Community"))
         organization = Organization(owner_id=organizer.id, name="E2E Organization", slug="e2e-organization")
         db.add(organization); db.flush()
         community = Community(organization_id=organization.id, name="E2E Community", slug="e2e-community")
