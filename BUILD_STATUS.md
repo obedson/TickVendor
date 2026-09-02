@@ -121,6 +121,8 @@ integrated product evidence. TickVendor is not specification-complete or product
 - [x] Add organizer task-verification queue API and UI with tenant authorization, evidence display,
   verify/reject actions, queue refresh, and browser coverage for real submitted evidence verification.
 - [x] Task-verification queue denial coverage confirms participant members cannot read organizer review data.
+- [x] Add privacy-aware organizer community member listing with active/inactive controls and
+  browser coverage for organizer access.
 - [ ] Complete the remaining participant frontend journeys: ticket acquisition, check-in result,
   peer confirmation, tasks, contributions, achievements, milestones, ranks, community selection,
   profile editing/privacy controls, and complete loading/error states.
