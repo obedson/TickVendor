@@ -18,3 +18,15 @@ test('organizer can open the real event-management list', async ({ page }) => {
   await expect(page.getByText('Created Organizer-created event.')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Organizer-created event' })).toBeVisible();
 });
+
+test('organizer can open attendance configuration for an owned event', async ({ page }) => {
+  await page.goto('/');
+  await page.getByLabel('Email').fill('e2e-organizer@example.com');
+  await page.getByLabel('Password').fill('e2e-password-123');
+  await page.getByRole('button', { name: 'Sign in' }).click();
+  await page.getByRole('button', { name: 'Manage events' }).click();
+  await page.getByRole('button', { name: 'Attendance settings' }).first().click();
+  await expect(page.getByRole('heading', { name: 'Attendance configuration' })).toBeVisible();
+  await page.getByRole('button', { name: 'Save attendance settings' }).click();
+  await expect(page.getByText('Attendance configuration saved.')).toBeVisible();
+});

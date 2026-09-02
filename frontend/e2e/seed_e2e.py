@@ -53,7 +53,7 @@ def main() -> None:
         db.add(community); db.flush()
         db.add_all([
             Membership(community_id=community.id, user_id=participant.id, role=MembershipRole.MEMBER, status=MembershipStatus.ACTIVE),
-            Membership(community_id=community.id, user_id=organizer.id, role=MembershipRole.ORGANIZER, status=MembershipStatus.ACTIVE),
+            Membership(community_id=community.id, user_id=organizer.id, role=MembershipRole.ADMIN, status=MembershipStatus.ACTIVE),
             Membership(community_id=community.id, user_id=peer.id, role=MembershipRole.MEMBER, status=MembershipStatus.ACTIVE),
         ])
         event = Event(

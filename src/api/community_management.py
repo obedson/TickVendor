@@ -88,7 +88,7 @@ def organizer_events(db: Annotated[Session, Depends(get_db)], user: Annotated[Us
     rows = db.scalars(select(Event).where(
         Event.organizer_id == user.id, Event.deleted_at.is_(None),
     ).order_by(Event.starts_at, Event.created_at)).all()
-    return [{"id": str(event.id), "title": event.title, "description": event.description,
+    return [{"id": str(event.id), "community_id": str(event.community_id), "title": event.title, "description": event.description,
              "status": event.status.value, "starts_at": event.starts_at, "ends_at": event.ends_at,
              "category": event.category,
              "venue": {"name": event.venue.name, "city": event.venue.city} if event.venue else None}
