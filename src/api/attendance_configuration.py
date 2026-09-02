@@ -21,6 +21,7 @@ router = APIRouter(prefix="/communities/{community_id}/events", tags=["attendanc
 class AttendanceConfigurationInput(BaseModel):
     qr_attendance_enabled: bool | None = None
     peer_confirmation_enabled: bool | None = None
+    confirmations_required: int | None = Field(default=None, ge=0, le=100)
     organizer_verification_enabled: bool | None = None
     geofence_enabled: bool | None = None
     geofence_radius_meters: int | None = Field(default=None, ge=10, le=100000)
@@ -52,6 +53,16 @@ def update_attendance_config(community_id: UUID, event_id: UUID, payload: Attend
     event = db.scalar(select(Event).where(Event.id == event_id, Event.community_id == community_id))
     if event is None: raise HTTPException(status_code=404, detail="Event not found")
     values = payload.model_dump(exclude_unset=True)
+    peer_enabled = values.get("peer_confirmation_enabled", event.peer_confirmation_enabled)
+    required_methods = values.get("required_verification_methods", event.required_verification_methods)
+    confirmations_required = values.get("confirmations_required", event.confirmations_required)
+    if "peer" in required_methods and not peer_enabled:
+        raise HTTPException(status_code=422, detail="Peer verification requires peer confirmation")
+    if peer_enabled and "peer" in required_methods and confirmations_required < 1:
+        raise HTTPException(status_code=422, detail="At least one peer confirmation is required")
+    max_peer_confirmations = values.get("max_peer_confirmations", event.max_peer_confirmations)
+    if "peer" in required_methods and max_peer_confirmations is not None and max_peer_confirmations < confirmations_required:
+        raise HTTPException(status_code=422, detail="Peer confirmation limit cannot be below required confirmations")
     if values.get("peer_confirmation_enabled") and values.get("max_peer_confirmations") == 0:
         raise HTTPException(status_code=422, detail="Peer confirmation limit must be positive")
     if values.get("peer_confirmation_enabled") and values.get("peer_selection_limit") == 0:
