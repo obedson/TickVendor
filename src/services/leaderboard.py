@@ -58,15 +58,19 @@ def leaderboard_entries(db: Session, leaderboard: Leaderboard, viewer: User, lim
             TaskAssignment.status == TaskAssignmentStatus.VERIFIED,
         ).group_by(TaskAssignment.assignee_id)
         if event_filter is not None:
-            score_query = score_query.where(TaskAssignment.created_at >= start, TaskAssignment.created_at <= now) if start is not None else score_query
+            score_query = score_query.where(TaskAssignment.task_id.in_(select(Task.id).where(Task.event_id == event_filter)))
+        if start is not None:
+            score_query = score_query.where(TaskAssignment.created_at >= start, TaskAssignment.created_at <= now)
     elif metric in {"service", "leadership"}:
         dimension = EngagementDimension.SERVICE if metric == "service" else EngagementDimension.LEADERSHIP
         score_query = select(Activity.user_id, func.count().label("score")).where(
             Activity.community_id == leaderboard.community_id, Activity.dimension == dimension,
             Activity.status == ActivityStatus.VERIFIED,
         ).group_by(Activity.user_id)
+        if event_filter is not None:
+            score_query = score_query.where(Activity.event_id == event_filter)
         if start is not None:
-            score_query = score_query.where(Activity.created_at >= start, Activity.created_at <= now)
+            score_query = score_query.where(Activity.occurred_at >= start, Activity.occurred_at <= now)
     else:
         return []
     scores = score_query.subquery()

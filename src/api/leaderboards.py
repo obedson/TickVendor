@@ -22,11 +22,13 @@ def community_leaderboard(
     db: Annotated[Session, Depends(get_db)],
     user: Annotated[User, Depends(get_current_user)],
     leaderboard_id: UUID | None = None,
+    event_id: UUID | None = None,
     limit: int = Query(default=100, ge=1, le=500),
 ):
     require_community_role(db, community_id, user, MembershipRole.MEMBER)
     query = select(Leaderboard).where(Leaderboard.community_id == community_id)
     if leaderboard_id is not None: query = query.where(Leaderboard.id == leaderboard_id)
+    if event_id is not None: query = query.where(Leaderboard.event_id == event_id)
     leaderboard = db.scalar(query.order_by(Leaderboard.created_at))
     if leaderboard is None: raise HTTPException(status_code=404, detail="Leaderboard not found")
     return {"id": str(leaderboard.id), "name": leaderboard.name, "metric": leaderboard.metric,
