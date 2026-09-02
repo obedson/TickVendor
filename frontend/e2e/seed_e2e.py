@@ -66,7 +66,9 @@ def main() -> None:
         db.add(event); db.flush()
         ticket_type = TicketType(event_id=event.id, name="Free admission", description="No-cost entry", price=0,
                                  quantity=10, visibility=TicketVisibility.PUBLIC, max_per_user=1)
-        db.add(ticket_type); db.flush()
+        paid_type = TicketType(event_id=event.id, name="Supporter admission", description="Paid entry",
+                               price=100, quantity=10, visibility=TicketVisibility.PUBLIC, max_per_user=1)
+        db.add_all([ticket_type, paid_type]); db.flush()
         db.add(Ticket(public_id="E2EPEER0000000000000001", qr_token="e2e-peer-qr-token-000000000000000000000000000000000000000000",
                       event_id=event.id, ticket_type_id=ticket_type.id, attendee_id=peer.id, status=TicketStatus.ACTIVE))
         db.add(Attendance(event_id=event.id, user_id=peer.id, status=AttendanceStatus.CHECKED_IN,
