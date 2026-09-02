@@ -112,6 +112,8 @@ integrated product evidence. TickVendor is not specification-complete or product
   ISO timestamps, backend validation/error rendering, authoritative refetch, and browser coverage.
 - [x] Add organizer attendance-configuration controls for QR, GPS/geofence, organizer and peer methods,
   required method selection, peer limits, backend error rendering and authoritative save feedback.
+- [x] Extend organizer event management with edit, draft publishing, and authoritative ticket-type
+  inventory display within the managed event workflow.
 - [ ] Complete the remaining participant frontend journeys: ticket acquisition, check-in result,
   peer confirmation, tasks, contributions, achievements, milestones, ranks, community selection,
   profile editing/privacy controls, and complete loading/error states.
