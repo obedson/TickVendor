@@ -91,6 +91,8 @@ integrated product evidence. TickVendor is not specification-complete or product
   participant free-ticket acquisition, wallet refresh, and QR persistence journey.
 - [x] Real participant Playwright flow now resolves the active community before loading assigned
   tasks, avoiding the prior placeholder route and proving the seeded backend task surface is reachable.
+- [x] The real participant browser flow now covers free acquisition, QR wallet refresh, attendance,
+  task evidence submission, and Impact/Recognition navigation against the isolated local backend.
 - [ ] Complete the remaining participant frontend journeys: ticket acquisition, check-in result,
   peer confirmation, tasks, contributions, achievements, milestones, ranks, community selection,
   profile editing/privacy controls, and complete loading/error states.

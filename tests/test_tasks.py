@@ -1,5 +1,7 @@
 """Task and Impact Point service tests."""
 
+from datetime import UTC, datetime, timedelta
+
 import pytest
 from fastapi import HTTPException
 from sqlalchemy import create_engine
@@ -122,4 +124,17 @@ def test_task_assignment_rejects_assignee_from_another_community(tmp_path):
         with pytest.raises(HTTPException) as denied:
             assign_task(db, task, outsider.id, organizer)
         assert denied.value.status_code == 404
+    engine.dispose()
+
+
+def test_task_submission_handles_sqlite_naive_due_datetime(tmp_path):
+    engine = create_engine(f"sqlite:///{tmp_path / 'task-naive-due.db'}")
+    Base.metadata.create_all(engine)
+    with Session(engine, expire_on_commit=False) as db:
+        _organizer, member, task, assignment = _submitted_task(db)
+        assignment.status = TaskAssignmentStatus.REJECTED
+        task.due_at = datetime.now(UTC) + timedelta(days=1)
+        db.commit()
+        submission = submit_task(db, assignment, member, evidence_text="Retry evidence")
+        assert submission is not None
     engine.dispose()
