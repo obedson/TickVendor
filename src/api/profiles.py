@@ -26,7 +26,7 @@ from src.models import (
     RankProgression,
     User,
 )
-from src.services.recognition import current_rank, user_metrics
+from src.services.recognition import current_rank, next_rank, user_metrics
 
 router = APIRouter(prefix="/profiles", tags=["profiles"])
 
@@ -81,10 +81,7 @@ def my_profile(
         raise HTTPException(status_code=403, detail="Active community membership required")
     metrics = user_metrics(db, user.id, community_id)
     rank = current_rank(db, user.id, community_id)
-    next_rank = db.scalar(select(Rank).where(
-        Rank.community_id == community_id, Rank.is_active.is_(True),
-        Rank.minimum_points > metrics["impact_points"],
-    ).order_by(Rank.minimum_points.asc()))
+    upcoming_rank = next_rank(db, user.id, community_id)
     badges = list(db.execute(select(BadgeAward, Badge).join(Badge, Badge.id == BadgeAward.badge_id).where(
         BadgeAward.user_id == user.id, Badge.community_id == community_id, BadgeAward.revoked_at.is_(None)
     )))
@@ -109,10 +106,10 @@ def my_profile(
             "rank": {"id": str(rank.id), "name": rank.name} if rank else None,
             "rank_history": [{"name": item.name, "achieved_at": progression.achieved_at.isoformat()}
                              for progression, item in rank_history],
-            "next_rank": ({"id": str(next_rank.id), "name": next_rank.name,
-                           "minimum_points": next_rank.minimum_points,
-                           "points_remaining": next_rank.minimum_points - metrics["impact_points"]}
-                          if next_rank else None),
+            "next_rank": ({"id": str(upcoming_rank.id), "name": upcoming_rank.name,
+                           "minimum_points": upcoming_rank.minimum_points,
+                           "points_remaining": max(0, upcoming_rank.minimum_points - metrics["impact_points"])}
+                          if upcoming_rank else None),
             "badges": [{"name": badge.name, "icon_url": badge.icon_url} for _award, badge in badges],
             "milestones": [{"name": milestone.name, "icon_url": milestone.icon_url}
                            for _award, milestone in milestones],
