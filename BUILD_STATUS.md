@@ -118,6 +118,9 @@ integrated product evidence. TickVendor is not specification-complete or product
   saves the existing verification policy through the authorized backend endpoint.
 - [x] Organizer event-management browser coverage verifies owned-event listing, event creation, and
   attendance-settings save through the real frontend and isolated backend.
+- [x] Add organizer task-verification queue API and UI with tenant authorization, evidence display,
+  verify/reject actions, queue refresh, and browser coverage for real submitted evidence verification.
+- [x] Task-verification queue denial coverage confirms participant members cannot read organizer review data.
 - [ ] Complete the remaining participant frontend journeys: ticket acquisition, check-in result,
   peer confirmation, tasks, contributions, achievements, milestones, ranks, community selection,
   profile editing/privacy controls, and complete loading/error states.

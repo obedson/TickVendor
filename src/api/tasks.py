@@ -8,8 +8,16 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from src.api.auth import get_current_user
+from src.authorization import require_community_role
 from src.database import get_db
-from src.models import Task, TaskAssignment, TaskAssignmentStatus, User
+from src.models import (
+    MembershipRole,
+    Task,
+    TaskAssignment,
+    TaskAssignmentStatus,
+    TaskSubmission,
+    User,
+)
 from src.schemas.task import (
     AssignmentInput,
     SubmissionInput,
@@ -27,6 +35,19 @@ from src.services.task import (
 )
 
 router = APIRouter(tags=["tasks"])
+
+
+@router.get("/communities/{community_id}/task-verification-queue")
+def verification_queue(community_id: UUID, db: Annotated[Session, Depends(get_db)], user: Annotated[User, Depends(get_current_user)]):
+    require_community_role(db, community_id, user, MembershipRole.ORGANIZER)
+    rows = db.execute(select(TaskAssignment, Task, TaskSubmission).join(Task, Task.id == TaskAssignment.task_id)
+                      .join(TaskSubmission, TaskSubmission.assignment_id == TaskAssignment.id)
+                      .where(Task.community_id == community_id, TaskAssignment.status == TaskAssignmentStatus.SUBMITTED)
+                      .order_by(TaskSubmission.submitted_at, TaskAssignment.id))
+    return [{"assignment_id": str(assignment.id), "task_id": str(task.id), "task_title": task.title,
+             "assignee_id": str(assignment.assignee_id), "submitted_at": submission.submitted_at,
+             "evidence_text": submission.evidence_text, "evidence_url": submission.evidence_url,
+             "evidence_attachments": submission.evidence_attachments} for assignment, task, submission in rows]
 
 
 @router.get("/communities/{community_id}/tasks", response_model=list[TaskResponse])
