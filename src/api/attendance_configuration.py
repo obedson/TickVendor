@@ -56,6 +56,13 @@ def update_attendance_config(community_id: UUID, event_id: UUID, payload: Attend
     peer_enabled = values.get("peer_confirmation_enabled", event.peer_confirmation_enabled)
     required_methods = values.get("required_verification_methods", event.required_verification_methods)
     confirmations_required = values.get("confirmations_required", event.confirmations_required)
+    enabled_methods = {"qr": values.get("qr_attendance_enabled", event.qr_attendance_enabled),
+                       "gps": values.get("geofence_enabled", event.geofence_enabled),
+                       "peer": peer_enabled,
+                       "organizer": values.get("organizer_verification_enabled", event.organizer_verification_enabled)}
+    missing_methods = [method for method in required_methods if not enabled_methods.get(method, False)]
+    if missing_methods:
+        raise HTTPException(status_code=422, detail=f"Required verification method is disabled: {missing_methods[0]}")
     if "peer" in required_methods and not peer_enabled:
         raise HTTPException(status_code=422, detail="Peer verification requires peer confirmation")
     if peer_enabled and "peer" in required_methods and confirmations_required < 1:

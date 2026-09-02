@@ -107,6 +107,8 @@ integrated product evidence. TickVendor is not specification-complete or product
   redaction coverage.
 - [x] Attendance policy validation enforces that required peer verification is enabled, requires at
   least one confirmation, and cannot require more confirmations than the configured peer limit.
+- [x] Attendance policy validation also requires every configured verification method to remain
+  enabled, preventing impossible QR, GPS, or organizer verification combinations.
 - [x] Add participant ticket catalog and authoritative payment-status API; public ticket inventory
   excludes hidden/invite-only types and payment status is restricted to the owning user/order.
 - [ ] Integrate `evaluate_recognition` into verified business transitions or a durable job so
