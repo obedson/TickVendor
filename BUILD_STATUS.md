@@ -111,6 +111,8 @@ integrated product evidence. TickVendor is not specification-complete or product
   enabled, preventing impossible QR, GPS, or organizer verification combinations.
 - [x] Add authenticated participant community context listing for active memberships, excluding
   invited/left memberships and preserving tenant isolation.
+- [x] Extend participant notification UI with authenticated loading/error/empty handling,
+  read-state synchronization and preference controls for in-app, email, push and muted types.
 - [x] Add participant ticket catalog and authoritative payment-status API; public ticket inventory
   excludes hidden/invite-only types and payment status is restricted to the owning user/order.
 - [ ] Integrate `evaluate_recognition` into verified business transitions or a durable job so
