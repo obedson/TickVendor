@@ -17,6 +17,11 @@ from src.services.notification import audit
 
 router = APIRouter(prefix="/admin/communities/{community_id}", tags=["admin"])
 
+@router.get("/leaderboards")
+def list_leaderboards(community_id: UUID, db: Annotated[Session, Depends(get_db)], user: Annotated[User, Depends(get_current_user)]):
+    require_community_role(db, community_id, user, MembershipRole.ADMIN)
+    return [{"id": str(board.id), "name": board.name, "slug": board.slug, "metric": board.metric, "period": board.period, "max_entries": board.max_entries, "is_enabled": board.is_enabled, "event_id": str(board.event_id) if board.event_id else None} for board in db.scalars(select(Leaderboard).where(Leaderboard.community_id == community_id).order_by(Leaderboard.created_at, Leaderboard.id))]
+
 
 class LeaderboardInput(BaseModel):
     name: str = Field(min_length=2, max_length=160)

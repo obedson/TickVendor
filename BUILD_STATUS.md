@@ -139,6 +139,8 @@ integrated product evidence. TickVendor is not specification-complete or product
   by existing community-scoped APIs; administrator browser access and participant navigation denial pass.
 - [x] Add administrator Contribution Bands list/create UI backed by the existing community-scoped
   API, including backend validation feedback and deterministic browser coverage.
+- [x] Add administrator Leaderboard Configuration list/create/update UI using the existing scoped API,
+  with backend-derived metric/period options and community authorization.
 - [ ] Complete the remaining participant frontend journeys: ticket acquisition, check-in result,
   peer confirmation, tasks, contributions, achievements, milestones, ranks, community selection,
   profile editing/privacy controls, and complete loading/error states.
