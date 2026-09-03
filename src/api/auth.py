@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session, selectinload
 from src.config import settings
 from src.database import get_db
 from src.models import AuthSession, AuthToken, AuthTokenPurpose, Profile, User
+from src.monitoring import emit
 from src.notifications.email import EmailSender, get_email_sender
 from src.schemas.auth import (
     LoginRequest,
@@ -105,6 +106,7 @@ def login(
     user = db.scalar(select(User).options(selectinload(User.profile)).where(User.email == str(payload.email)))
     if user is None or not user.is_active or not verify_password(payload.password, user.password_hash):
         login_attempt_limiter.record_failure(attempt_key)
+        emit("authentication_failure", reason="invalid_credentials")
         raise HTTPException(status_code=401, detail="Invalid email or password")
     login_attempt_limiter.record_success(attempt_key)
     response = issue_tokens(db, user)

@@ -41,7 +41,13 @@ def process_scheduled_notifications(db: Session, sender: ScheduledSender, *, now
             NotificationRule.notification_type == item.notification_type,
             NotificationRule.is_active.is_(True),
         )) if item.community_id else None
-        if (preference and (not preference.in_app_enabled or item.notification_type in preference.muted_types)) or (rule and not rule.in_app_enabled):
+        muted = preference and item.notification_type in preference.muted_types
+        channels_enabled = (
+            (rule is None or rule.in_app_enabled) and (preference is None or preference.in_app_enabled)
+            or (rule is None or rule.email_enabled) and preference is not None and preference.email_enabled
+            or (rule is None or rule.push_enabled) and preference is not None and preference.push_enabled
+        )
+        if muted or not channels_enabled:
             db.execute(update(ScheduledNotification).where(ScheduledNotification.id == item.id).values(
                 status=ScheduledNotificationStatus.DELIVERED, delivered_at=now))
             db.commit(); delivered += 1; continue

@@ -12,7 +12,9 @@ class ConfiguredSender:
         # invoked by immediate notification dispatch according to preferences/rules.
         from src.services.notification import notify
         with SessionLocal() as db:
-            notify(db, user_id, notification_type, title, message, payload)
+            community_id = payload.get("community_id") if isinstance(payload, dict) else None
+            notify(db, user_id, notification_type, title, message, payload,
+                   community_id=community_id)
 
 
 def run_once() -> int:

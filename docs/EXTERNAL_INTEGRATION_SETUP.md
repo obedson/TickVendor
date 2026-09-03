@@ -33,6 +33,7 @@ Redis
 
 Deployment
 - Release migration command: `alembic upgrade head`.
+- Compose runs migrations before the API; managed platforms should use the same release command.
 - API command: `uvicorn src.main:app --host 0.0.0.0 --port 8000`.
 - Worker command: `python scripts/notification_worker.py`.
 - Frontend build consumes infrastructure variable `VITE_API_ORIGIN`.

@@ -65,7 +65,8 @@ def test_future_work_and_muted_preference_are_not_delivered(tmp_path):
         db.add(future); db.commit()
         assert process_scheduled_notifications(db, sender, now=now) == 0
         assert sender.messages == []
-        db.add(NotificationPreference(user_id=user_id, in_app_enabled=False))
+        db.add(NotificationPreference(user_id=user_id, in_app_enabled=False,
+                                      email_enabled=False, push_enabled=False))
         muted = ScheduledNotification(user_id=user_id, notification_type="muted", title="Muted",
                                       message="hidden", payload={}, idempotency_key="muted",
                                       scheduled_at=now - timedelta(minutes=1))
@@ -86,6 +87,20 @@ def test_transient_failure_retries_with_backoff(tmp_path):
         assert work.status == ScheduledNotificationStatus.RETRYABLE and work.attempt_count == 1
         assert process_scheduled_notifications(db, sender, now=now + timedelta(minutes=6)) == 1
         assert work.status == ScheduledNotificationStatus.DELIVERED
+    engine.dispose()
+
+
+def test_email_only_preference_does_not_suppress_scheduled_dispatch(tmp_path):
+    engine, user_id = setup(tmp_path)
+    sender = LocalSender(); now = datetime.now(UTC)
+    with Session(engine) as db:
+        db.add(NotificationPreference(user_id=user_id, in_app_enabled=False, email_enabled=True))
+        work = ScheduledNotification(user_id=user_id, notification_type="email-only", title="Email",
+                                     message="send", payload={}, idempotency_key="email-only",
+                                     scheduled_at=now - timedelta(minutes=1))
+        db.add(work); db.commit()
+        assert process_scheduled_notifications(db, sender, now=now) == 1
+        assert len(sender.messages) == 1
     engine.dispose()
 
 

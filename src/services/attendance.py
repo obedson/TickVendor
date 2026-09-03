@@ -26,6 +26,7 @@ from src.models import (
     User,
     VerificationMethod,
 )
+from src.monitoring import emit
 from src.schemas.attendance import AttendanceCheckIn
 from src.services.event import as_utc
 from src.services.impact import award_points
@@ -115,6 +116,8 @@ def evaluate_attendance_abuse(db: Session, attendance: Attendance) -> Attendance
         attendance.flagged_for_review = True
         attendance.review_reason = ((attendance.review_reason + "; ") if attendance.review_reason else "") + \
             f"impossible_location_transition:speed_kmh={speed_kmh:.1f}"
+        emit("attendance_abuse_signal", reason="impossible_location_transition",
+             attendance_id=str(attendance.id), event_id=str(attendance.event_id))
         db.commit()
     burst = db.scalar(select(func.count()).select_from(AttendanceVerification).join(
         Attendance, Attendance.id == AttendanceVerification.attendance_id,
@@ -132,6 +135,8 @@ def evaluate_attendance_abuse(db: Session, attendance: Attendance) -> Attendance
         attendance.flagged_for_review = True
         attendance.review_reason = ((attendance.review_reason + "; ") if attendance.review_reason else "") + \
             f"repeated_location_pattern:count={burst}"
+        emit("attendance_abuse_signal", reason="repeated_location_pattern",
+             attendance_id=str(attendance.id), event_id=str(attendance.event_id))
         db.commit()
     return attendance
 
