@@ -143,6 +143,8 @@ integrated product evidence. TickVendor is not specification-complete or product
   with backend-derived metric/period options and community authorization.
 - [x] Add administrator manual Impact Point adjustment UI with active-member selection, explicit
   nonzero amount/reason validation, append-only API submission, and mutation feedback.
+- [x] Add real browser acceptance for administrator leaderboard configuration mutation and
+  authoritative response handling.
 - [x] Add administrator navigation/access coverage for manual Impact Point adjustment and Audit Log
   controls; adjustment submission remains backend-authorized and append-only.
 - [x] Complete Audit Log UI with action filtering and bounded previous/next pagination using the
