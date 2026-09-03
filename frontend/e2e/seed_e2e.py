@@ -45,7 +45,8 @@ def main() -> None:
             role=PlatformRole.PARTICIPANT, email_verified_at=now,
             profile=Profile(username="e2e-peer", display_name="E2E Peer"),
         )
-        db.add_all([participant, organizer, peer]); db.flush()
+        admin = User(email="e2e-admin@example.com", password_hash=hash_password("e2e-password-123"), role=PlatformRole.SUPER_ADMIN, email_verified_at=now, profile=Profile(username="e2e-admin", display_name="E2E Admin"))
+        db.add_all([participant, organizer, peer, admin]); db.flush()
         db.add(EventCategory(slug="community", name="Community"))
         organization = Organization(owner_id=organizer.id, name="E2E Organization", slug="e2e-organization")
         db.add(organization); db.flush()

@@ -135,6 +135,8 @@ integrated product evidence. TickVendor is not specification-complete or product
   real frontend renders the authoritative validation result without client-side ticket decisions.
 - [x] Current full Playwright suite is green: 14 passed, including organizer event, attendance,
   review, task, member, and participant reward-loop coverage.
+- [x] Begin administrator frontend with role-gated Point Rules and redacted Audit Log views backed
+  by existing community-scoped APIs; administrator browser access and participant navigation denial pass.
 - [ ] Complete the remaining participant frontend journeys: ticket acquisition, check-in result,
   peer confirmation, tasks, contributions, achievements, milestones, ranks, community selection,
   profile editing/privacy controls, and complete loading/error states.
