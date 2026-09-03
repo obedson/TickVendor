@@ -40,6 +40,20 @@ export function AdminRecognition({ token, communityId }: Props) {
     }
   }, [token]);
 
+  useEffect(() => {
+    if (!community) return;
+    Promise.all((['achievement-rules', 'badges', 'milestones', 'ranks'] as const).map(async resource => {
+      const response = await fetch(api(community, resource), { headers });
+      if (!response.ok) throw Error('Unable to load recognition configuration.');
+      return [resource, await response.json() as SavedItem[]] as const;
+    })).then(items => items.forEach(([resource, values]) => {
+      if (resource === 'achievement-rules') setRules(values);
+      if (resource === 'badges') setBadges(values);
+      if (resource === 'milestones') setMilestones(values);
+      if (resource === 'ranks') setRanks(values);
+    })).catch(cause => setError(cause instanceof Error ? cause.message : 'Unable to load recognition configuration.'));
+  }, [community, token]);
+
   const create = async (resource: string, body: object, label: string) => {
     setError('');
     setMessage('');
@@ -52,12 +66,14 @@ export function AdminRecognition({ token, communityId }: Props) {
       });
       const data = await response.json();
       if (!response.ok) throw Error(data.detail || `Unable to create ${label}.`);
-      const saved = { ...data, name: body['name' as keyof typeof body] } as SavedItem;
-      if (resource === 'achievement-rules') setRules(items => [...items, saved]);
-      if (resource === 'badges') setBadges(items => [...items, saved]);
-      if (resource === 'milestones') setMilestones(items => [...items, saved]);
-      if (resource === 'ranks') setRanks(items => [...items, saved]);
       setMessage(`${label} saved.`);
+      const refreshed = await fetch(api(id, resource), { headers });
+      if (!refreshed.ok) throw Error('Saved, but unable to reload recognition configuration.');
+      const values = await refreshed.json() as SavedItem[];
+      if (resource === 'achievement-rules') setRules(values);
+      if (resource === 'badges') setBadges(values);
+      if (resource === 'milestones') setMilestones(values);
+      if (resource === 'ranks') setRanks(values);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : `Unable to create ${label}.`);
     }

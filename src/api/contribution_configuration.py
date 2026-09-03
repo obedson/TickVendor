@@ -59,6 +59,14 @@ def update_band(community_id: UUID, band_id: UUID, payload: ContributionBandInpu
     require_community_role(db, community_id, user, MembershipRole.ADMIN)
     band = db.scalar(select(ContributionBand).where(ContributionBand.id == band_id, ContributionBand.community_id == community_id))
     if band is None: raise HTTPException(status_code=404, detail="Contribution band not found")
+    overlap = db.scalar(select(ContributionBand).where(
+        ContributionBand.id != band_id, ContributionBand.community_id == community_id,
+        ContributionBand.currency == payload.currency, ContributionBand.is_active.is_(True),
+        ContributionBand.minimum_amount <= (payload.maximum_amount or payload.minimum_amount),
+        (ContributionBand.maximum_amount.is_(None)) | (ContributionBand.maximum_amount >= payload.minimum_amount),
+    ))
+    if payload.is_active and overlap:
+        raise HTTPException(status_code=409, detail="Contribution band overlaps an active band")
     for field, value in payload.model_dump().items(): setattr(band, field, value)
     audit(db, actor_id=user.id, community_id=community_id, action="contribution_band.updated", target_type="contribution_band", target_id=band.id, metadata={"fields": sorted(payload.model_dump())}, commit=False)
     db.commit(); return {"id": str(band.id), "points": band.points, "is_active": band.is_active}

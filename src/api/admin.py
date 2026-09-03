@@ -124,6 +124,16 @@ def create_milestone(
     return {"id": str(milestone.id), "slug": milestone.slug}
 
 
+@router.get("/milestones")
+def list_milestones(
+    community_id: UUID, db: Annotated[Session, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
+):
+    require_admin(db, community_id, user)
+    return [{"id": str(item.id), "name": item.name, "slug": item.slug, "is_active": item.is_active}
+            for item in db.query(Milestone).filter(Milestone.community_id == community_id).order_by(Milestone.name)]
+
+
 @router.post("/ranks", status_code=status.HTTP_201_CREATED)
 def create_rank(
     community_id: UUID,
@@ -169,6 +179,17 @@ def update_rank(
     return {"id": str(rank.id), "slug": rank.slug}
 
 
+@router.get("/ranks")
+def list_ranks(
+    community_id: UUID, db: Annotated[Session, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
+):
+    require_admin(db, community_id, user)
+    return [{"id": str(item.id), "name": item.name, "slug": item.slug,
+             "minimum_points": item.minimum_points, "is_active": item.is_active}
+            for item in db.query(Rank).filter(Rank.community_id == community_id).order_by(Rank.sort_order, Rank.name)]
+
+
 @router.post("/badges", status_code=status.HTTP_201_CREATED)
 def create_badge(
     community_id: UUID,
@@ -194,6 +215,16 @@ def create_badge(
         metadata={"slug": badge.slug},
     )
     return {"id": str(badge.id), "slug": badge.slug}
+
+
+@router.get("/badges")
+def list_badges(
+    community_id: UUID, db: Annotated[Session, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
+):
+    require_admin(db, community_id, user)
+    return [{"id": str(item.id), "name": item.name, "slug": item.slug, "is_active": item.is_active}
+            for item in db.query(Badge).filter(Badge.community_id == community_id).order_by(Badge.name)]
 
 
 @router.post("/badge-awards/{award_id}/revoke", status_code=204)
@@ -258,6 +289,16 @@ def create_achievement_rule(
         metadata={"slug": rule.slug},
     )
     return {"id": str(rule.id), "slug": rule.slug}
+
+
+@router.get("/achievement-rules")
+def list_achievement_rules(
+    community_id: UUID, db: Annotated[Session, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
+):
+    require_admin(db, community_id, user)
+    return [{"id": str(item.id), "name": item.name, "slug": item.slug, "is_active": item.is_active}
+            for item in db.query(AchievementRule).filter(AchievementRule.community_id == community_id).order_by(AchievementRule.name)]
 
 
 @router.patch("/achievement-rules/{rule_id}")
