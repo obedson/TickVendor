@@ -17,6 +17,11 @@ from src.services.notification import audit
 
 router = APIRouter(prefix="/admin/communities/{community_id}", tags=["admin"])
 
+@router.get("/contribution-bands")
+def list_bands(community_id: UUID, db: Annotated[Session, Depends(get_db)], user: Annotated[User, Depends(get_current_user)]):
+    require_community_role(db, community_id, user, MembershipRole.ADMIN)
+    return [{"id": str(band.id), "currency": band.currency, "minimum_amount": str(band.minimum_amount), "maximum_amount": str(band.maximum_amount) if band.maximum_amount is not None else None, "points": band.points, "per_user_period_cap": band.per_user_period_cap, "is_active": band.is_active} for band in db.scalars(select(ContributionBand).where(ContributionBand.community_id == community_id).order_by(ContributionBand.minimum_amount, ContributionBand.id))]
+
 
 class ContributionBandInput(BaseModel):
     currency: str = Field(default="NGN", min_length=3, max_length=3, pattern=r"^[A-Z]{3}$")

@@ -137,6 +137,8 @@ integrated product evidence. TickVendor is not specification-complete or product
   review, task, member, and participant reward-loop coverage.
 - [x] Begin administrator frontend with role-gated Point Rules and redacted Audit Log views backed
   by existing community-scoped APIs; administrator browser access and participant navigation denial pass.
+- [x] Add administrator Contribution Bands list/create UI backed by the existing community-scoped
+  API, including backend validation feedback and deterministic browser coverage.
 - [ ] Complete the remaining participant frontend journeys: ticket acquisition, check-in result,
   peer confirmation, tasks, contributions, achievements, milestones, ranks, community selection,
   profile editing/privacy controls, and complete loading/error states.
