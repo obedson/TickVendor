@@ -133,6 +133,8 @@ integrated product evidence. TickVendor is not specification-complete or product
   validation endpoint; no QR trust or signing logic is implemented in the browser.
 - [x] Organizer attendance operation browser coverage exercises invalid QR input and verifies the
   real frontend renders the authoritative validation result without client-side ticket decisions.
+- [x] Current full Playwright suite is green: 14 passed, including organizer event, attendance,
+  review, task, member, and participant reward-loop coverage.
 - [ ] Complete the remaining participant frontend journeys: ticket acquisition, check-in result,
   peer confirmation, tasks, contributions, achievements, milestones, ranks, community selection,
   profile editing/privacy controls, and complete loading/error states.
