@@ -13,7 +13,8 @@ The current repository-backed assessment counts 771 normative bullet requirement
 - C — not implemented: 0
 - Implementation completion: 771 / 771 = 100.00%
 - Verification completion: 639 / 771 = 82.88%
-- Not implemented: 0 / 771 = 0.00%
+- Not implemented: 0 / 771 × 100 = 0.00%
+- B verification dependency split: L1 = 73, L2 = 48, E1 = 2, E2 = 9 (sum = 132).
 
 Counting method: each top-level `*` bullet inside numbered sections 1–82 is one requirement. Headings, explanatory prose, examples, repeated BUILD_STATUS checklist rows, and the final product statement are not additional requirements. A/B/C are mutually exclusive. The matrix intentionally keeps production, deployment, provider, infrastructure, and operational requirements in the denominator.
 
@@ -36,3 +37,6 @@ The local seed/bootstrap and documentation gaps were resolved and locally verifi
 Current local evidence includes the full backend suite, full Playwright suite, frontend lint/build, Ruff, Python compilation, fresh migration upgrade/current/check, responsive/offline/retry/bundle policy probes, and deterministic provider adapter tests. These prove local behavior only and do not replace external or deployed verification.
 
 The exact remaining-B verification manifest is in `docs/EXTERNAL_VERIFICATION_MANIFEST.md`.
+
+The current matrix retains all 132 B rows pending requirement-specific evidence. L1/L2 rows are the next
+local verification backlog; E1/E2 rows require the external/deployed conditions listed in the manifest.

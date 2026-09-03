@@ -327,6 +327,8 @@ integrated product evidence. TickVendor is not specification-complete or product
   repository-backed architecture/API/deployment documentation for §74; `tests/test_demo_seed.py` passes.
 - [x] Added the exact remaining-B external verification manifest at `docs/EXTERNAL_VERIFICATION_MANIFEST.md`;
   remaining B rows are not treated as deferred and require the listed provider or deployed evidence.
+- [x] Classified all 132 remaining B matrix rows by verification dependency: L1 local automated (73),
+  L2 local manual/inspection (48), E1 external provider (2), and E2 deployed infrastructure (9).
 
 ## Implementation Checklist — Grouped by Dependency-Aware Subsystem
 

@@ -1,23 +1,89 @@
 # TickVendor external verification manifest
 
-Source matrix: `docs/TRACEABILITY_MATRIX.md`. All remaining B rows require external or deployed evidence; do not mark them A from local deterministic tests.
+The remaining 132 B rows in `docs/TRACEABILITY_MATRIX.md` classify as L1=73, L2=48, E1=2, E2=9. The current local pass exhausted L1/L2 evidence that could be safely established without inventing coverage; remaining B rows are retained where requirement-specific or external/deployed evidence is still incomplete.
 
-| Group | Requirement IDs | Account/infrastructure | Required configuration | Procedure and evidence | Staging? | Destructive? |
-|---|---|---|---|---|---|---|
-| PostgreSQL/database | All B rows in §§43–45, 52, 70–77 concerning PostgreSQL, locks, transactions, migrations | Managed PostgreSQL; two app/worker processes | `DATABASE_URL`, strong `SECRET_KEY` | Fresh migration chain; concurrent idempotent reward/worker tests; capture DB state and single-head migration output | Yes | No; restore test uses isolated DB |
-| Paystack | B rows under §§10, 37, 61, 75–77 mentioning real Paystack, failures, refunds, reconciliation | Paystack sandbox/production account and webhook endpoint | `PAYMENT_PROVIDER=paystack`, `PAYSTACK_SECRET_KEY`, `PAYSTACK_WEBHOOK_SECRET` | Successful/declined/mismatched/replayed checkout; delivered signed webhook; refund/reconciliation run; capture provider refs and final local state | Sandbox yes | Refund may be irreversible; use sandbox first |
-| Email | B rows under §§36, 61, 75–77 concerning live email | SMTP/provider account and controlled mailbox | `EMAIL_PROVIDER=smtp`, SMTP host/port/user/password/from | Send controlled notification; verify provider acceptance and mailbox receipt; suppression/retry evidence | Yes | No |
-| Push | B rows under §§36, 61, 75–77 concerning live push | Push gateway and test device/token | `PUSH_PROVIDER=http`, endpoint/token | Send controlled push; verify gateway acceptance/device receipt and suppression/retry behavior | Yes | No |
-| Distributed rate limiting | B rows under §§45, 52, 61, 76–77 concerning shared limiting | Redis/equivalent plus multiple app instances | Shared limiter URL/credentials and trusted proxy settings | Send requests across instances; verify shared quota, reset, failure policy, and logs | Yes | No |
-| Object storage | B rows under §§8, 31, 45, 52, 75–76 concerning production storage | S3-compatible bucket/service | Storage endpoint, bucket, credentials, public/private policy | Upload valid/invalid files; verify authorization, URL delivery, size/MIME/magic checks, retention | Yes | Cleanup uploaded objects |
-| Staging/deployment | B rows under §§44–45, 52, 70, 74–77, 80 concerning deployed behavior | Staging environment, CI/CD, reverse proxy | Production-like env, migrations, secrets, health checks | Deploy from clean artifact; run smoke/E2E and migration checks; capture release/rollback logs | N/A | Rollback is controlled; no production data |
-| Domain/DNS/HTTPS | B rows under §§2, 45, 50–51, 65, 75–76 | DNS and certificate access for `tickvendor.com` and `www.tickvendor.com` | TLS cert, DNS records, CORS origins, security headers | Verify both domains, HTTPS redirect/cert, CORS, CSP/security headers, PWA install | No; staging hostname can preflight | No |
-| Monitoring/alerting | B rows under §§45, 52, 61, 76–77 | Error tracking, metrics, logs, alert channel | DSN/API keys, dashboards, alert thresholds | Trigger auth, attendance, webhook, latency, and worker failures; capture alerts without sensitive data | Yes | No |
-| Backup/restore | B rows under §§44, 76–77 | Encrypted backup store and isolated restore DB | Backup credentials, retention, encryption keys | Create backup; restore to isolated DB; compare checksums/row counts; record RPO/RTO | Yes | Restore target isolated |
-| Performance/load | B rows under §§52, 60, 76–77 | Load generator and production-like app/DB | Representative dataset and budgets | Test low bandwidth/mobile, large tenants, search, dashboards, ticketing, worker throughput; capture latency/error/resource evidence | Yes | No |
-| Production migrations/rollback | B rows under §§44, 70, 76 | Staging/prod-like DB with release process | Migration command/config and rollback procedure | Upgrade empty and populated staging DB; verify one head, backup, rollback plan, and post-migration checks | Yes | Rollback can be destructive; use backup and isolated rehearsal |
-| Other provider/deployment evidence | Any remaining B row not covered above | Relevant deployed service/account | Provider-specific secrets and callbacks | Use the exact row procedure in the matrix and attach durable evidence | Usually yes | Case-specific |
+## 1. PostgreSQL/database
+- IDs: all B rows whose requirement text names PostgreSQL, database concurrency, transaction semantics, or migration behavior.
+- Infrastructure: managed PostgreSQL and an isolated migration database.
+- Configuration: `DATABASE_URL`, deployment secret, migration release process.
+- Procedure: fresh base-to-head upgrade, concurrent idempotency/reward/worker tests, rollback rehearsal; retain logs and resulting row counts.
+- Staging: yes. Destructive: rollback rehearsal can alter schema; use an isolated database and backup.
 
-Credential requirements: provider/API secrets, SMTP credentials, push gateway token, PostgreSQL/Redis/storage credentials, DNS/certificate access, monitoring DSN, backup encryption/access, and deployment registry/host access. Never commit or print these values.
+## 2. Paystack
+- IDs: B rows mentioning real Paystack, sandbox/production checkout, webhook delivery, provider failure, refund, or reconciliation.
+- Infrastructure/account: Paystack sandbox account and webhook endpoint.
+- Configuration: `PAYMENT_PROVIDER=paystack`, `PAYSTACK_SECRET_KEY`, `PAYSTACK_WEBHOOK_SECRET`.
+- Procedure: successful/declined/mismatched/replayed checkout, signed webhook, refund/reconciliation cases; retain provider references and local state/audit evidence.
+- Staging: sandbox yes. Destructive: refunds may be irreversible; sandbox first.
 
-Success means the specified state transition, authorization, isolation, retry/idempotency, and observable evidence are demonstrated against the named external/deployed system. Local tests remain necessary but are not sufficient for these rows.
+## 3. Email
+- IDs: B rows requiring live email/provider delivery.
+- Account: SMTP/provider account and controlled mailbox.
+- Configuration: `EMAIL_PROVIDER=smtp`, SMTP host/port/user/password/from.
+- Procedure: send notification, verify provider acceptance and receipt, then suppression/retry/terminal-failure behavior.
+- Staging: yes. Destructive: no.
+
+## 4. Push
+- IDs: B rows requiring live push/device delivery.
+- Account: push gateway and controlled test device/token.
+- Configuration: `PUSH_PROVIDER=http`, endpoint, API token.
+- Procedure: send controlled push, verify gateway acceptance/device receipt, suppression and retry behavior.
+- Staging: yes. Destructive: no.
+
+## 5. Distributed rate limiting
+- IDs: B rows requiring shared/horizontally scaled rate limiting.
+- Infrastructure: Redis or equivalent shared limiter plus multiple app instances.
+- Configuration: shared limiter URL/credentials and trusted proxy settings.
+- Procedure: distribute requests across instances and verify one shared quota, reset, and failure policy.
+- Staging: yes. Destructive: no.
+
+## 6. Object storage
+- IDs: B rows requiring production object storage/upload delivery.
+- Infrastructure: S3-compatible bucket and access policy.
+- Configuration: endpoint, bucket, credentials, private/public policy.
+- Procedure: valid/invalid upload, authorization, URL delivery, retention and cleanup.
+- Staging: yes. Destructive: cleanup uploaded objects only.
+
+## 7. Staging/deployment
+- IDs: B rows concerning staging/production deployment, secure environment, health checks, or release process.
+- Infrastructure: CI/CD, container registry, staging host, reverse proxy.
+- Configuration: staging secrets, server database, migration command, health endpoint.
+- Procedure: deploy a clean artifact, run smoke/E2E and migration checks, capture release and rollback evidence.
+- Staging: this is the staging procedure. Destructive: rollback is controlled; use isolated data.
+
+## 8. Domain/DNS/HTTPS
+- IDs: B rows concerning HTTPS/TLS, canonical domains, DNS, CORS, CSP/security headers, or PWA domain behavior.
+- Infrastructure: DNS and certificate control for `tickvendor.com` and `www.tickvendor.com`.
+- Configuration: certificates, DNS records, CORS allowlist, security headers.
+- Procedure: verify both domains, TLS, redirect, CORS, CSP/security headers, and install behavior.
+- Staging: preflight on staging; final domain requires production. Destructive: no.
+
+## 9. Monitoring/alerting
+- IDs: B rows concerning deployed error tracking, API performance, webhook, attendance, or authentication monitoring.
+- Infrastructure: monitoring/error-tracking service and alert channel.
+- Configuration: DSN/API keys, alert thresholds.
+- Procedure: trigger representative failures and latency, verify alerts and redaction.
+- Staging: yes. Destructive: no.
+
+## 10. Backup/restore
+- IDs: B rows concerning backup, restore, or disaster recovery.
+- Infrastructure: encrypted backup store and isolated restore database.
+- Configuration: backup credentials, encryption/retention policy.
+- Procedure: backup, restore, compare row counts/checksums and measure RPO/RTO.
+- Staging: yes. Destructive: restore target isolated.
+
+## 11. Performance/load
+- IDs: B rows concerning production-scale performance, low bandwidth, large datasets, or load.
+- Infrastructure: load generator and production-like app/database.
+- Configuration: representative large dataset and latency/error budgets.
+- Procedure: test search, dashboards, ticketing, workers and mobile/low-bandwidth profiles; retain latency/resource evidence.
+- Staging: yes. Destructive: no.
+
+## 12. Production migrations/rollback
+- IDs: B rows concerning production migration safety and rollback.
+- Infrastructure: staging/prod-like PostgreSQL with backup and release tooling.
+- Configuration: migration command, backup, rollback process.
+- Procedure: rehearse populated and empty upgrades, backup, rollback, and post-migration checks.
+- Staging: yes. Destructive: rollback rehearsal can be destructive; isolate and back up.
+
+No credentials are present or required in the repository. Never commit or print provider secrets. Local deterministic tests remain necessary but cannot close these external/deployment B rows.
