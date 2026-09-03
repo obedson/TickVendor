@@ -1,0 +1,3 @@
+import { test, expect } from '@playwright/test';
+
+test('administrator can open impact adjustment and audit controls', async ({ page }) => { await page.goto('/'); await page.getByLabel('Email').fill('e2e-admin@example.com'); await page.getByLabel('Password').fill('e2e-password-123'); await page.getByRole('button', { name: 'Sign in' }).click(); await page.getByRole('button', { name: 'Impact adjustments' }).click(); await expect(page.getByRole('heading', { name: 'Manual Impact Point adjustment' })).toBeVisible(); await expect(page.getByRole('button', { name: 'Adjust points' })).toBeDisabled(); await page.getByRole('button', { name: 'Audit log' }).click(); await expect(page.getByRole('heading', { name: 'Audit log' })).toBeVisible(); });

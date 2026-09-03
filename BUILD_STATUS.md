@@ -141,6 +141,10 @@ integrated product evidence. TickVendor is not specification-complete or product
   API, including backend validation feedback and deterministic browser coverage.
 - [x] Add administrator Leaderboard Configuration list/create/update UI using the existing scoped API,
   with backend-derived metric/period options and community authorization.
+- [x] Add administrator manual Impact Point adjustment UI with active-member selection, explicit
+  nonzero amount/reason validation, append-only API submission, and mutation feedback.
+- [x] Add administrator navigation/access coverage for manual Impact Point adjustment and Audit Log
+  controls; adjustment submission remains backend-authorized and append-only.
 - [ ] Complete the remaining participant frontend journeys: ticket acquisition, check-in result,
   peer confirmation, tasks, contributions, achievements, milestones, ranks, community selection,
   profile editing/privacy controls, and complete loading/error states.
