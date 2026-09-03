@@ -56,6 +56,7 @@ def main() -> None:
             Membership(community_id=community.id, user_id=participant.id, role=MembershipRole.MEMBER, status=MembershipStatus.ACTIVE),
             Membership(community_id=community.id, user_id=organizer.id, role=MembershipRole.ADMIN, status=MembershipStatus.ACTIVE),
             Membership(community_id=community.id, user_id=peer.id, role=MembershipRole.MEMBER, status=MembershipStatus.ACTIVE),
+            Membership(community_id=community.id, user_id=admin.id, role=MembershipRole.ADMIN, status=MembershipStatus.ACTIVE),
         ])
         event = Event(
             community_id=community.id, organizer_id=organizer.id, title="E2E Community Meetup",

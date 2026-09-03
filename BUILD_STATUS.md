@@ -153,6 +153,8 @@ integrated product evidence. TickVendor is not specification-complete or product
   controls; adjustment submission remains backend-authorized and append-only.
 - [x] Complete Audit Log UI with action filtering and bounded previous/next pagination using the
   existing redacted community-scoped endpoint.
+- [x] Current-head admin mutation acceptance covers Point Rule persistence, Contribution Band
+  creation, Leaderboard configuration, Impact Point adjustment, and Audit Log access.
 - [ ] Complete the remaining participant frontend journeys: ticket acquisition, check-in result,
   peer confirmation, tasks, contributions, achievements, milestones, ranks, community selection,
   profile editing/privacy controls, and complete loading/error states.
