@@ -127,6 +127,10 @@ integrated product evidence. TickVendor is not specification-complete or product
   resolution actions, preserved signal summaries, audit-backed API coverage, and browser access coverage.
 - [x] Upgrade the participant reward-loop browser journey to use separate participant and organizer
   browser contexts for task verification, including organizer queue replay/refresh safety.
+- [x] Add organizer attendance operations with backend-authoritative QR token validation, explicit
+  invalid-token handling, and organizer browser access coverage.
+- [x] Attendance operation entry point is role-gated and uses the existing event-scoped ticket
+  validation endpoint; no QR trust or signing logic is implemented in the browser.
 - [ ] Complete the remaining participant frontend journeys: ticket acquisition, check-in result,
   peer confirmation, tasks, contributions, achievements, milestones, ranks, community selection,
   profile editing/privacy controls, and complete loading/error states.
