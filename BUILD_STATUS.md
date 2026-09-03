@@ -145,6 +145,10 @@ integrated product evidence. TickVendor is not specification-complete or product
   nonzero amount/reason validation, append-only API submission, and mutation feedback.
 - [x] Add real browser acceptance for administrator leaderboard configuration mutation and
   authoritative response handling.
+- [x] Narrow recognition inventory: administrator create/update APIs exist for achievement rules,
+  badges, milestones, and ranks; participant-facing recognition remains separately covered.
+- [x] Narrow notification inventory: participant preferences and in-app notification reads/updates
+  exist; no community notification-configuration API is currently exposed.
 - [x] Add administrator navigation/access coverage for manual Impact Point adjustment and Audit Log
   controls; adjustment submission remains backend-authorized and append-only.
 - [x] Complete Audit Log UI with action filtering and bounded previous/next pagination using the
