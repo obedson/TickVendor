@@ -117,7 +117,8 @@ def verify_task(db: Session, assignment: TaskAssignment, verifier: User, approve
     notify(db, assignment.assignee_id, "task_verified" if approve else "task_rejected",
            "Task verified" if approve else "Task needs attention",
            "Your task was verified." if approve else "Your task submission was not approved.",
-           {"task_id": str(task.id), "assignment_id": str(assignment.id)}, commit=False)
+           {"task_id": str(task.id), "assignment_id": str(assignment.id)},
+           community_id=task.community_id, commit=False)
     db.commit()
     if approve:
         evaluate_recognition(db, assignment.assignee_id, task.community_id)

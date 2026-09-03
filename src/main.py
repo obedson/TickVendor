@@ -24,8 +24,8 @@ from src.api.contribution_configuration import router as contribution_configurat
 from src.api.events import router as events_router
 from src.api.leaderboard_configuration import router as leaderboard_configuration_router
 from src.api.leaderboards import router as leaderboards_router
-from src.api.notifications import router as notifications_router
 from src.api.notification_configuration import router as notification_configuration_router
+from src.api.notifications import router as notifications_router
 from src.api.payments import router as payments_router
 from src.api.profiles import router as profiles_router
 from src.api.search import router as search_router

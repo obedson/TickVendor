@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
 
-from src.models import AuditLog, Notification, NotificationPreference, User
+from src.models import AuditLog, Notification, NotificationPreference, NotificationRule, User
 from src.notifications.email import EmailSender, get_email_sender
 from src.notifications.push import PushSender, get_push_sender
 
@@ -17,6 +17,7 @@ def notify(
     message: str,
     payload=None,
     *,
+    community_id=None,
     email_sender: EmailSender | None = None,
     push_sender: PushSender | None = None,
     deduplication_key: str | None = None,
@@ -29,16 +30,24 @@ def notify(
     preference = db.query(NotificationPreference).filter_by(user_id=user_id).one_or_none()
     if preference and notification_type in preference.muted_types:
         return None
+    rule = None
+    if community_id is not None:
+        rule = db.query(NotificationRule).filter_by(
+            community_id=community_id, notification_type=notification_type, is_active=True,
+        ).one_or_none()
+    in_app_enabled = (rule is None or rule.in_app_enabled) and (preference is None or preference.in_app_enabled)
+    email_enabled = (rule is None or rule.email_enabled) and preference is not None and preference.email_enabled
+    push_enabled = (rule is None or rule.push_enabled) and preference is not None and preference.push_enabled
     item = None
-    if preference is None or preference.in_app_enabled:
+    if in_app_enabled:
         item = Notification(user_id=user_id, notification_type=notification_type, title=title,
                             message=message, payload=payload or {}, deduplication_key=deduplication_key)
         db.add(item)
-    if preference and preference.email_enabled:
+    if email_enabled:
         user = db.get(User, user_id)
         if user is not None:
             (email_sender or get_email_sender()).send(user.email, title, message)
-    if preference and preference.push_enabled:
+    if push_enabled:
         (push_sender or get_push_sender()).send(user_id, title, message, payload or {})
     if commit:
         db.commit()

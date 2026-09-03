@@ -7,7 +7,17 @@ from sqlalchemy.orm import sessionmaker
 import src.models  # noqa: F401
 from src.database import Base, get_db
 from src.main import create_app
-from src.models import AchievementRule, Badge, Community, Membership, MembershipRole, Milestone, Organization, Rank, User
+from src.models import (
+    AchievementRule,
+    Badge,
+    Community,
+    Membership,
+    MembershipRole,
+    Milestone,
+    Organization,
+    Rank,
+    User,
+)
 from src.security import create_access_token
 from tests.test_admin_configuration_product import headers, setup
 
@@ -127,10 +137,13 @@ def test_recognition_mutations_allow_community_admin_and_deny_member_and_cross_c
     engine, client, (admin, member, community), sessions = setup(tmp_path)
     with sessions() as db:
         db.query(Membership).filter_by(community_id=community, user_id=member).one().role = MembershipRole.ORGANIZER
+        participant = User(email="recognition-participant@example.com", password_hash="hash")
+        db.add(participant); db.flush()
+        db.add(Membership(community_id=community, user_id=participant.id, role=MembershipRole.MEMBER))
         other_org = Organization(owner_id=admin, name="Other Org", slug="other-org")
         db.add(other_org); db.flush()
         other = Community(organization_id=other_org.id, name="Other", slug="other-community")
-        db.add(other); db.commit(); other_id = other.id
+        db.add(other); db.commit(); other_id, participant_id = other.id, participant.id
     payloads = {
         "achievement-rules": {"name": "Rule", "slug": "rule", "condition_tree": {"metric": "impact_points", "operator": ">=", "value": 1}, "reward_definition": {}},
         "badges": {"name": "Badge", "slug": "badge", "category": "test", "requirements": {"metric": "attendance_count", "operator": ">=", "value": 1}, "reward_points": 0},
@@ -142,5 +155,7 @@ def test_recognition_mutations_allow_community_admin_and_deny_member_and_cross_c
     for resource, payload in payloads.items():
         assert client.post(f"/api/v1/admin/communities/{community}/{resource}", headers=headers(admin), json=payload).status_code == 201
         assert client.post(f"/api/v1/admin/communities/{community}/{resource}", headers=headers(member), json={**payload, "slug": f"member-{payload['slug']}"}).status_code == 403
+        assert client.get(f"/api/v1/admin/communities/{community}/{resource}", headers=headers(member)).status_code == 403
+        assert client.post(f"/api/v1/admin/communities/{community}/{resource}", headers=headers(participant_id), json={**payload, "slug": f"participant-{payload['slug']}"}).status_code == 403
         assert client.post(f"/api/v1/admin/communities/{other_id}/{resource}", headers=headers(member), json={**payload, "slug": f"other-{payload['slug']}"}).status_code == 403
     engine.dispose()

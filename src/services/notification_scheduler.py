@@ -39,7 +39,7 @@ def generate_scheduled_notifications(db: Session, now: datetime | None = None) -
             key = f"event-reminder:{event.id}:{user_id}:{event.starts_at.date()}"
             if db.scalar(select(Notification.id).where(Notification.deduplication_key == key)) is None:
                 notify(db, user_id, "event_reminder", "Event starts tomorrow",
-                       "Your event starts tomorrow.", {"event_id": str(event.id)}, deduplication_key=key)
+                       "Your event starts tomorrow.", {"event_id": str(event.id)}, community_id=event.community_id, deduplication_key=key)
                 created += 1
             if event.check_in_opens_at and event.check_in_opens_at <= now:
                 attendance = db.scalar(select(Attendance.id).where(
@@ -50,7 +50,7 @@ def generate_scheduled_notifications(db: Session, now: datetime | None = None) -
                         Notification.deduplication_key == checkin_key)) is None:
                     notify(db, user_id, "attendance_open", "Attendance is open",
                            "Attendance is now open.", {"event_id": str(event.id)},
-                           deduplication_key=checkin_key)
+                           community_id=event.community_id, deduplication_key=checkin_key)
                     created += 1
 
     proximity_requirements = db.execute(
@@ -88,7 +88,7 @@ def generate_scheduled_notifications(db: Session, now: datetime | None = None) -
                     "Milestone within reach",
                     f"You're {remaining} Impact Points away from {milestone.name}.",
                     {"milestone_id": str(milestone.id), "points_remaining": remaining},
-                    deduplication_key=key,
+                    community_id=milestone.community_id, deduplication_key=key,
                 )
                 created += 1
 
@@ -126,7 +126,7 @@ def generate_scheduled_notifications(db: Session, now: datetime | None = None) -
                     "Attendance confirmations waiting",
                     "You have attendance confirmations waiting.",
                     {"event_id": str(event.id)},
-                    deduplication_key=key,
+                    community_id=event.community_id, deduplication_key=key,
                 )
                 created += 1
     return created

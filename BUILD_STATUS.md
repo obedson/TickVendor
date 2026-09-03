@@ -191,6 +191,15 @@ integrated product evidence. TickVendor is not specification-complete or product
 - [x] Added community notification-rule configuration API, migration, admin UI, audit record, authorization
   test, and browser persistence coverage. Existing in-app preferences, scheduled reminders, worker claiming,
   suppression, retry/backoff, terminal failure, and local delivery idempotency remain verified.
+- [x] Notification dispatch now applies active community channel rules together with participant preferences
+  for ticket, task, recognition, and scheduled notifications; focused tests cover channel suppression, tenant
+  isolation, and unchanged worker delivery/retry semantics.
+- [x] The Recognition authorization report inconsistency is resolved: `tests/test_admin_configuration_api.py::test_recognition_mutations_allow_community_admin_and_deny_member_and_cross_community`
+  proves organizer denial (the fixture promotes the organizer membership and the API returns 403), while the
+  same test proves participant denial, community-admin success, and cross-community mutation denial.
+- [x] Added environment-configured SMTP and generic HTTP push adapters behind provider selection, with safe
+  unconfigured-provider failure and deterministic mocked transport tests. Live provider delivery remains
+  externally unverified.
 - [x] Attendance policy validation enforces that required peer verification is enabled, requires at
   least one confirmation, and cannot require more confirmations than the configured peer limit.
 - [x] Attendance policy validation also requires every configured verification method to remain

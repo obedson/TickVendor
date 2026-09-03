@@ -186,7 +186,8 @@ def evaluate_rank_progression(db: Session, user_id, community_id) -> Rank | None
           target_type="rank_progression", target_id=progression.id,
           metadata={"rank_id": str(rank.id), "user_id": str(user_id)}, commit=False)
     notify(db, user_id, "rank_achieved", "New rank achieved", f"You reached {rank.name}.",
-           {"rank_id": str(rank.id)}, deduplication_key=f"rank:{rank.id}:user:{user_id}", commit=False)
+           {"rank_id": str(rank.id)}, community_id=community_id,
+           deduplication_key=f"rank:{rank.id}:user:{user_id}", commit=False)
     db.commit()
     return rank
 
@@ -268,7 +269,8 @@ def evaluate_achievement_rules(db: Session, user_id, community_id, metrics: dict
               target_type="achievement_award", target_id=award.id,
               metadata={"rule_id": str(rule.id), "user_id": str(user_id)}, commit=False)
         notify(db, user_id, "achievement_awarded", "Achievement earned", f"You earned {rule.name}.",
-               {"rule_id": str(rule.id)}, deduplication_key=f"achievement:{rule.id}:user:{user_id}", commit=False)
+               {"rule_id": str(rule.id)}, community_id=community_id,
+               deduplication_key=f"achievement:{rule.id}:user:{user_id}", commit=False)
         awarded += 1
     db.commit()
     return awarded
@@ -306,6 +308,7 @@ def evaluate_recognition(db: Session, user_id, community_id) -> dict[str, int]:
             "Milestone reached",
             f"Congratulations! You reached {milestone.name}.",
             {"milestone_id": str(milestone.id)},
+            community_id=community_id,
         )
 
     metrics = user_metrics(db, user_id, community_id)
@@ -341,6 +344,7 @@ def evaluate_recognition(db: Session, user_id, community_id) -> dict[str, int]:
             "New badge earned",
             f"You earned the {badge.name} badge.",
             {"badge_id": str(badge.id)},
+            community_id=community_id,
         )
 
     achievement_rules_awarded = evaluate_achievement_rules(db, user_id, community_id, user_metrics(db, user_id, community_id))

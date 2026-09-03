@@ -102,7 +102,8 @@ def create_order(db: Session, event_id: UUID, payload: OrderCreate, user: User) 
         raise HTTPException(status_code=409, detail="Concurrent order conflict; retry safely") from exc
     if is_free:
         notify(db, user.id, "ticket_confirmed", "Ticket confirmed",
-               "Your ticket has been confirmed.", {"event_id": str(event_id), "order_id": str(order.id)})
+               "Your ticket has been confirmed.", {"event_id": str(event_id), "order_id": str(order.id)},
+               community_id=event.community_id)
     return order
 
 
