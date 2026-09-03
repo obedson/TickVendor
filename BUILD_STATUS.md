@@ -145,6 +145,8 @@ integrated product evidence. TickVendor is not specification-complete or product
   nonzero amount/reason validation, append-only API submission, and mutation feedback.
 - [x] Add administrator navigation/access coverage for manual Impact Point adjustment and Audit Log
   controls; adjustment submission remains backend-authorized and append-only.
+- [x] Complete Audit Log UI with action filtering and bounded previous/next pagination using the
+  existing redacted community-scoped endpoint.
 - [ ] Complete the remaining participant frontend journeys: ticket acquisition, check-in result,
   peer confirmation, tasks, contributions, achievements, milestones, ranks, community selection,
   profile editing/privacy controls, and complete loading/error states.
