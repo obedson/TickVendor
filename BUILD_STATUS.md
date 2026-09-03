@@ -200,6 +200,15 @@ integrated product evidence. TickVendor is not specification-complete or product
 - [x] Added environment-configured SMTP and generic HTTP push adapters behind provider selection, with safe
   unconfigured-provider failure and deterministic mocked transport tests. Live provider delivery remains
   externally unverified.
+- [x] Resolved the organizer Recognition authorization report inconsistency: the organizer membership case
+  is explicitly promoted to ORGANIZER and denied by the community-admin Recognition endpoints in
+  `tests/test_admin_configuration_api.py::test_recognition_mutations_allow_community_admin_and_deny_member_and_cross_community`.
+- [x] Notification dispatch applies active community channel rules with participant-level suppression for
+  immediate and scheduled notifications; retry, backoff, terminal failure, and local idempotency remain green.
+- [x] Administrator capabilities were reconciled against the targeted specification role/configuration
+  sections: community/member, point, contribution-band, leaderboard, recognition, notification-rule,
+  attendance-review/configuration, audit, and analytics APIs/UI are implemented with local acceptance;
+  live provider/deployment verification remains separate.
 - [x] Attendance policy validation enforces that required peer verification is enabled, requires at
   least one confirmation, and cannot require more confirmations than the configured peer limit.
 - [x] Attendance policy validation also requires every configured verification method to remain
