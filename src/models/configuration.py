@@ -49,3 +49,19 @@ class ContributionBand(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     points: Mapped[int] = mapped_column(Integer, nullable=False)
     per_user_period_cap: Mapped[int | None] = mapped_column(Integer)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
+
+class NotificationRule(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "notification_rules"
+    __table_args__ = (
+        UniqueConstraint("community_id", "notification_type", name="uq_notification_rule_community_type"),
+    )
+
+    community_id: Mapped[Any] = mapped_column(
+        GUID(), ForeignKey("communities.id", ondelete="CASCADE"), nullable=False
+    )
+    notification_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    in_app_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    email_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    push_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)

@@ -21,7 +21,7 @@ from src.models.community import (
     MembershipRole,
     MembershipStatus,
 )
-from src.models.configuration import ContributionBand, EventCategory, PointRule
+from src.models.configuration import ContributionBand, EventCategory, NotificationRule, PointRule
 from src.models.contribution import (
     Activity,
     ActivityStatus,
@@ -99,6 +99,7 @@ __all__ = [
     "MilestoneRequirement",
     "Notification",
     "NotificationPreference",
+    "NotificationRule",
     "Order",
     "OrderStatus",
     "Organization",

@@ -25,6 +25,7 @@ from src.api.events import router as events_router
 from src.api.leaderboard_configuration import router as leaderboard_configuration_router
 from src.api.leaderboards import router as leaderboards_router
 from src.api.notifications import router as notifications_router
+from src.api.notification_configuration import router as notification_configuration_router
 from src.api.payments import router as payments_router
 from src.api.profiles import router as profiles_router
 from src.api.search import router as search_router
@@ -58,6 +59,7 @@ def create_app() -> FastAPI:
     application.include_router(communities_router, prefix=settings.api_v1_prefix)
     application.include_router(events_router, prefix=settings.api_v1_prefix)
     application.include_router(notifications_router, prefix=settings.api_v1_prefix)
+    application.include_router(notification_configuration_router, prefix=settings.api_v1_prefix)
     application.include_router(leaderboards_router, prefix=settings.api_v1_prefix)
     application.include_router(leaderboard_configuration_router, prefix=settings.api_v1_prefix)
     application.include_router(payments_router, prefix=settings.api_v1_prefix)

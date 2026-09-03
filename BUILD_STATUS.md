@@ -183,6 +183,14 @@ integrated product evidence. TickVendor is not specification-complete or product
 - [x] The isolated participant task verification flow now evaluates a configured achievement rule through
   the normal recognition engine and verifies the resulting authoritative Impact Point reward in the browser;
   recognition replay/idempotency remains covered by backend tests.
+- [x] Added tenant-scoped Recognition list endpoints and authorization/reference-integrity tests; admin
+  success, participant denial, organizer policy behavior, cross-community mutation denial, and non-point
+  rank requirement references are covered.
+- [x] Added admin Recognition configuration refetch/readback and explicit loading, malformed-JSON, and
+  bounded mutation handling in the UI; focused browser coverage proves all four configuration types persist.
+- [x] Added community notification-rule configuration API, migration, admin UI, audit record, authorization
+  test, and browser persistence coverage. Existing in-app preferences, scheduled reminders, worker claiming,
+  suppression, retry/backoff, terminal failure, and local delivery idempotency remain verified.
 - [x] Attendance policy validation enforces that required peer verification is enabled, requires at
   least one confirmation, and cannot require more confirmations than the configured peer limit.
 - [x] Attendance policy validation also requires every configured verification method to remain

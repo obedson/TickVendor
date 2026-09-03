@@ -137,6 +137,8 @@ def test_recognition_mutations_allow_community_admin_and_deny_member_and_cross_c
         "milestones": {"name": "Milestone", "slug": "milestone", "requirements": [{"metric": "attendance_count", "operator": ">=", "threshold": 1}]},
         "ranks": {"name": "Rank", "slug": "rank", "minimum_points": 10, "sort_order": 1, "requirements": [{"requirement_type": "attendance_count", "threshold": 1}]},
     }
+    with sessions() as db:
+        db.commit()
     for resource, payload in payloads.items():
         assert client.post(f"/api/v1/admin/communities/{community}/{resource}", headers=headers(admin), json=payload).status_code == 201
         assert client.post(f"/api/v1/admin/communities/{community}/{resource}", headers=headers(member), json={**payload, "slug": f"member-{payload['slug']}"}).status_code == 403
