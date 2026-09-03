@@ -56,6 +56,8 @@ class Settings(BaseSettings):
     push_provider: Literal["memory", "http"] = "memory"
     push_endpoint: str | None = None
     push_api_token: SecretStr | None = None
+    redis_url: str | None = None
+    distributed_rate_limit_enabled: bool = False
 
     @field_validator("cors_origins", mode="before")
     @classmethod

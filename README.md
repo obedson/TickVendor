@@ -50,3 +50,6 @@ Backend: `./venv/Scripts/python.exe -m pytest -q`, `./venv/Scripts/ruff.exe chec
 Detailed current requirement evidence is in `docs/TRACEABILITY_MATRIX.md`.
 External staging/production verification steps are in `docs/EXTERNAL_VERIFICATION_RUNBOOK.md`.
 The exact remaining-B verification manifest is in `docs/EXTERNAL_VERIFICATION_MANIFEST.md`.
+External account and staging setup instructions are in `docs/EXTERNAL_INTEGRATION_SETUP.md`.
+Run the scheduled notification worker separately with `./venv/Scripts/python.exe scripts/notification_worker.py` after migrations are applied.
+Object storage remains filesystem-only until its production storage abstraction is implemented; the generic HTTP push adapter is not native Web Push/FCM/APNs.

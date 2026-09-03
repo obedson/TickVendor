@@ -4,6 +4,9 @@ import time
 from collections import defaultdict, deque
 
 from fastapi import HTTPException, Request
+from redis import Redis
+
+from src.config import settings
 
 
 class RateLimiter:
@@ -20,6 +23,23 @@ class RateLimiter:
         if len(bucket) >= self.limit:
             raise HTTPException(status_code=429, detail="Too many requests")
         bucket.append(now)
+
+
+class RedisRateLimiter:
+    """Atomic fixed-window limiter for horizontally scaled deployments."""
+
+    def __init__(self, url: str, limit: int = 60, window_seconds: int = 60):
+        self.redis = Redis.from_url(url, decode_responses=True, socket_timeout=1, socket_connect_timeout=1)
+        self.limit = limit
+        self.window_seconds = window_seconds
+
+    def check(self, key: str) -> None:
+        bucket = f"tickvendor:rate:{key}"
+        count = self.redis.incr(bucket)
+        if count == 1:
+            self.redis.expire(bucket, self.window_seconds)
+        if count > self.limit:
+            raise HTTPException(status_code=429, detail="Too many requests")
 
 
 class LoginAttemptLimiter:
@@ -46,7 +66,7 @@ class LoginAttemptLimiter:
         self._failures.pop(key, None)
 
 
-rate_limiter = RateLimiter()
+rate_limiter = RedisRateLimiter(settings.redis_url) if settings.distributed_rate_limit_enabled and settings.redis_url else RateLimiter()
 login_attempt_limiter = LoginAttemptLimiter()
 
 
