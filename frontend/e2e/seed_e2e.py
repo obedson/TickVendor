@@ -17,7 +17,7 @@ import src.models  # noqa: F401,E402
 from src.database import Base  # noqa: E402
 from src.models import (  # noqa: E402
     Attendance, AttendanceStatus, Community, Event, EventCategory, EventStatus, LocationType, Membership, MembershipRole,
-    MembershipStatus, Organization, PlatformRole, PointRule, Profile, Task,
+    AchievementRule, MembershipStatus, Organization, PlatformRole, PointRule, Profile, Task,
     TaskAssignment, Ticket, TicketStatus, TicketType, TicketVisibility, User,
 )
 from src.security import hash_password  # noqa: E402
@@ -82,6 +82,11 @@ def main() -> None:
         db.add(task); db.flush()
         db.add(TaskAssignment(task_id=task.id, assignee_id=participant.id, assigned_by_id=organizer.id))
         db.add(PointRule(community_id=community.id, source_type="task_completion", points=5, is_active=True))
+        db.add(AchievementRule(
+            community_id=community.id, name="Verified task achievement", slug="verified-task-achievement",
+            condition_tree={"operator": ">=", "metric": "task_count", "value": 1},
+            reward_definition={"impact_points": 11},
+        ))
         db.commit()
     engine.dispose()
 

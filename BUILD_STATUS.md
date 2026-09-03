@@ -175,6 +175,14 @@ integrated product evidence. TickVendor is not specification-complete or product
   bounded pagination, deterministic ordering and recursive sensitive-field redaction.
 - [x] Freshly verified audit API access is restricted to community administrators with filter and
   redaction coverage.
+- [x] Recognition administrator APIs now provide tenant-scoped list/readback for achievement rules,
+  badges, milestones, and ranks; focused tests cover admin success, participant denial, and cross-community
+  mutation denial, including rejection of cross-community badge/milestone rank references.
+- [x] Contribution Band administration now covers create, valid update, overlap-rejected update,
+  disable, and re-enable through the real UI/API with focused backend and browser coverage.
+- [x] The isolated participant task verification flow now evaluates a configured achievement rule through
+  the normal recognition engine and verifies the resulting authoritative Impact Point reward in the browser;
+  recognition replay/idempotency remains covered by backend tests.
 - [x] Attendance policy validation enforces that required peer verification is enabled, requires at
   least one confirmation, and cannot require more confirmations than the configured peer limit.
 - [x] Attendance policy validation also requires every configured verification method to remain

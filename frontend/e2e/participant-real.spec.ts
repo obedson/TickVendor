@@ -79,6 +79,7 @@ test('real participant can acquire a free ticket and retain its QR wallet', asyn
   await page.getByRole('button', { name: 'Impact' }).click();
   await expect(page.getByRole('heading', { name: 'Recognition' })).toBeVisible();
   await expect(page.getByText(/Impact Points/)).toBeVisible();
+  await expect(page.getByText('16 Impact Points')).toBeVisible({ timeout: 10_000 });
 });
 
 test('participant attendance failure is rendered without duplicate check-in', async ({ page }) => {

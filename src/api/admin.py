@@ -142,6 +142,13 @@ def create_rank(
     user: Annotated[User, Depends(get_current_user)],
 ):
     require_admin(db, community_id, user)
+    for requirement in payload.requirements:
+        if requirement.requirement_type not in {"badge", "milestone"}:
+            continue
+        model = Badge if requirement.requirement_type == "badge" else Milestone
+        referenced = db.get(model, requirement.reference_id) if requirement.reference_id else None
+        if referenced is None or referenced.community_id != community_id:
+            raise HTTPException(status_code=422, detail="Rank requirement reference must belong to the community")
     values = payload.model_dump(exclude={"requirements"})
     rank = Rank(community_id=community_id, **values)
     db.add(rank)

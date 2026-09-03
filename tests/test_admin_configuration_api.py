@@ -7,8 +7,9 @@ from sqlalchemy.orm import sessionmaker
 import src.models  # noqa: F401
 from src.database import Base, get_db
 from src.main import create_app
-from src.models import AchievementRule, Community, Membership, MembershipRole, Organization, User
+from src.models import AchievementRule, Badge, Community, Membership, MembershipRole, Milestone, Organization, Rank, User
 from src.security import create_access_token
+from tests.test_admin_configuration_product import headers, setup
 
 
 def test_community_admin_can_create_milestone_and_outsider_cannot(tmp_path):
@@ -101,4 +102,42 @@ def test_community_admin_can_create_milestone_and_outsider_cannot(tmp_path):
     )
     assert toggled.status_code == 200, toggled.text
     assert toggled.json()["is_active"] is True
+    engine.dispose()
+
+
+def test_recognition_lists_are_tenant_scoped_and_role_protected(tmp_path):
+    engine, client, (admin, member, community), sessions = setup(tmp_path)
+    with sessions() as db:
+        db.add_all([
+            AchievementRule(community_id=community, name="Rule", slug="rule", condition_tree={}, reward_definition={}),
+            Badge(community_id=community, name="Badge", slug="badge", category="test", requirements={}),
+            Milestone(community_id=community, name="Milestone", slug="milestone"),
+            Rank(community_id=community, name="Rank", slug="rank", minimum_points=10, sort_order=1),
+        ])
+        db.commit()
+    for resource, expected in [("achievement-rules", "Rule"), ("badges", "Badge"), ("milestones", "Milestone"), ("ranks", "Rank")]:
+        response = client.get(f"/api/v1/admin/communities/{community}/{resource}", headers=headers(admin))
+        assert response.status_code == 200
+        assert [item["name"] for item in response.json()] == [expected]
+        assert client.get(f"/api/v1/admin/communities/{community}/{resource}", headers=headers(member)).status_code == 403
+    engine.dispose()
+
+
+def test_recognition_mutations_allow_community_admin_and_deny_member_and_cross_community(tmp_path):
+    engine, client, (admin, member, community), sessions = setup(tmp_path)
+    with sessions() as db:
+        other_org = Organization(owner_id=admin, name="Other Org", slug="other-org")
+        db.add(other_org); db.flush()
+        other = Community(organization_id=other_org.id, name="Other", slug="other-community")
+        db.add(other); db.commit(); other_id = other.id
+    payloads = {
+        "achievement-rules": {"name": "Rule", "slug": "rule", "condition_tree": {"metric": "impact_points", "operator": ">=", "value": 1}, "reward_definition": {}},
+        "badges": {"name": "Badge", "slug": "badge", "category": "test", "requirements": {"metric": "attendance_count", "operator": ">=", "value": 1}, "reward_points": 0},
+        "milestones": {"name": "Milestone", "slug": "milestone", "requirements": [{"metric": "attendance_count", "operator": ">=", "threshold": 1}]},
+        "ranks": {"name": "Rank", "slug": "rank", "minimum_points": 10, "sort_order": 1, "requirements": [{"requirement_type": "attendance_count", "threshold": 1}]},
+    }
+    for resource, payload in payloads.items():
+        assert client.post(f"/api/v1/admin/communities/{community}/{resource}", headers=headers(admin), json=payload).status_code == 201
+        assert client.post(f"/api/v1/admin/communities/{community}/{resource}", headers=headers(member), json={**payload, "slug": f"member-{payload['slug']}"}).status_code == 403
+        assert client.post(f"/api/v1/admin/communities/{other_id}/{resource}", headers=headers(member), json={**payload, "slug": f"other-{payload['slug']}"}).status_code == 403
     engine.dispose()

@@ -16,6 +16,8 @@ export function AdminRecognition({ token, communityId }: Props) {
   const [ranks, setRanks] = useState<SavedItem[]>([]);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [busy, setBusy] = useState(false);
   const headers = { Authorization: `Bearer ${token}` };
 
   const [rule, setRule] = useState({ name: '', slug: '', description: '', condition: '', reward: '' });
@@ -42,6 +44,7 @@ export function AdminRecognition({ token, communityId }: Props) {
 
   useEffect(() => {
     if (!community) return;
+    setLoading(true);
     Promise.all((['achievement-rules', 'badges', 'milestones', 'ranks'] as const).map(async resource => {
       const response = await fetch(api(community, resource), { headers });
       if (!response.ok) throw Error('Unable to load recognition configuration.');
@@ -51,12 +54,14 @@ export function AdminRecognition({ token, communityId }: Props) {
       if (resource === 'badges') setBadges(values);
       if (resource === 'milestones') setMilestones(values);
       if (resource === 'ranks') setRanks(values);
-    })).catch(cause => setError(cause instanceof Error ? cause.message : 'Unable to load recognition configuration.'));
+    })).catch(cause => setError(cause instanceof Error ? cause.message : 'Unable to load recognition configuration.')).finally(() => setLoading(false));
   }, [community, token]);
 
   const create = async (resource: string, body: object, label: string) => {
     setError('');
     setMessage('');
+    if (busy) return;
+    setBusy(true);
     try {
       const id = await loadCommunity();
       const response = await fetch(api(id, resource), {
@@ -76,7 +81,7 @@ export function AdminRecognition({ token, communityId }: Props) {
       if (resource === 'ranks') setRanks(values);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : `Unable to create ${label}.`);
-    }
+    } finally { setBusy(false); }
   };
 
   const toggle = async (resource: string, item: SavedItem, active: boolean) => {
@@ -124,8 +129,8 @@ export function AdminRecognition({ token, communityId }: Props) {
   const json = (label: string, value: string, onChange: (value: string) => void, placeholder: string) => <label>{label}<textarea required value={value} onChange={event => onChange(event.target.value)} placeholder={placeholder} rows={3} /></label>;
   const list = (title: string, items: SavedItem[], resource: string, canToggle: boolean) => <><h3>{title}</h3>{items.length ? items.map(item => <p key={item.id}>{item.name} ({item.slug}) {canToggle && <button type="button" className="secondary" onClick={() => void toggle(resource, item, item.is_active === false)}>{item.is_active === false ? 'Enable' : 'Disable'}</button>}</p>) : <p className="empty">No {title.toLowerCase()} configured in this session.</p>}</>;
 
-  return <section className="panel"><h2>Recognition configuration</h2><p>Configure achievement rules, badges, milestones, and ranks for community <code>{community || 'loading'}</code>.</p>{error && <p role="alert" className="error">{error}</p>}{message && <p role="status">{message}</p>}
-    <form onSubmit={submitRule}><h3>Achievement rule</h3>{input('Name', rule.name, value => setRule({ ...rule, name: value }))}{input('Slug', rule.slug, value => setRule({ ...rule, slug: value }))}{json('Condition tree', rule.condition, value => setRule({ ...rule, condition: value }), '{"metric":"impact_points","operator":">=","threshold":100}')}{json('Reward definition', rule.reward, value => setRule({ ...rule, reward: value }), '{"points":10}') }<button>Create achievement rule</button></form>
+  return <section className="panel"><h2>Recognition configuration</h2><p>Configure achievement rules, badges, milestones, and ranks for community <code>{community || 'loading'}</code>.</p>{loading && <p role="status">Loading recognition configuration…</p>}{error && <p role="alert" className="error">{error}</p>}{message && <p role="status">{message}</p>}
+    <form onSubmit={submitRule}><h3>Achievement rule</h3>{input('Name', rule.name, value => setRule({ ...rule, name: value }))}{input('Slug', rule.slug, value => setRule({ ...rule, slug: value }))}{json('Condition tree', rule.condition, value => setRule({ ...rule, condition: value }), '{"metric":"impact_points","operator":">=","threshold":100}')}{json('Reward definition', rule.reward, value => setRule({ ...rule, reward: value }), '{"impact_points":10}') }<button disabled={busy}>Create achievement rule</button></form>
     <form onSubmit={submitBadge}><h3>Badge</h3>{input('Name', badge.name, value => setBadge({ ...badge, name: value }))}{input('Slug', badge.slug, value => setBadge({ ...badge, slug: value }))}{input('Category', badge.category, value => setBadge({ ...badge, category: value }))}{json('Requirements', badge.requirements, value => setBadge({ ...badge, requirements: value }), '{"metric":"attendance_count","operator":">=","threshold":1}')}{input('Reward points', badge.rewardPoints, value => setBadge({ ...badge, rewardPoints: value }))}<button>Create badge</button></form>
     <form onSubmit={submitMilestone}><h3>Milestone</h3>{input('Name', milestone.name, value => setMilestone({ ...milestone, name: value }))}{input('Slug', milestone.slug, value => setMilestone({ ...milestone, slug: value }))}{json('Requirements', milestone.requirements, value => setMilestone({ ...milestone, requirements: value }), '[{"metric":"contribution_count","operator":">=","threshold":5}]')}{input('Reward points', milestone.rewardPoints, value => setMilestone({ ...milestone, rewardPoints: value }))}<button>Create milestone</button></form>
     <form onSubmit={submitRank}><h3>Rank</h3>{input('Name', rank.name, value => setRank({ ...rank, name: value }))}{input('Slug', rank.slug, value => setRank({ ...rank, slug: value }))}{input('Minimum points', rank.minimumPoints, value => setRank({ ...rank, minimumPoints: value }))}{input('Sort order', rank.sortOrder, value => setRank({ ...rank, sortOrder: value }))}{json('Requirements', rank.requirements, value => setRank({ ...rank, requirements: value }), '[{"requirement_type":"attendance_count","threshold":3}]')}<button>Create rank</button></form>
