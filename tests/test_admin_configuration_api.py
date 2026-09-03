@@ -126,6 +126,7 @@ def test_recognition_lists_are_tenant_scoped_and_role_protected(tmp_path):
 def test_recognition_mutations_allow_community_admin_and_deny_member_and_cross_community(tmp_path):
     engine, client, (admin, member, community), sessions = setup(tmp_path)
     with sessions() as db:
+        db.query(Membership).filter_by(community_id=community, user_id=member).one().role = MembershipRole.ORGANIZER
         other_org = Organization(owner_id=admin, name="Other Org", slug="other-org")
         db.add(other_org); db.flush()
         other = Community(organization_id=other_org.id, name="Other", slug="other-community")
