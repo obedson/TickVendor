@@ -211,6 +211,8 @@ integrated product evidence. TickVendor is not specification-complete or product
   sections: community/member, point, contribution-band, leaderboard, recognition, notification-rule,
   attendance-review/configuration, audit, and analytics APIs/UI are implemented with local acceptance;
   live provider/deployment verification remains separate.
+- [x] Added a community-admin Analytics view backed by the tenant-authorized authoritative community
+  aggregation endpoint, with deterministic browser coverage for analytics access and rendered metrics.
 - [x] Attendance policy validation enforces that required peer verification is enabled, requires at
   least one confirmation, and cannot require more confirmations than the configured peer limit.
 - [x] Attendance policy validation also requires every configured verification method to remain
