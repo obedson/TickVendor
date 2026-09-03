@@ -485,8 +485,10 @@ integrated product evidence. TickVendor is not specification-complete or product
 - [x] In-app notification creation/list/read APIs with per-user ownership
 - [x] Per-user in-app/email/push preferences and muted notification types
 - [x] Ticket/task/badge/milestone notifications and idempotent event, attendance-opening, milestone-proximity and pending peer-confirmation prompts are wired
-- [x] Email notification provider abstraction and deterministic in-memory adapter honor user preferences
-- [x] Push notification provider abstraction and deterministic in-memory adapter honor user preferences
+- [x] Email notification provider abstraction includes deterministic in-memory and environment-configured SMTP
+  adapters; user/community preferences are honored. Live SMTP delivery remains externally unverified.
+- [x] Push notification provider abstraction includes deterministic in-memory and environment-configured HTTP
+  gateway adapters; user/community preferences are honored. Live push delivery remains externally unverified.
 
 ### Search
 - [x] Global search covers events, organizers, public communities, privacy-permitted members and membership-authorized tasks
