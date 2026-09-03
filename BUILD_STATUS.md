@@ -147,8 +147,8 @@ integrated product evidence. TickVendor is not specification-complete or product
   authoritative response handling.
 - [x] Narrow recognition inventory: administrator create/update APIs exist for achievement rules,
   badges, milestones, and ranks; participant-facing recognition remains separately covered.
-- [x] Narrow notification inventory: participant preferences and in-app notification reads/updates
-  exist; no community notification-configuration API is currently exposed.
+- [x] Narrow notification inventory: participant preferences, in-app notification reads/updates, and
+  tenant-scoped community notification-rule configuration now exist with audit and browser persistence.
 - [x] Add administrator navigation/access coverage for manual Impact Point adjustment and Audit Log
   controls; adjustment submission remains backend-authorized and append-only.
 - [x] Complete Audit Log UI with action filtering and bounded previous/next pagination using the
@@ -163,8 +163,8 @@ integrated product evidence. TickVendor is not specification-complete or product
   analytics, audit log, and all data-driven recognition/configuration screens.
 - [x] Add tenant-authorized PointRule listing/upsert and append-only manual Impact Point adjustment
   APIs with input validation and audit-backed mutations.
-- [ ] Complete remaining server-side configuration APIs for attendance/verification rules,
-  contribution bands/caps, notification rules, and leaderboard visibility.
+- [ ] Complete remaining server-side configuration APIs for attendance/verification rules and leaderboard
+  visibility; contribution-band lifecycle and notification-rule administration are implemented locally.
 - [x] Add community-scoped contribution reward-band create/update APIs with amount-range, overlap,
   reward/cap validation, tenant authorization, enable/disable handling and audit records.
 - [x] Add community/organization creation/editing, logo metadata, membership listing/invitation,
@@ -205,6 +205,8 @@ integrated product evidence. TickVendor is not specification-complete or product
   `tests/test_admin_configuration_api.py::test_recognition_mutations_allow_community_admin_and_deny_member_and_cross_community`.
 - [x] Notification dispatch applies active community channel rules with participant-level suppression for
   immediate and scheduled notifications; retry, backoff, terminal failure, and local idempotency remain green.
+- [x] Community Administrator navigation now exposes the community-admin configuration surfaces allowed by
+  the backend contract; direct Recognition tests prove organizers remain denied while community admins succeed.
 - [x] Administrator capabilities were reconciled against the targeted specification role/configuration
   sections: community/member, point, contribution-band, leaderboard, recognition, notification-rule,
   attendance-review/configuration, audit, and analytics APIs/UI are implemented with local acceptance;
