@@ -12,6 +12,7 @@ from src.models import (
     ScheduledNotification,
     ScheduledNotificationStatus,
 )
+from src.monitoring import emit
 
 
 class ScheduledSender(Protocol):
@@ -47,6 +48,8 @@ def process_scheduled_notifications(db: Session, sender: ScheduledSender, *, now
         try:
             sender.send(item.user_id, item.notification_type, item.title, item.message, item.payload)
         except Exception as exc:  # noqa: BLE001 - adapter failures must become retry state
+            emit("notification_worker_failure", notification_id=str(item.id),
+                 error_type=type(exc).__name__)
             current = db.get(ScheduledNotification, item.id)
             terminal = current.attempt_count >= current.max_attempts
             db.execute(update(ScheduledNotification).where(ScheduledNotification.id == item.id).values(

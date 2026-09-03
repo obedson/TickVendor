@@ -7,17 +7,24 @@ from decimal import Decimal
 
 import httpx
 
+from src.config import settings
 from src.payments.providers import PaymentInitialization, PaymentVerification
 
 
 class PaystackProvider:
     name = "paystack"
 
-    def __init__(self, secret_key: str, webhook_secret: str | None = None):
+    def __init__(
+        self,
+        secret_key: str,
+        webhook_secret: str | None = None,
+        callback_url: str | None = None,
+    ):
         if not secret_key:
             raise ValueError("Paystack secret key is required")
         self.secret_key = secret_key
         self.webhook_secret = webhook_secret or secret_key
+        self.callback_url = callback_url or settings.frontend_url or settings.canonical_url
 
     @property
     def headers(self) -> dict[str, str]:
@@ -34,12 +41,24 @@ class PaystackProvider:
                 "amount": int(amount * 100),
                 "currency": currency,
                 "email": email,
+                "callback_url": f"{self.callback_url.rstrip('/')}/payment/return",
             },
             timeout=15,
         )
         response.raise_for_status()
         data = response.json()["data"]
         return PaymentInitialization(data["reference"], data["authorization_url"])
+
+    def refund(self, provider_reference: str, amount: Decimal) -> dict[str, object]:
+        response = httpx.post(
+            "https://api.paystack.co/refund",
+            headers=self.headers,
+            json={"transaction": provider_reference, "amount": int(amount * 100)},
+            timeout=15,
+        )
+        response.raise_for_status()
+        data = response.json().get("data", {})
+        return {"status": data.get("status", "pending"), "reference": data.get("transaction", provider_reference)}
 
     def verify(self, provider_reference: str) -> PaymentVerification:
         response = httpx.get(

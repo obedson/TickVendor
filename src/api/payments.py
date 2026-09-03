@@ -10,6 +10,7 @@ from src.api.auth import get_current_user
 from src.config import settings
 from src.database import get_db
 from src.models import Order, Payment, User
+from src.monitoring import emit
 from src.payments.live_providers import FlutterwaveProvider, PaystackProvider, StripeProvider
 from src.payments.providers import PaymentProvider, TestPaymentProvider
 from src.schemas.payment import (
@@ -17,7 +18,8 @@ from src.schemas.payment import (
     PaymentInitializeResponse,
     PaymentVerifyRequest,
 )
-from src.services.payment import apply_successful_payment, initialize_payment
+from src.services.payment import apply_successful_payment, initialize_payment, reconcile_payment
+from src.services.ticket import refund_order
 
 router = APIRouter(prefix="/payments", tags=["payments"])
 _test_provider = TestPaymentProvider()
@@ -32,6 +34,7 @@ def get_payment_provider() -> PaymentProvider:
             settings.paystack_webhook_secret.get_secret_value()
             if settings.paystack_webhook_secret
             else None,
+            settings.frontend_url or settings.canonical_url,
         )
     if settings.payment_provider == "flutterwave":
         return FlutterwaveProvider(
@@ -98,6 +101,31 @@ def verify(
     return {"status": payment.status.value}
 
 
+@router.post("/{payment_id}/refund")
+def refund(
+    payment_id: UUID, db: Annotated[Session, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
+    provider: Annotated[PaymentProvider, Depends(get_payment_provider)],
+):
+    payment = db.get(Payment, payment_id)
+    if payment is None:
+        raise HTTPException(status_code=404, detail="Payment not found")
+    order = db.get(Order, payment.order_id)
+    return refund_order(db, order, user, provider)
+
+
+@router.post("/{payment_id}/reconcile")
+def reconcile(
+    payment_id: UUID, db: Annotated[Session, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
+    provider: Annotated[PaymentProvider, Depends(get_payment_provider)],
+):
+    payment = db.get(Payment, payment_id)
+    if payment is None:
+        raise HTTPException(status_code=404, detail="Payment not found")
+    return reconcile_payment(db, payment, provider, user)
+
+
 @router.post("/webhooks/{provider_name}")
 async def webhook(
     provider_name: str,
@@ -113,7 +141,8 @@ async def webhook(
         signature = x_paystack_signature if provider.name == "paystack" else x_payment_signature
         event = provider.verify_webhook(await request.body(), signature)
     except ValueError as exc:
-        raise HTTPException(status_code=401, detail="Invalid webhook") from exc
+        emit("payment_webhook_failure", provider=provider_name, error_type=type(exc).__name__)
+        raise HTTPException(status_code=400, detail="Invalid webhook signature") from exc
     if provider.name == "paystack" and event.get("event") != "charge.success":
         return {"status": "ignored"}
     reference = str(event.get("provider_reference", ""))

@@ -26,6 +26,8 @@ from src.models import (
     TicketVisibility,
     User,
 )
+from src.monitoring import emit
+from src.payments.providers import PaymentProvider
 from src.schemas.ticket import OrderCreate, TicketTypeCreate
 from src.services.event import as_utc
 from src.services.notification import audit, notify
@@ -147,16 +149,34 @@ def cancel_ticket(db: Session, ticket: Ticket, user: User) -> Ticket:
     return ticket
 
 
-def refund_order(db: Session, order: Order, user: User) -> Order:
+def refund_order(db: Session, order: Order, user: User, provider: PaymentProvider) -> Order:
     if order.user_id != user.id and user.role != PlatformRole.SUPER_ADMIN:
         raise HTTPException(status_code=403, detail="Order ownership required")
     if order.status not in {OrderStatus.CONFIRMED, OrderStatus.PENDING}:
         raise HTTPException(status_code=409, detail="Order cannot be refunded")
+    payment = db.scalar(select(Payment).where(
+        Payment.order_id == order.id, Payment.status == PaymentStatus.SUCCESSFUL,
+    ))
+    if payment is not None:
+        metadata = dict(payment.provider_metadata or {})
+        if not metadata.get("refund_reference"):
+            try:
+                result = provider.refund(payment.provider_reference, payment.amount)
+            except Exception as exc:
+                emit("payment_refund_failure", provider=payment.provider,
+                     payment_id=str(payment.id), error_type=type(exc).__name__)
+                payment.failure_reason = f"Refund initiation failed: {type(exc).__name__}"
+                db.commit()
+                raise HTTPException(status_code=502, detail="Payment provider refund failed") from exc
+            metadata["refund_reference"] = str(result.get("reference", payment.provider_reference))
+            metadata["refund_status"] = str(result.get("status", "pending"))
+            payment.provider_metadata = metadata
+        if metadata.get("refund_status") != "success":
+            db.commit()
+            return order
+        payment.status = PaymentStatus.REFUNDED
+        payment.refunded_at = datetime.now(UTC)
     order.status = OrderStatus.REFUNDED
-    for payment in db.scalars(select(Payment).where(Payment.order_id == order.id)):
-        if payment.status == PaymentStatus.SUCCESSFUL:
-            payment.status = PaymentStatus.REFUNDED
-            payment.refunded_at = datetime.now(UTC)
     for ticket in db.scalars(select(Ticket).where(Ticket.order_id == order.id)):
         if ticket.status != TicketStatus.USED:
             ticket.status = TicketStatus.REFUNDED

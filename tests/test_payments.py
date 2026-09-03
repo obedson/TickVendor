@@ -14,7 +14,7 @@ from src.database import Base
 from src.models import Order, OrderStatus, Payment, PaymentStatus, Ticket, TicketStatus, TicketType
 from src.payments.live_providers import PaystackProvider, StripeProvider
 from src.payments.providers import PaymentInitialization, PaymentVerification, TestPaymentProvider
-from src.services.payment import apply_successful_payment, initialize_payment
+from src.services.payment import apply_successful_payment, initialize_payment, reconcile_payment
 from tests.test_database import create_event_context
 
 
@@ -62,19 +62,20 @@ def test_paystack_initialization_and_authoritative_verification(monkeypatch):
             return {"data": {"reference": "ORDER-1", "amount": 12550, "currency": "NGN", "status": "success"}}
     monkeypatch.setattr("src.payments.live_providers.httpx.post", lambda *a, **kw: calls.append(("post", a, kw)) or Response())
     monkeypatch.setattr("src.payments.live_providers.httpx.get", lambda *a, **kw: calls.append(("get", a, kw)) or Response())
-    provider = PaystackProvider("sk_test")
+    provider = PaystackProvider("sk_test", callback_url="https://staging.example.test")
     initialized = provider.initialize("ORDER-1", Decimal("125.50"), "NGN", "member@example.com")
     verified = provider.verify("ORDER-1")
     assert initialized == PaymentInitialization("ORDER-1", "https://paystack.test/checkout")
     assert verified == PaymentVerification("ORDER-1", Decimal("125.5"), "NGN", "success")
     assert calls[0][2]["json"]["amount"] == 12550
+    assert calls[0][2]["json"]["callback_url"] == "https://staging.example.test/payment/return"
 
 
 def test_paystack_webhook_signature_and_event_contract():
     body = json.dumps({"event": "charge.success", "data": {"reference": "ORDER-1"}}).encode()
     secret = "paystack-secret"
     signature = hmac.new(secret.encode(), body, hashlib.sha512).hexdigest()
-    provider = PaystackProvider("sk_test", secret)
+    provider = PaystackProvider(secret)
     assert provider.verify_webhook(body, signature) == {
         "event": "charge.success", "provider_reference": "ORDER-1",
     }
@@ -143,4 +144,23 @@ def test_authoritative_payment_verification_rejects_mismatch(tmp_path, verificat
         with pytest.raises(HTTPException) as rejected:
             apply_successful_payment(db, payment, provider)
         assert detail in rejected.value.detail.lower()
+    engine.dispose()
+
+
+def test_reconciliation_reports_mismatch_without_changing_local_state(tmp_path):
+    engine = create_engine(f"sqlite:///{tmp_path / 'reconcile.db'}")
+    Base.metadata.create_all(engine)
+    with Session(engine, expire_on_commit=False) as db:
+        user, _community, event = create_event_context(db)
+        order = Order(reference="REC-1", idempotency_key="reconcile-order-key", user_id=user.id,
+                      event_id=event.id, total_amount=Decimal(100), currency="NGN")
+        db.add(order); db.flush()
+        payment = Payment(order_id=order.id, provider="paystack", provider_reference="success-1",
+                          idempotency_key="reconcile-payment-key", amount=Decimal(100), currency="NGN")
+        db.add(payment); db.commit()
+        provider = RecordingProvider()
+        provider.verification = PaymentVerification("success-1", Decimal(99), "NGN", "success")
+        result = reconcile_payment(db, payment, provider, user)
+        assert result["mismatches"] == ["amount", "status"]
+        assert payment.status == PaymentStatus.PENDING
     engine.dispose()

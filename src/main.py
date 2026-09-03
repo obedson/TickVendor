@@ -1,7 +1,7 @@
 """FastAPI application factory and ASGI entry point."""
 
-import logging
 import secrets
+import time
 from typing import Annotated
 from uuid import uuid4
 
@@ -34,6 +34,7 @@ from src.api.ticket_catalog import router as ticket_catalog_router
 from src.api.tickets import router as tickets_router
 from src.config import settings
 from src.logging_config import configure_logging, request_id_context
+from src.monitoring import capture_exception, emit
 from src.security_middleware import rate_limiter, request_key
 
 
@@ -74,6 +75,7 @@ def create_app() -> FastAPI:
         request_id = request.headers.get("X-Request-ID") or str(uuid4())
         token = request_id_context.set(request_id)
         request.state.request_id = request_id
+        started = time.perf_counter()
         try:
             rate_limiter.check(request_key(request))
             if request.method not in {"GET", "HEAD", "OPTIONS", "TRACE"} and request.cookies.get("access_token"):
@@ -83,6 +85,9 @@ def create_app() -> FastAPI:
                 if origin not in settings.cors_origins or not csrf_cookie or not secrets.compare_digest(csrf_cookie, csrf_header):
                     return JSONResponse(status_code=403, content={"detail": "CSRF validation failed"})
             response = await call_next(request)
+            emit("api_request", path=request.url.path, method=request.method,
+                 status_code=response.status_code,
+                 duration_ms=round((time.perf_counter() - started) * 1000, 2))
             response.headers["X-Request-ID"] = request_id
             response.headers["X-Content-Type-Options"] = "nosniff"
             response.headers["X-Frame-Options"] = "DENY"
@@ -109,9 +114,7 @@ def create_app() -> FastAPI:
 
     @application.exception_handler(Exception)
     async def unexpected_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-        logging.getLogger("tickvendor.errors").exception(
-            {"event": "unhandled_error", "path": request.url.path}, exc_info=exc
-        )
+        capture_exception(exc, path=request.url.path)
         return JSONResponse(
             status_code=500,
             content={"error": {"code": "internal_error", "message": "An unexpected error occurred."}},
@@ -119,7 +122,12 @@ def create_app() -> FastAPI:
 
     @application.get("/health", tags=["system"])
     async def health() -> dict[str, str]:
-        return {"status": "ok"}
+        from sqlalchemy import text
+
+        from src.database import engine
+        with engine.connect() as connection:
+            connection.execute(text("SELECT 1"))
+        return {"status": "ok", "database": "ok"}
 
     @application.get("/health/validate", include_in_schema=False)
     async def validation_probe(value: Annotated[int, Query(ge=1)]) -> dict[str, int]:

@@ -1,8 +1,6 @@
 """Event creation, management, publishing, and discovery routes."""
 
-import os
 from decimal import Decimal
-from pathlib import Path
 from typing import Annotated
 from uuid import UUID
 
@@ -11,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from src.api.auth import get_current_user
+from src.config import settings
 from src.database import get_db
 from src.models import Event, EventStatus, User
 from src.schemas.event import EventCreate, EventResponse, EventUpdate
@@ -23,6 +22,7 @@ from src.services.event import (
     soft_delete_event,
     update_event,
 )
+from src.storage import LocalObjectStorage, S3ObjectStorage, event_cover_key
 from src.uploads import safe_upload_name, validate_image_upload
 
 router = APIRouter(prefix="/events", tags=["events"])
@@ -46,11 +46,20 @@ async def upload_cover_image(
 
     event = get_event_for_management(db, event_id, current_user)
     data = await validate_image_upload(upload)
-    root = Path(os.environ.get("TICKVENDOR_UPLOAD_DIR", "uploads")) / "events"
-    root.mkdir(parents=True, exist_ok=True)
     filename = safe_upload_name(str(event.id), upload.filename, upload.content_type)
-    (root / filename).write_bytes(data)
-    event.cover_image_url = f"/uploads/events/{filename}"
+    key = event_cover_key(event.community_id, event.id, filename)
+    if settings.storage_provider == "s3":
+        storage = S3ObjectStorage(
+            bucket=settings.storage_bucket or "", region=settings.storage_region,
+            endpoint=settings.storage_endpoint,
+            access_key=settings.storage_access_key.get_secret_value() if settings.storage_access_key else None,
+            secret_key=settings.storage_secret_key.get_secret_value() if settings.storage_secret_key else None,
+            signed_url_ttl_seconds=settings.storage_signed_url_ttl_seconds,
+        )
+    else:
+        storage = LocalObjectStorage(settings.storage_local_root)
+    stored = storage.put(key, data, upload.content_type or "application/octet-stream")
+    event.cover_image_url = stored.url
     db.commit()
     from src.services.notification import audit
     audit(db, actor_id=current_user.id, community_id=event.community_id,

@@ -7,7 +7,7 @@ from tests.test_events import setup_client
 
 def test_event_cover_upload_validates_content_and_ownership(tmp_path, monkeypatch):
     client, engine, _sessions, (community_id, organizer_id, outsider_id) = setup_client(tmp_path)
-    monkeypatch.setenv("TICKVENDOR_UPLOAD_DIR", str(tmp_path / "uploads"))
+    monkeypatch.setattr("src.api.events.settings.storage_local_root", str(tmp_path / "uploads"))
     now = datetime.now(UTC) + timedelta(days=1)
     payload = {"community_id": str(community_id), "title": "Image Event",
                "description": "Event with a safe cover image", "category": "technology",
@@ -25,5 +25,5 @@ def test_event_cover_upload_validates_content_and_ownership(tmp_path, monkeypatc
     uploaded = client.post(f'/api/v1/events/{event_id}/cover-image', headers=headers(organizer_id),
                            files={'upload': ('cover.png', png, 'image/png')})
     assert uploaded.status_code == 200, uploaded.text
-    assert uploaded.json()['cover_image_url'].startswith('/uploads/events/')
+    assert uploaded.json()['cover_image_url'].startswith('/uploads/communities/')
     engine.dispose()

@@ -61,6 +61,9 @@ def test_production_accepts_server_database_url():
         environment="production",
         database_url="postgresql+psycopg://user:pass@db/tickvendor",
         secret_key="x" * 40,
+        storage_provider="s3", storage_bucket="private-media",
+        distributed_rate_limit_enabled=True, redis_url="rediss://redis/0",
+        paystack_secret_key="sk_live_value",
     )
 
     assert production.environment == "production"

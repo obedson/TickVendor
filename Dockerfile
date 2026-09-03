@@ -3,6 +3,7 @@ WORKDIR /app
 COPY pyproject.toml ./
 COPY src ./src
 COPY migrations ./migrations
+COPY scripts ./scripts
 COPY alembic.ini ./
 RUN pip install --no-cache-dir .
 ENV ENVIRONMENT=production

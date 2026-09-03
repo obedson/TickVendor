@@ -46,7 +46,7 @@ def test_application_exposes_health_endpoint():
 
     response = TestClient(app).get("/health")
     assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
+    assert response.json() == {"status": "ok", "database": "ok"}
 
 
 def test_validation_errors_use_stable_envelope():

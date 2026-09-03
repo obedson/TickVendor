@@ -2,11 +2,20 @@ services:
   api:
     build: .
     environment:
-      ENVIRONMENT: production
+      ENVIRONMENT: staging
       DATABASE_URL: postgresql+psycopg://tickvendor:tickvendor@db/tickvendor
       SECRET_KEY: ${SECRET_KEY}
+      REDIS_URL: redis://redis:6379/0
+      DISTRIBUTED_RATE_LIMIT_ENABLED: "true"
+      STORAGE_PROVIDER: s3
+      STORAGE_BUCKET: ${STORAGE_BUCKET}
     depends_on: [db, redis]
     ports: ["8000:8000"]
+  worker:
+    build: .
+    command: ["python", "scripts/notification_worker.py"]
+    env_file: [.env]
+    depends_on: [db, redis]
   db:
     image: postgres:17
     environment:

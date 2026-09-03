@@ -6,8 +6,19 @@ from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from src.models import Order, OrderStatus, Payment, PaymentStatus, Ticket, TicketStatus
+from src.models import (
+    Event,
+    Order,
+    OrderStatus,
+    Payment,
+    PaymentStatus,
+    PlatformRole,
+    Ticket,
+    TicketStatus,
+    User,
+)
 from src.payments.providers import PaymentProvider
+from src.services.notification import audit
 
 
 def initialize_payment(db: Session, order: Order, user_email: str, idempotency_key: str, provider: PaymentProvider):
@@ -59,3 +70,32 @@ def apply_successful_payment(db: Session, payment: Payment, provider: PaymentPro
             ticket.status = TicketStatus.ACTIVE
     db.commit()
     return payment
+
+
+def reconcile_payment(
+    db: Session, payment: Payment, provider: PaymentProvider, actor: User
+) -> dict[str, object]:
+    """Compare local/provider payment data and audit; never silently correct state."""
+    order = db.get(Order, payment.order_id)
+    if order is None or (order.user_id != actor.id and actor.role != PlatformRole.SUPER_ADMIN):
+        raise HTTPException(status_code=404, detail="Payment not found")
+    verification = provider.verify(payment.provider_reference)
+    mismatches: list[str] = []
+    if verification.provider_reference != payment.provider_reference:
+        mismatches.append("reference")
+    if verification.amount != payment.amount:
+        mismatches.append("amount")
+    if verification.currency != payment.currency:
+        mismatches.append("currency")
+    expected = "success" if payment.status == PaymentStatus.SUCCESSFUL else payment.status.value
+    if verification.status != expected:
+        mismatches.append("status")
+    result: dict[str, object] = {
+        "payment_id": str(payment.id), "provider_status": verification.status,
+        "local_status": payment.status.value, "mismatches": mismatches,
+    }
+    event = db.get(Event, order.event_id)
+    audit(db, actor_id=actor.id, community_id=event.community_id,
+          action="payment.reconciled", target_type="payment", target_id=payment.id,
+          metadata=result)
+    return result

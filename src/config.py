@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     debug: bool = False
     api_v1_prefix: str = "/api/v1"
     canonical_url: str = "https://tickvendor.com"
+    frontend_url: str | None = None
 
     database_url: str = "sqlite:///./tickvendor.db"
     database_echo: bool = False
@@ -58,6 +59,16 @@ class Settings(BaseSettings):
     push_api_token: SecretStr | None = None
     redis_url: str | None = None
     distributed_rate_limit_enabled: bool = False
+    storage_provider: Literal["local", "s3"] = "local"
+    storage_local_root: str = "uploads"
+    storage_bucket: str | None = None
+    storage_region: str | None = None
+    storage_endpoint: str | None = None
+    storage_access_key: SecretStr | None = None
+    storage_secret_key: SecretStr | None = None
+    storage_signed_url_ttl_seconds: int = Field(default=900, ge=60, le=86400)
+    metrics_endpoint: str | None = None
+    monitoring_api_token: SecretStr | None = None
 
     @field_validator("cors_origins", mode="before")
     @classmethod
@@ -76,6 +87,22 @@ class Settings(BaseSettings):
                 raise ValueError("DEBUG must be disabled outside development and test")
             if self.database_url.startswith("sqlite"):
                 raise ValueError("SQLite is not allowed for staging or production")
+            urls = (("CANONICAL_URL", self.canonical_url), ("FRONTEND_URL", self.frontend_url))
+            for name, value in urls:
+                if value is not None and not value.startswith("https://"):
+                    raise ValueError(f"{name} must use HTTPS outside development and test")
+            if self.storage_provider != "s3":
+                raise ValueError("S3 object storage is required outside development and test")
+            if not self.storage_bucket:
+                raise ValueError("STORAGE_BUCKET is required for S3 storage")
+            if not self.distributed_rate_limit_enabled or not self.redis_url:
+                raise ValueError("Distributed Redis rate limiting is required outside development and test")
+            if self.payment_provider == "paystack" and not self.paystack_secret_key:
+                raise ValueError("PAYSTACK_SECRET_KEY is required for deployed Paystack")
+            if self.email_provider == "smtp" and (not self.smtp_host or not self.smtp_from_address):
+                raise ValueError("SMTP_HOST and SMTP_FROM_ADDRESS are required for SMTP")
+            if self.push_provider == "http" and not self.push_endpoint:
+                raise ValueError("PUSH_ENDPOINT is required for HTTP push")
         return self
 
 

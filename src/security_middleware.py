@@ -5,6 +5,7 @@ from collections import defaultdict, deque
 
 from fastapi import HTTPException, Request
 from redis import Redis
+from redis.exceptions import RedisError
 
 from src.config import settings
 
@@ -35,7 +36,10 @@ class RedisRateLimiter:
 
     def check(self, key: str) -> None:
         bucket = f"tickvendor:rate:{key}"
-        count = self.redis.incr(bucket)
+        try:
+            count = self.redis.incr(bucket)
+        except RedisError as exc:
+            raise HTTPException(status_code=503, detail="Rate limiting service unavailable") from exc
         if count == 1:
             self.redis.expire(bucket, self.window_seconds)
         if count > self.limit:

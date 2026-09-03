@@ -1,4 +1,5 @@
 """Run the scheduled notification worker against the configured database."""
+import os
 import time
 
 from src.database import SessionLocal
@@ -16,7 +17,9 @@ class ConfiguredSender:
 
 def run_once() -> int:
     with SessionLocal() as db:
-        return process_scheduled_notifications(db, ConfiguredSender())
+        return process_scheduled_notifications(
+            db, ConfiguredSender(), batch_size=int(os.getenv("NOTIFICATION_WORKER_BATCH_SIZE", "100"))
+        )
 
 
 def main() -> None:
