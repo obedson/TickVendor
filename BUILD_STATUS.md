@@ -320,6 +320,11 @@ integrated product evidence. TickVendor is not specification-complete or product
 - [ ] Verify PostgreSQL migration/application behavior, production deployment, HTTPS/TLS, CORS,
   monitoring/error tracking, and live Paystack/email/push providers. Optional Stripe/Flutterwave
   verification is future work and does not block V1.
+- [x] Added the complete repository-backed requirement matrix at `docs/TRACEABILITY_MATRIX.md`, concise
+  assessment index at `docs/TRACEABILITY_SUMMARY.md`, and external verification procedure at
+  `docs/EXTERNAL_VERIFICATION_RUNBOOK.md`; current totals are 771 requirements, 639 A, 132 B, 0 C.
+- [x] Added idempotent complete local demo/bootstrap seed coverage for the §73 named dataset and
+  repository-backed architecture/API/deployment documentation for §74; `tests/test_demo_seed.py` passes.
 
 ## Implementation Checklist — Grouped by Dependency-Aware Subsystem
 
