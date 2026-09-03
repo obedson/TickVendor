@@ -34,3 +34,5 @@ The local seed/bootstrap and documentation gaps were resolved and locally verifi
 ## Local verification boundary
 
 Current local evidence includes the full backend suite, full Playwright suite, frontend lint/build, Ruff, Python compilation, fresh migration upgrade/current/check, responsive/offline/retry/bundle policy probes, and deterministic provider adapter tests. These prove local behavior only and do not replace external or deployed verification.
+
+The exact remaining-B verification manifest is in `docs/EXTERNAL_VERIFICATION_MANIFEST.md`.

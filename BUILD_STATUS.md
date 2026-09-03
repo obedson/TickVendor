@@ -325,6 +325,8 @@ integrated product evidence. TickVendor is not specification-complete or product
   `docs/EXTERNAL_VERIFICATION_RUNBOOK.md`; current totals are 771 requirements, 639 A, 132 B, 0 C.
 - [x] Added idempotent complete local demo/bootstrap seed coverage for the §73 named dataset and
   repository-backed architecture/API/deployment documentation for §74; `tests/test_demo_seed.py` passes.
+- [x] Added the exact remaining-B external verification manifest at `docs/EXTERNAL_VERIFICATION_MANIFEST.md`;
+  remaining B rows are not treated as deferred and require the listed provider or deployed evidence.
 
 ## Implementation Checklist — Grouped by Dependency-Aware Subsystem
 

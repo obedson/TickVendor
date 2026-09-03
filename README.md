@@ -49,3 +49,4 @@ Backend: `./venv/Scripts/python.exe -m pytest -q`, `./venv/Scripts/ruff.exe chec
 
 Detailed current requirement evidence is in `docs/TRACEABILITY_MATRIX.md`.
 External staging/production verification steps are in `docs/EXTERNAL_VERIFICATION_RUNBOOK.md`.
+The exact remaining-B verification manifest is in `docs/EXTERNAL_VERIFICATION_MANIFEST.md`.
