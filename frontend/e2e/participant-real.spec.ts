@@ -42,7 +42,8 @@ test('real participant can acquire a free ticket and retain its QR wallet', asyn
   const assignmentsResponse = await page.request.get('http://127.0.0.1:8000/api/v1/task-assignments/me', {
     headers: { Authorization: `Bearer ${participantToken}` },
   });
-  const assignment = (await assignmentsResponse.json())[0];
+  const assignments = await assignmentsResponse.json();
+  expect(assignments[0]).toBeTruthy();
 
   const organizer = await browser.newContext();
   const organizerPage = await organizer.newPage();
