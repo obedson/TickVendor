@@ -1,10 +1,10 @@
 """Validated environment-backed application settings."""
 
 from functools import lru_cache
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import Field, SecretStr, field_validator, model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -33,7 +33,7 @@ class Settings(BaseSettings):
     bcrypt_rounds: int = Field(default=12, ge=12, le=16)
 
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
-    cors_origins: list[str] = [
+    cors_origins: Annotated[list[str], NoDecode] = [
         "http://localhost:3000",
         "http://localhost:5173",
         "https://tickvendor.com",
@@ -73,8 +73,15 @@ class Settings(BaseSettings):
     @field_validator("cors_origins", mode="before")
     @classmethod
     def parse_cors_origins(cls, value: object) -> object:
-        if isinstance(value, str) and not value.lstrip().startswith("["):
-            return [origin.strip() for origin in value.split(",") if origin.strip()]
+        if isinstance(value, str):
+            text = value.strip()
+            if text.startswith("["):
+                import json
+                value = json.loads(text)
+            else:
+                value = text.split(",")
+        if isinstance(value, list):
+            return [str(origin).strip().rstrip("/") for origin in value if str(origin).strip()]
         return value
 
     @model_validator(mode="after")

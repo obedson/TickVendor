@@ -53,4 +53,8 @@ Credential checklist
 | Frontend/CORS | `FRONTEND_URL`, `CANONICAL_URL`, `CORS_ORIGINS`, `VITE_API_ORIGIN` | Non-secret HTTPS deployment origins |
 | Core | `SECRET_KEY`, `ENVIRONMENT`, `DEBUG` | Random application signing secret |
 
-Staging acceptance remains external: provider delivery, multi-instance behavior, private object retrieval, Paystack sandbox checkout/refund/reconciliation, SMTP receipt, push device receipt, alert delivery, TLS/DNS, and backup restore.
+Staging acceptance remains external: provider delivery, multi-instance behavior, private object retrieval, Paystack sandbox checkout/refund/reconciliation, SMTP receipt, push device receipt, alert delivery, DNS/TLS, and restore evidence.
+
+CORS configuration: `CORS_ORIGINS` is parsed by the application as either a JSON array or a comma-separated string. In Render, use the exact JSON value `[
+  "https://tickvendor-1.onrender.com"
+]` (single line: `["https://tickvendor-1.onrender.com"]`). The JSON form is recommended for an unambiguous single origin. Origins are normalized by removing surrounding whitespace and a trailing slash; wildcard `*` is not accepted as a substitute for the allowlist.
