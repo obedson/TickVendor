@@ -17,6 +17,7 @@ test('desktop participant shell, account menu, empty state, and no overflow', as
   await page.goto('/');
   await expect(page.locator('.sidebar')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Find your next event' })).toBeVisible();
+  await expect(page.getByRole('textbox', { name: 'Search events' })).toHaveCount(1);
   await expect(page.getByRole('heading', { name: 'No events found nearby' })).toBeVisible();
   await expect(page.getByText('Make your presence count.')).not.toBeVisible();
   await page.locator('.account-menu summary').click();
