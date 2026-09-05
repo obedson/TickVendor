@@ -10,16 +10,23 @@ async function authenticated(page: Parameters<typeof test>[0] extends never ? ne
   await page.route('**/api/v1/auth/me', async route => route.fulfill({ json: { id: role } }));
   await page.route('**/api/v1/events?search=', async route => route.fulfill({ json: [] }));
   await page.route('**/api/v1/tickets/me', async route => route.fulfill({ json: [] }));
+  await page.route('**/api/v1/profiles/me', async route => route.fulfill({ json: { display_name: 'Participant', impact_points: 12, rank: null, next_rank: null, badges: [], milestones: [], events_attended: 1, tasks_completed: 0 } }));
+  await page.route('**/api/v1/task-assignments/me/details', async route => route.fulfill({ json: [] }));
 }
 
-test('desktop participant shell, account menu, empty state, and no overflow', async ({ page }) => {
+test('desktop participant Home and Discover remain distinct', async ({ page }) => {
   await authenticated(page);
   await page.goto('/');
   await expect(page.locator('.sidebar')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Make your presence count.' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Find your next event' })).not.toBeVisible();
+  await page.getByRole('button', { name: 'Discover' }).click();
   await expect(page.getByRole('heading', { name: 'Find your next event' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Make your presence count.' })).not.toBeVisible();
   await expect(page.getByRole('textbox', { name: 'Search events' })).toHaveCount(1);
   await expect(page.getByRole('heading', { name: 'No events found nearby' })).toBeVisible();
-  await expect(page.getByText('Make your presence count.')).not.toBeVisible();
+  await page.getByRole('button', { name: 'Home' }).click();
+  await expect(page.getByRole('heading', { name: 'Make your presence count.' })).toBeVisible();
   await page.locator('.account-menu summary').click();
   await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBeTruthy();
