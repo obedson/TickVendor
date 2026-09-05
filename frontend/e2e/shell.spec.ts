@@ -31,8 +31,8 @@ test('desktop participant Home and Discover remain distinct', async ({ page }) =
   await page.goto('/');
   await expect(page.locator('.sidebar')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Make your presence count.' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Find your next event' })).not.toBeVisible();
-  await page.getByRole('button', { name: 'Discover' }).click();
+  await expect(page.getByText('Welcome back, Participant.')).toBeVisible();
+  await page.getByRole('button', { name: 'Discover', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Find your next event' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Make your presence count.' })).not.toBeVisible();
   await expect(page.getByRole('textbox', { name: 'Search events' })).toHaveCount(1);
@@ -60,7 +60,7 @@ test('role-restricted organizer navigation remains reachable', async ({ page }) 
   await authenticated(page, 'organizer');
   await page.goto('/');
   await expect(page.getByRole('button', { name: 'Overview' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Events and tickets' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Manage events' })).toBeVisible();
 });
 
 test('verification success handoff and invalid-link non-redirect behavior', async ({ page }) => {

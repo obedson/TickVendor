@@ -14,8 +14,8 @@ test('participant auth and navigation shell reaches core views', async ({ page }
   await expect(page.getByRole('button', { name: 'Tasks' })).toBeVisible();
   await page.getByRole('button', { name: 'Tasks' }).click();
   await expect(page.getByRole('heading', { name: 'Tasks' })).toBeVisible();
-  await page.getByRole('button', { name: 'Impact' }).click();
-  await expect(page.getByRole('heading', { name: 'Recognition' })).toBeVisible();
+  await page.getByRole('button', { name: 'Achievements' }).click();
+  await expect(page.getByRole('heading', { name: 'Achievements' })).toBeVisible();
   await page.getByRole('button', { name: 'Communities' }).click();
   await expect(page.getByRole('heading', { name: 'Your communities' })).toBeVisible();
 });

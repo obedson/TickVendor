@@ -5,7 +5,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
-os.environ["DATABASE_URL"] = f"sqlite:///{ROOT / '.tmp-e2e.db'}"
+os.environ["DATABASE_URL"] = os.environ.get("E2E_DATABASE_URL", f"sqlite:///{ROOT / '.tmp-e2e.db'}")
 os.environ["ENVIRONMENT"] = "test"
 os.environ["PAYMENT_PROVIDER"] = "test"
 

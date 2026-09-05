@@ -6,7 +6,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
-os.environ["DATABASE_URL"] = f"sqlite:///{ROOT / '.tmp-e2e.db'}"
+os.environ["DATABASE_URL"] = os.environ.get("E2E_DATABASE_URL", f"sqlite:///{ROOT / '.tmp-e2e.db'}")
 os.environ["ENVIRONMENT"] = "test"
 os.environ["PAYMENT_PROVIDER"] = "test"
 
@@ -24,7 +24,7 @@ from src.security import hash_password  # noqa: E402
 
 
 def main() -> None:
-    database = ROOT / ".tmp-e2e.db"
+    database = Path(os.environ["DATABASE_URL"].removeprefix("sqlite:///"))
     database.unlink(missing_ok=True)
     engine = create_engine(os.environ["DATABASE_URL"], connect_args={"check_same_thread": False})
     Base.metadata.create_all(engine)
