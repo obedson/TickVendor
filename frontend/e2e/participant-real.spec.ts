@@ -58,7 +58,7 @@ test('real participant can acquire a free ticket and retain its QR wallet', asyn
   await organizerPage.getByLabel('Password').fill('e2e-password-123');
   await organizerPage.getByRole('button', { name: 'Sign in' }).click();
   await organizerPage.getByRole('button', { name: 'Review tasks' }).click();
-  await expect(organizerPage.getByText('Completed the welcome task.')).toBeVisible();
+  await expect(organizerPage.getByText(/Completed the welcome task/)).toBeVisible();
   await organizerPage.getByRole('button', { name: 'Verify' }).click();
   await expect(organizerPage.getByText('Task verified.')).toBeVisible();
   await organizerPage.reload();
