@@ -4,7 +4,7 @@ test('organizer verifies submitted task evidence through the browser', async ({ 
   const participant = await browser.newContext();
   const participantPage = await participant.newPage();
   await participantPage.goto('/');
-  await participantPage.getByLabel('Email').fill('e2e-participant@example.com');
+  await participantPage.getByLabel('Email').fill('e2e-peer@example.com');
   await participantPage.getByLabel('Password').fill('e2e-password-123');
   await participantPage.getByRole('button', { name: 'Sign in' }).click();
   await participantPage.getByRole('button', { name: 'Tasks' }).click();

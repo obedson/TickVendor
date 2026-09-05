@@ -5,6 +5,7 @@ export default defineConfig({
   timeout: 30_000,
   fullyParallel: false,
   reporter: 'list',
+  globalTeardown: './e2e/global-teardown.mjs',
   use: { baseURL: 'http://127.0.0.1:4173', trace: 'retain-on-failure' },
   webServer: [
     {

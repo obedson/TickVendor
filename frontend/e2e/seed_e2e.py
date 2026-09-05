@@ -80,7 +80,10 @@ def main() -> None:
                     title="Welcome task", description="Complete the welcome check-in task.",
                     due_at=now + timedelta(days=1), impact_point_reward=5, verification_required=True)
         db.add(task); db.flush()
-        db.add(TaskAssignment(task_id=task.id, assignee_id=participant.id, assigned_by_id=organizer.id))
+        db.add_all([
+            TaskAssignment(task_id=task.id, assignee_id=participant.id, assigned_by_id=organizer.id),
+            TaskAssignment(task_id=task.id, assignee_id=peer.id, assigned_by_id=organizer.id),
+        ])
         db.add(PointRule(community_id=community.id, source_type="task_completion", points=5, is_active=True))
         db.add(AchievementRule(
             community_id=community.id, name="Verified task achievement", slug="verified-task-achievement",
