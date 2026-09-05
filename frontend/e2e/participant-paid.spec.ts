@@ -5,6 +5,7 @@ test('paid ticket uses real backend order and provider verification flow', async
   await page.getByLabel('Email').fill('e2e-participant@example.com');
   await page.getByLabel('Password').fill('e2e-password-123');
   await page.getByRole('button', { name: 'Sign in' }).click();
+  await page.getByRole('button', { name: 'Discover', exact: true }).click();
   await page.getByRole('button', { name: 'View event' }).click();
   await expect(page.getByRole('heading', { name: 'Supporter admission' })).toBeVisible();
 
@@ -18,7 +19,7 @@ test('paid ticket uses real backend order and provider verification flow', async
   await page.getByRole('button', { name: 'Acquire ticket' }).nth(1).click();
   await expect(page).toHaveURL(/payment_id=/);
   expect(initializeCalls).toBe(1);
-  await expect(page.getByRole('heading', { name: 'Payment pending' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Payment status' })).toBeVisible();
   await page.reload();
   expect(initializeCalls).toBe(1);
 });

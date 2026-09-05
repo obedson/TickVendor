@@ -59,7 +59,7 @@ test('mobile participant shell and More navigation', async ({ page }) => {
 test('role-restricted organizer navigation remains reachable', async ({ page }) => {
   await authenticated(page, 'organizer');
   await page.goto('/');
-  await expect(page.getByRole('button', { name: 'Overview' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Organizer dashboard' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Manage events' })).toBeVisible();
 });
 

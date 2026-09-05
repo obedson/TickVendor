@@ -5,6 +5,7 @@ test('real participant can acquire a free ticket and retain its QR wallet', asyn
   await page.getByLabel('Email').fill('e2e-participant@example.com');
   await page.getByLabel('Password').fill('e2e-password-123');
   await page.getByRole('button', { name: 'Sign in' }).click();
+  await page.getByRole('button', { name: 'Discover', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'E2E Community Meetup' }).first()).toBeVisible();
 
   await page.getByRole('button', { name: 'View event' }).click();
@@ -22,7 +23,7 @@ test('real participant can acquire a free ticket and retain its QR wallet', asyn
   await expect(page.getByRole('heading', { name: 'E2E Community Meetup' }).first()).toBeVisible();
   await expect(page.getByAltText(/Entrance QR code/).first()).toBeVisible();
 
-  await page.getByRole('button', { name: 'Attendance' }).click();
+  await page.getByRole('button', { name: 'Activity' }).click();
   await expect(page.getByRole('heading', { name: 'Attendance' })).toBeVisible();
   await page.getByRole('button', { name: 'Check in' }).click();
   await page.waitForResponse(response => response.url().includes('/attendance/check-in'));
@@ -87,10 +88,11 @@ test('participant attendance failure is rendered without duplicate check-in', as
   await page.getByLabel('Email').fill('e2e-participant@example.com');
   await page.getByLabel('Password').fill('e2e-password-123');
   await page.getByRole('button', { name: 'Sign in' }).click();
+  await page.getByRole('button', { name: 'Discover', exact: true }).click();
   await page.getByRole('button', { name: 'View event' }).click();
   await page.getByRole('button', { name: 'Acquire ticket' }).first().click();
   await expect(page.getByText('Ticket confirmed. Open My tickets to view it.')).toBeVisible();
-  await page.getByRole('button', { name: 'Attendance' }).click();
+  await page.getByRole('button', { name: 'Activity' }).click();
   await page.evaluate(() => {
     Object.defineProperty(navigator, 'geolocation', {
       configurable: true,
@@ -106,10 +108,11 @@ test('participant can load and submit peer confirmation', async ({ page }) => {
   await page.getByLabel('Email').fill('e2e-participant@example.com');
   await page.getByLabel('Password').fill('e2e-password-123');
   await page.getByRole('button', { name: 'Sign in' }).click();
+  await page.getByRole('button', { name: 'Discover', exact: true }).click();
   await page.getByRole('button', { name: 'View event' }).click();
   await page.getByRole('button', { name: 'Acquire ticket' }).first().click();
   await expect(page.getByText('Ticket confirmed. Open My tickets to view it.')).toBeVisible();
-  await page.getByRole('button', { name: 'Attendance' }).click();
+  await page.getByRole('button', { name: 'Activity' }).click();
   await page.getByRole('button', { name: 'Check in' }).click();
   await expect(page.getByText(/Attendance status:/)).toBeVisible();
 });
