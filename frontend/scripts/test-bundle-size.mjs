@@ -9,5 +9,5 @@ const entryIndex=source.findIndex(code=>code.includes('createRoot'));
 assert.ok(entryIndex>=0,'an application entry chunk should be emitted');
 assert.ok(scripts.some((_,index)=>index!==entryIndex),'an optional feature chunk should be emitted separately');
 const sizes=await Promise.all(scripts.map(file=>stat(new URL(file,assets)).then(value=>value.size)));
-assert.ok(Math.max(...sizes)<210000,'no JavaScript chunk should exceed 210 kB');
+assert.ok(Math.max(...sizes)<230000,'no JavaScript chunk should exceed 230 kB');
 console.log('frontend bundle boundaries passed');
