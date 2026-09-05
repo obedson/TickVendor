@@ -133,6 +133,25 @@ def test_resend_verification_delivers_new_token(tmp_path):
     engine.dispose()
 
 
+def test_verification_email_body_contains_frontend_link(tmp_path, monkeypatch):
+    from src.config import settings
+    from src.notifications.email import InMemoryEmailSender, get_email_sender
+
+    monkeypatch.setattr(settings, "frontend_url", "https://staging.example")
+    client, engine = make_client(tmp_path)
+    sender = InMemoryEmailSender()
+    client.app.dependency_overrides[get_email_sender] = lambda: sender
+    response = client.post("/api/v1/auth/register", json={
+        "email": "link@example.com", "password": "initial-password-123",
+        "username": "link_user", "display_name": "Link User",
+    })
+    assert response.status_code == 201
+    message = sender.messages[-1]
+    assert message.body != message.token
+    assert "https://staging.example/verify-email?token=" in message.body
+    engine.dispose()
+
+
 def test_smtp_timeout_rolls_back_all_registration_rows_and_allows_retry(tmp_path):
     from sqlalchemy import func, select
 

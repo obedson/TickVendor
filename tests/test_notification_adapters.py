@@ -3,7 +3,7 @@ from uuid import uuid4
 
 import pytest
 
-from src.notifications.email import SMTPEmailSender
+from src.notifications.email import SMTPEmailSender, verification_email_content, verification_url
 from src.notifications.push import HTTPPushSender
 
 
@@ -20,6 +20,18 @@ def test_smtp_sender_uses_configured_transport_without_logging_credentials(monke
     monkeypatch.setattr("src.notifications.email.smtplib.SMTP", lambda host, port, timeout: (calls.append((host, port, timeout)) or Connection()))
     SMTPEmailSender("smtp.example", 587, "user", "secret", "from@example.com").send("to@example.com", "Subject", "Body")
     assert calls == [("smtp.example", 587, 10), "tls", ("login", "user", "secret"), ("message", "to@example.com", "Subject")]
+
+
+def test_verification_email_is_link_based_and_uses_configured_frontend(monkeypatch):
+    from src.config import settings
+
+    monkeypatch.setattr(settings, "frontend_url", "https://staging.example/app/")
+    text, html = verification_email_content("opaque-token")
+    assert verification_url("opaque-token") == "https://staging.example/app/verify-email?token=opaque-token"
+    assert "Verify your email address" in text
+    assert "https://staging.example/app/verify-email?token=opaque-token" in text
+    assert '<a href="https://staging.example/app/verify-email?token=opaque-token">' in html
+    assert "raw verification token" not in text
 
 
 def test_http_push_sender_sends_bounded_payload_and_raises_provider_error(monkeypatch):
