@@ -58,3 +58,5 @@ Staging acceptance remains external: provider delivery, multi-instance behavior,
 CORS configuration: `CORS_ORIGINS` is parsed by the application as either a JSON array or a comma-separated string. In Render, use the exact JSON value `[
   "https://tickvendor-1.onrender.com"
 ]` (single line: `["https://tickvendor-1.onrender.com"]`). The JSON form is recommended for an unambiguous single origin. Origins are normalized by removing surrounding whitespace and a trailing slash; wildcard `*` is not accepted as a substitute for the allowlist.
+
+Registration/email failure acceptance: follow the Render/Brevo procedure in `docs/EXTERNAL_VERIFICATION_RUNBOOK.md`. Registration sends verification before commit; relay failure returns HTTP 503 and rolls back the user, profile, session, and token. The frontend exposes resend for active unverified accounts and displays the controlled failure message without claiming verification.

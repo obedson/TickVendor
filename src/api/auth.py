@@ -23,6 +23,7 @@ from src.schemas.auth import (
     TokenRequest,
     TokenResponse,
     UserResponse,
+    VerificationResendRequest,
 )
 from src.security import (
     InvalidTokenError,
@@ -88,11 +89,19 @@ def register(
             db, user, AuthTokenPurpose.EMAIL_VERIFICATION, hours=24
         )
         response = issue_tokens(db, user)
+        # Delivery is part of registration's transaction. A failed send must
+        # not leave an account that cannot complete email verification.
+        email_sender.send_token(user.email, "Verify your TickVendor email", verification_token)
         db.commit()
     except IntegrityError as exc:
         db.rollback()
         raise HTTPException(status_code=409, detail="Email or username is already registered") from exc
-    email_sender.send_token(user.email, "Verify your TickVendor email", verification_token)
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=503,
+            detail="Verification email could not be sent; account was not created",
+        ) from exc
     return response
 
 
@@ -128,6 +137,29 @@ def verify_email(payload: TokenRequest, db: Annotated[Session, Depends(get_db)])
     token.consumed_at = datetime.now(UTC)
     db.commit()
     return Response(status_code=204)
+
+
+@router.post("/verification/resend", status_code=202)
+def resend_verification(
+    payload: VerificationResendRequest,
+    db: Annotated[Session, Depends(get_db)],
+    email_sender: Annotated[EmailSender, Depends(get_email_sender)],
+) -> dict[str, str]:
+    """Issue a fresh verification token without verifying the account."""
+    user = db.scalar(select(User).where(User.email == payload.email))
+    if user is None or not user.is_active or user.email_verified_at is not None:
+        return {"message": "If the account exists and needs verification, instructions were sent."}
+
+    verification_token = create_one_time_token(
+        db, user, AuthTokenPurpose.EMAIL_VERIFICATION, hours=24
+    )
+    try:
+        email_sender.send_token(user.email, "Verify your TickVendor email", verification_token)
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(status_code=503, detail="Verification email could not be sent") from exc
+    return {"message": "If the account exists and needs verification, instructions were sent."}
 
 
 @router.post("/refresh", response_model=TokenResponse)
