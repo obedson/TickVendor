@@ -1,56 +1,15 @@
 import { useEffect, useState } from 'react';
 import { EmptyState } from './AppShell';
+import { apiJson, ApiError } from './api';
 
-type HomeData = {
-  display_name?: string;
-  impact_points?: number;
-  rank?: { name: string } | null;
-  next_rank?: { name: string; points_remaining: number } | null;
-  badges?: unknown[];
-  milestones?: unknown[];
-  events_attended?: number;
-  tasks_completed?: number;
-  contributions?: number;
-  service_activities?: number;
-};
+type HomeData = { display_name?: string; impact_points?: number; rank?: { name: string } | null; next_rank?: { name: string; points_remaining: number } | null; badges?: unknown[]; milestones?: unknown[]; events_attended?: number; tasks_completed?: number };
 type Ticket = { public_id: string; event_title?: string; event_starts_at?: string; status: string };
 type Task = { id: string; title: string; status: string; due_at?: string | null };
-
 export function HomeDashboard({ token }: { token: string }) {
-  const [profile, setProfile] = useState<HomeData | null>(null);
-  const [tickets, setTickets] = useState<Ticket[]>([]);
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [error, setError] = useState('');
-  useEffect(() => {
-    const headers = { Authorization: `Bearer ${token}` };
-    Promise.all([
-      fetch('/api/v1/profiles/me', { headers }),
-      fetch('/api/v1/tickets/me', { headers }),
-      fetch('/api/v1/task-assignments/me/details', { headers }),
-    ]).then(async ([profileResponse, ticketsResponse, tasksResponse]) => {
-      if (!profileResponse.ok) throw Error('Unable to load your progress.');
-      if (!ticketsResponse.ok) throw Error('Unable to load your tickets.');
-      if (!tasksResponse.ok) throw Error('Unable to load your tasks.');
-      setProfile(await profileResponse.json());
-      setTickets(await ticketsResponse.json());
-      setTasks(await tasksResponse.json());
-    }).catch(cause => setError(cause instanceof Error ? cause.message : 'Unable to load your dashboard.'));
-  }, [token]);
-
+  const [profile, setProfile] = useState<HomeData | null>(null); const [tickets, setTickets] = useState<Ticket[]>([]); const [tasks, setTasks] = useState<Task[]>([]); const [error, setError] = useState('');
+  useEffect(() => { Promise.all([apiJson<HomeData>('profiles/me', {}, token), apiJson<Ticket[]>('tickets/me', {}, token), apiJson<Task[]>('task-assignments/me/details', {}, token)]).then(([p, t, a]) => { setProfile(p); setTickets(t); setTasks(a); }).catch(cause => setError(cause instanceof ApiError ? cause.message : 'Unable to load your dashboard.')); }, [token]);
   if (error) return <section className="panel" aria-labelledby="home-title"><h1 id="home-title">Make your presence count.</h1><p role="alert" className="error">{error}</p></section>;
   if (!profile) return <section className="panel" aria-labelledby="home-title"><h1 id="home-title">Make your presence count.</h1><p role="status">Loading your progress…</p></section>;
   const activeTasks = tasks.filter(task => !['verified', 'rejected'].includes(task.status));
-  return <div className="home-dashboard" aria-labelledby="home-title">
-    <section className="home-hero panel"><p className="eyebrow">Your participation journey</p><h1 id="home-title">Make your presence count.</h1><p>{profile.display_name ? `Welcome back, ${profile.display_name}.` : 'Your participation creates measurable impact.'}</p></section>
-    <section aria-labelledby="progress-title"><div className="section-heading"><div><p className="eyebrow">Your progress</p><h2 id="progress-title">Impact and recognition</h2></div></div><div className="grid home-metrics">
-      <article className="panel card"><h3>Impact Points</h3><p className="metric">{profile.impact_points ?? 0}</p></article>
-      <article className="panel card"><h3>Current rank</h3><p>{profile.rank?.name || 'No qualifying rank yet'}</p>{profile.next_rank && <small>{profile.next_rank.points_remaining} points to {profile.next_rank.name}</small>}</article>
-      <article className="panel card"><h3>Achievements</h3><p>{profile.badges?.length ?? 0} badges · {profile.milestones?.length ?? 0} milestones</p></article>
-      <article className="panel card"><h3>Participation</h3><p>{profile.events_attended ?? 0} attended · {profile.tasks_completed ?? 0} tasks completed</p></article>
-    </div></section>
-    <section className="home-columns" aria-label="Your next actions and upcoming participation">
-      <article className="panel"><p className="eyebrow">Next actions</p><h2>Keep moving forward</h2>{activeTasks.length ? <ul>{activeTasks.slice(0, 3).map(task => <li key={task.id}>{task.title} <span className="status-chip">{task.status}</span></li>)}</ul> : <EmptyState title="You're all caught up" description="Discover another way to participate when you're ready." />}</article>
-      <article className="panel"><p className="eyebrow">Upcoming participation</p><h2>Your tickets</h2>{tickets.length ? <ul>{tickets.slice(0, 3).map(ticket => <li key={ticket.public_id}>{ticket.event_title || ticket.public_id}{ticket.event_starts_at && <small> · {new Date(ticket.event_starts_at).toLocaleDateString()}</small>}</li>)}</ul> : <p className="empty">You don't have any upcoming tickets yet.</p>}</article>
-    </section>
-  </div>;
+  return <div className="home-dashboard" aria-labelledby="home-title"><section className="home-hero panel"><p className="eyebrow">Your participation journey</p><h1 id="home-title">Make your presence count.</h1><p>{profile.display_name ? `Welcome back, ${profile.display_name}.` : 'Your participation creates measurable impact.'}</p></section><section aria-labelledby="progress-title"><div className="section-heading"><div><p className="eyebrow">Your progress</p><h2 id="progress-title">Impact and recognition</h2></div></div><div className="grid home-metrics"><article className="panel card"><h3>Impact Points</h3><p className="metric">{profile.impact_points ?? 0}</p></article><article className="panel card"><h3>Current rank</h3><p>{profile.rank?.name || 'No qualifying rank yet'}</p>{profile.next_rank && <small>{profile.next_rank.points_remaining} points to {profile.next_rank.name}</small>}</article><article className="panel card"><h3>Achievements</h3><p>{profile.badges?.length ?? 0} badges · {profile.milestones?.length ?? 0} milestones</p></article><article className="panel card"><h3>Participation</h3><p>{profile.events_attended ?? 0} attended · {profile.tasks_completed ?? 0} tasks completed</p></article></div></section><section className="home-columns" aria-label="Your next actions and upcoming participation"><article className="panel"><p className="eyebrow">Next actions</p><h2>Keep moving forward</h2>{activeTasks.length ? <ul>{activeTasks.slice(0, 3).map(task => <li key={task.id}>{task.title} <span className="status-chip">{task.status}</span></li>)}</ul> : <EmptyState title="You're all caught up" description="Discover another way to participate when you're ready." />}</article><article className="panel"><p className="eyebrow">Upcoming participation</p><h2>Your tickets</h2>{tickets.length ? <ul>{tickets.slice(0, 3).map(ticket => <li key={ticket.public_id}>{ticket.event_title || ticket.public_id}{ticket.event_starts_at && <small> · {new Date(ticket.event_starts_at).toLocaleDateString()}</small>}</li>)}</ul> : <p className="empty">You don't have any upcoming tickets yet.</p>}</article></section></div>;
 }

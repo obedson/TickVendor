@@ -1,6 +1,7 @@
 """Deployment entrypoint command contract."""
 import os
 import subprocess
+import sys
 from pathlib import Path
 
 
@@ -15,12 +16,12 @@ def test_blank_database_migrates_to_current_head(tmp_path):
     database = tmp_path / "blank.db"
     environment = {**os.environ, "DATABASE_URL": f"sqlite:///{database}"}
     result = subprocess.run(
-        ["venv/Scripts/alembic.exe", "upgrade", "head"],
+        [sys.executable, "-m", "alembic", "upgrade", "head"],
         env=environment, capture_output=True, text=True, check=True,
     )
     assert "initial schema" in result.stdout + result.stderr
     current = subprocess.run(
-        ["venv/Scripts/alembic.exe", "current"],
+        [sys.executable, "-m", "alembic", "current"],
         env=environment, capture_output=True, text=True, check=True,
     )
     assert "d0e1f2a3b4c5 (head)" in current.stdout + current.stderr

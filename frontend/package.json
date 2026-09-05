@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "test:e2e": "npm run build && python e2e/seed_e2e.py && playwright test",
+    "test:e2e": "npm run build && node e2e/python-runner.mjs e2e/seed_e2e.py && playwright test",
     "preview": "vite preview"
   },
   "dependencies": {

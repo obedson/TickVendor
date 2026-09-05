@@ -14,6 +14,18 @@ async function authenticated(page: Parameters<typeof test>[0] extends never ? ne
   await page.route('**/api/v1/task-assignments/me/details', async route => route.fulfill({ json: [] }));
 }
 
+test('participant API-backed screens use the API service origin', async ({ page }) => {
+  await authenticated(page);
+  const requests: string[] = [];
+  page.on('request', request => { if (request.url().includes('/api/v1/')) requests.push(request.url()); });
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Achievements' }).click();
+  await page.getByRole('button', { name: 'Tasks' }).click();
+  await page.getByRole('button', { name: 'Communities' }).click();
+  await page.getByRole('button', { name: 'Open notifications' }).click();
+  expect(requests.every(url => url.includes('/api/v1/'))).toBeTruthy();
+});
+
 test('desktop participant Home and Discover remain distinct', async ({ page }) => {
   await authenticated(page);
   await page.goto('/');

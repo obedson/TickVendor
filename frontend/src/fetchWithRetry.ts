@@ -1,5 +1,6 @@
 type Fetcher=(input:RequestInfo|URL,init?:RequestInit)=>Promise<Response>;
 type Sleeper=(milliseconds:number)=>Promise<void>;
+
 const RETRYABLE_STATUS=new Set([408,425,429,500,502,503,504]);
 
 export async function fetchWithRetry(input:RequestInfo|URL,init:RequestInit={},fetcher:Fetcher=fetch,sleep:Sleeper=milliseconds=>new Promise(resolve=>setTimeout(resolve,milliseconds))):Promise<Response>{
