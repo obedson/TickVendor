@@ -1,0 +1,26 @@
+"""Deployment entrypoint command contract."""
+import os
+import subprocess
+from pathlib import Path
+
+
+def test_start_web_runs_alembic_before_uvicorn():
+    source = Path("scripts/start_web.py").read_text()
+    assert '"-m", "alembic", "upgrade", "head"' in source
+    assert "os.execvp" in source
+    assert source.index("subprocess.run") < source.index("os.execvp")
+
+
+def test_blank_database_migrates_to_current_head(tmp_path):
+    database = tmp_path / "blank.db"
+    environment = {**os.environ, "DATABASE_URL": f"sqlite:///{database}"}
+    result = subprocess.run(
+        ["venv/Scripts/alembic.exe", "upgrade", "head"],
+        env=environment, capture_output=True, text=True, check=True,
+    )
+    assert "initial schema" in result.stdout + result.stderr
+    current = subprocess.run(
+        ["venv/Scripts/alembic.exe", "current"],
+        env=environment, capture_output=True, text=True, check=True,
+    )
+    assert "d0e1f2a3b4c5 (head)" in current.stdout + current.stderr
