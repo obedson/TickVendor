@@ -6,7 +6,9 @@ The complete generated requirement matrix is maintained at `docs/TRACEABILITY_MA
 
 ## Current assessment
 
-The current repository-backed assessment counts 771 normative bullet requirements:
+The current repository-backed assessment counts 771 normative bullet requirements. This slice adds
+verified evidence for the organization-scoped volunteer/community activity opportunity path without
+changing the overall assessment counts.
 
 - A — implemented + verified: 639
 - B — implemented, verification outstanding: 132

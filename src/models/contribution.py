@@ -48,6 +48,9 @@ class Activity(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     event_id: Mapped[Any | None] = mapped_column(
         GUID(), ForeignKey("events.id", ondelete="SET NULL")
     )
+    opportunity_id: Mapped[Any | None] = mapped_column(
+        GUID(), ForeignKey("activity_opportunities.id", ondelete="SET NULL"), index=True
+    )
     activity_type: Mapped[str] = mapped_column(String(80), nullable=False)
     dimension: Mapped[EngagementDimension] = mapped_column(
         Enum(EngagementDimension, native_enum=False, length=16), nullable=False

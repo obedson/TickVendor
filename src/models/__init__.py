@@ -41,6 +41,7 @@ from src.models.impact import ImpactTransaction, ImpactTransactionStatus
 from src.models.milestone import Milestone, MilestoneAward, MilestoneRequirement
 from src.models.notification import AuditLog, Leaderboard, Notification
 from src.models.organization import Organization
+from src.models.opportunity import ActivityOpportunity, OpportunityRegistration, OpportunityRegistrationStatus, OpportunityStatus
 from src.models.payment import Payment, PaymentStatus
 from src.models.preference import NotificationPreference
 from src.models.rank import Rank, RankProgression, RankRequirement
@@ -103,6 +104,10 @@ __all__ = [
     "Order",
     "OrderStatus",
     "Organization",
+    "ActivityOpportunity",
+    "OpportunityRegistration",
+    "OpportunityRegistrationStatus",
+    "OpportunityStatus",
     "Payment",
     "PaymentStatus",
     "PeerConfirmation",

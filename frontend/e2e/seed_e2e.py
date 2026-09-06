@@ -19,6 +19,7 @@ from src.models import (  # noqa: E402
     Attendance, AttendanceStatus, Community, Event, EventCategory, EventStatus, LocationType, Membership, MembershipRole,
     AchievementRule, MembershipStatus, Organization, PlatformRole, PointRule, Profile, Task,
     TaskAssignment, Ticket, TicketStatus, TicketType, TicketVisibility, User,
+    ActivityOpportunity, OpportunityStatus,
 )
 from src.security import hash_password  # noqa: E402
 
@@ -89,6 +90,12 @@ def main() -> None:
             community_id=community.id, name="Verified task achievement", slug="verified-task-achievement",
             condition_tree={"operator": ">=", "metric": "task_count", "value": 1},
             reward_definition={"impact_points": 11},
+        ))
+        db.add(ActivityOpportunity(
+            community_id=community.id, created_by_id=organizer.id, title="E2E Park Cleanup",
+            description="Join the community for a verified park cleanup.", activity_type="volunteer_work",
+            dimension="service", starts_at=now + timedelta(days=2), ends_at=now + timedelta(days=2, hours=2),
+            location="E2E Community Park", capacity=20, members_only=True, status=OpportunityStatus.PUBLISHED,
         ))
         db.commit()
     engine.dispose()

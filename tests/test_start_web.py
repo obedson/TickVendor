@@ -24,4 +24,4 @@ def test_blank_database_migrates_to_current_head(tmp_path):
         [sys.executable, "-m", "alembic", "current"],
         env=environment, capture_output=True, text=True, check=True,
     )
-    assert "d0e1f2a3b4c5 (head)" in current.stdout + current.stderr
+    assert "f1a2b3c4d5e6 (head)" in current.stdout + current.stderr
