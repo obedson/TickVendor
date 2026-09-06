@@ -8,9 +8,21 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from src.authorization import require_community_role
-from src.models import Activity, ActivityOpportunity, ActivityStatus, EngagementDimension, Membership, MembershipRole, MembershipStatus, OpportunityRegistration, OpportunityRegistrationStatus, OpportunityStatus, User
-from src.services.notification import audit
+from src.models import (
+    Activity,
+    ActivityOpportunity,
+    ActivityStatus,
+    EngagementDimension,
+    Membership,
+    MembershipRole,
+    MembershipStatus,
+    OpportunityRegistration,
+    OpportunityRegistrationStatus,
+    OpportunityStatus,
+    User,
+)
 from src.services.activity import verify_activity
+from src.services.notification import audit, notify
 
 
 def _as_utc(value: datetime) -> datetime:
@@ -67,9 +79,16 @@ def list_opportunities(db: Session, user: User, community_id: UUID | None = None
         require_community_role(db, community_id, user, MembershipRole.ADMIN)
         query = select(ActivityOpportunity).where(ActivityOpportunity.community_id == community_id, ActivityOpportunity.deleted_at.is_(None))
     else:
-        query = select(ActivityOpportunity).join(Membership, Membership.community_id == ActivityOpportunity.community_id).where(
-            ActivityOpportunity.status == OpportunityStatus.PUBLISHED, ActivityOpportunity.deleted_at.is_(None),
-            ActivityOpportunity.ends_at >= datetime.now(UTC), Membership.user_id == user.id, Membership.status == MembershipStatus.ACTIVE,
+        query = select(ActivityOpportunity).outerjoin(
+            Membership,
+            (Membership.community_id == ActivityOpportunity.community_id)
+            & (Membership.user_id == user.id)
+            & (Membership.status == MembershipStatus.ACTIVE),
+        ).where(
+            ActivityOpportunity.status == OpportunityStatus.PUBLISHED,
+            ActivityOpportunity.deleted_at.is_(None),
+            ActivityOpportunity.ends_at >= datetime.now(UTC),
+            (ActivityOpportunity.members_only.is_(False) | (Membership.id.is_not(None))),
         )
     return list(db.scalars(query.order_by(ActivityOpportunity.starts_at, ActivityOpportunity.id).limit(100)))
 
@@ -87,6 +106,13 @@ def join_opportunity(db: Session, opportunity_id: UUID, user: User) -> Opportuni
         raise HTTPException(status_code=409, detail="Opportunity is at capacity")
     registration = OpportunityRegistration(opportunity_id=item.id, participant_id=user.id)
     db.add(registration); db.commit(); db.refresh(registration)
+    audit(db, actor_id=user.id, community_id=item.community_id, action="activity_opportunity.joined",
+          target_type="opportunity_registration", target_id=registration.id,
+          metadata={"opportunity_id": str(item.id)})
+    notify(db, user.id, "opportunity_registered", "Opportunity registration confirmed",
+           f"You registered for {item.title}.", {"opportunity_id": str(item.id)},
+           community_id=item.community_id,
+           deduplication_key=f"opportunity:{item.id}:participant:{user.id}:registered")
     return registration
 
 
@@ -101,6 +127,13 @@ def complete_opportunity(db: Session, opportunity_id: UUID, user: User) -> Oppor
     registration.completed_at = datetime.now(UTC)
     db.add(Activity(community_id=item.community_id, opportunity_id=item.id, user_id=user.id, activity_type=item.activity_type, dimension=EngagementDimension(item.dimension), description=item.description, status=ActivityStatus.PENDING, occurred_at=registration.completed_at))
     db.commit(); db.refresh(registration)
+    audit(db, actor_id=user.id, community_id=item.community_id, action="activity_opportunity.completed",
+          target_type="opportunity_registration", target_id=registration.id,
+          metadata={"opportunity_id": str(item.id)})
+    notify(db, user.id, "opportunity_completed", "Opportunity marked complete",
+           f"Your participation in {item.title} is awaiting verification.",
+           {"opportunity_id": str(item.id)}, community_id=item.community_id,
+           deduplication_key=f"opportunity:{item.id}:participant:{user.id}:completed")
     return registration
 
 

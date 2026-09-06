@@ -87,3 +87,18 @@ def test_activity_opportunity_enforces_tenant_duplicate_and_capacity_boundaries(
     other = client.post(f"/api/v1/communities/{other_community}/activity-opportunities", headers=headers(other_admin), json=payload("Other opportunity"))
     assert other.status_code == 201
     engine.dispose()
+
+
+def test_public_opportunity_is_discoverable_without_membership(tmp_path):
+    engine, client, (admin, _member, outsider, _other_admin, community, _other_community) = setup(tmp_path)
+    created = client.post(
+        f"/api/v1/communities/{community}/activity-opportunities",
+        headers=headers(admin), json={**payload("Public cleanup"), "members_only": False},
+    )
+    opportunity_id = created.json()["id"]
+    assert client.post(f"/api/v1/activity-opportunities/{opportunity_id}/publish", headers=headers(admin)).status_code == 200
+    discovered = client.get("/api/v1/activity-opportunities", headers=headers(outsider))
+    assert discovered.status_code == 200
+    assert [item["id"] for item in discovered.json()] == [opportunity_id]
+    assert client.post(f"/api/v1/activity-opportunities/{opportunity_id}/join", headers=headers(outsider)).status_code == 201
+    engine.dispose()

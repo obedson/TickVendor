@@ -1,7 +1,9 @@
 """add activity opportunities and registrations"""
 from collections.abc import Sequence
+
 import sqlalchemy as sa
 from alembic import op
+
 from src.models.base import GUID
 
 revision: str = "f1a2b3c4d5e6"

@@ -10,8 +10,21 @@ from sqlalchemy.orm import Session
 from src.api.auth import get_current_user
 from src.database import get_db
 from src.models import User
-from src.schemas.opportunity import OpportunityCreate, OpportunityResponse, OpportunityUpdate, RegistrationResponse
-from src.services.opportunity import complete_opportunity, create_opportunity, join_opportunity, list_opportunities, publish_opportunity, update_opportunity, verify_opportunity
+from src.schemas.opportunity import (
+    OpportunityCreate,
+    OpportunityResponse,
+    OpportunityUpdate,
+    RegistrationResponse,
+)
+from src.services.opportunity import (
+    complete_opportunity,
+    create_opportunity,
+    join_opportunity,
+    list_opportunities,
+    publish_opportunity,
+    update_opportunity,
+    verify_opportunity,
+)
 
 router = APIRouter(tags=["activity opportunities"])
 
