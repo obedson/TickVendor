@@ -19,6 +19,7 @@ from src.schemas.opportunity import (
 from src.services.opportunity import (
     complete_opportunity,
     create_opportunity,
+    get_participant_registration,
     join_opportunity,
     list_opportunities,
     publish_opportunity,
@@ -57,6 +58,11 @@ def update(opportunity_id: UUID, payload: OpportunityUpdate, db: Annotated[Sessi
 @router.post("/activity-opportunities/{opportunity_id}/join", response_model=RegistrationResponse, status_code=201)
 def join(opportunity_id: UUID, db: Annotated[Session, Depends(get_db)], user: Annotated[User, Depends(get_current_user)]):
     return join_opportunity(db, opportunity_id, user)
+
+
+@router.get("/activity-opportunities/{opportunity_id}/registration/me", response_model=RegistrationResponse | None)
+def my_registration(opportunity_id: UUID, db: Annotated[Session, Depends(get_db)], user: Annotated[User, Depends(get_current_user)]):
+    return get_participant_registration(db, opportunity_id, user)
 
 
 @router.post("/activity-opportunities/{opportunity_id}/complete", response_model=RegistrationResponse)

@@ -116,6 +116,14 @@ def join_opportunity(db: Session, opportunity_id: UUID, user: User) -> Opportuni
     return registration
 
 
+def get_participant_registration(db: Session, opportunity_id: UUID, user: User) -> OpportunityRegistration | None:
+    _opportunity(db, opportunity_id)
+    return db.scalar(select(OpportunityRegistration).where(
+        OpportunityRegistration.opportunity_id == opportunity_id,
+        OpportunityRegistration.participant_id == user.id,
+    ))
+
+
 def complete_opportunity(db: Session, opportunity_id: UUID, user: User) -> OpportunityRegistration:
     item = _opportunity(db, opportunity_id)
     registration = db.scalar(select(OpportunityRegistration).where(OpportunityRegistration.opportunity_id == item.id, OpportunityRegistration.participant_id == user.id))
