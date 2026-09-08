@@ -13,6 +13,8 @@ from sqlalchemy.orm import Session
 from src.api.auth import get_current_user
 from src.database import get_db
 from src.models import (
+    Attendance,
+    AttendanceStatus,
     Badge,
     BadgeAward,
     Event,
@@ -26,6 +28,8 @@ from src.models import (
     ProfileVisibility,
     Rank,
     RankProgression,
+    TaskAssignment,
+    TaskAssignmentStatus,
     User,
 )
 from src.security import decode_access_token
@@ -95,9 +99,49 @@ def my_profile(
             ImpactTransaction.user_id == user.id,
             ImpactTransaction.status == ImpactTransactionStatus.POSTED,
         ))
-        return {"id": str(user.id), "username": user.profile.username,
-                "display_name": user.profile.display_name, "visibility": user.profile.visibility.value,
-                "impact_points": points}
+        # Aggregate badges and milestones across all communities for the dashboard summary
+        all_badges = list(db.execute(
+            select(BadgeAward, Badge).join(Badge, Badge.id == BadgeAward.badge_id).where(
+                BadgeAward.user_id == user.id, BadgeAward.revoked_at.is_(None)
+            )
+        ))
+        all_milestones = list(db.execute(
+            select(MilestoneAward, Milestone).join(Milestone, Milestone.id == MilestoneAward.milestone_id).where(
+                MilestoneAward.user_id == user.id
+            )
+        ))
+        # Attendance count across all communities
+        events_attended = db.scalar(select(func.count()).select_from(Attendance).where(
+            Attendance.user_id == user.id,
+            Attendance.status.notin_([AttendanceStatus.NOT_CHECKED_IN, AttendanceStatus.REJECTED]),
+        )) or 0
+        tasks_completed = db.scalar(select(func.count()).select_from(TaskAssignment).where(
+            TaskAssignment.assignee_id == user.id,
+            TaskAssignment.status == TaskAssignmentStatus.VERIFIED,
+        )) or 0
+        # Best rank across all communities
+        best_rank_progression = db.scalar(
+            select(RankProgression).join(Rank, Rank.id == RankProgression.rank_id).where(
+                RankProgression.user_id == user.id
+            ).order_by(Rank.minimum_points.desc()).limit(1)
+        )
+        best_rank = db.get(Rank, best_rank_progression.rank_id) if best_rank_progression else None
+        return {
+            "id": str(user.id),
+            "username": user.profile.username,
+            "display_name": user.profile.display_name,
+            "visibility": user.profile.visibility.value,
+            "bio": user.profile.bio,
+            "location": user.profile.location,
+            "photo_url": user.profile.photo_url,
+            "impact_points": points,
+            "rank": {"id": str(best_rank.id), "name": best_rank.name} if best_rank else None,
+            "next_rank": None,
+            "badges": [{"id": str(award.id), "name": badge.name, "icon_url": badge.icon_url} for award, badge in all_badges],
+            "milestones": [{"id": str(award.id), "name": milestone.name} for award, milestone in all_milestones],
+            "events_attended": events_attended,
+            "tasks_completed": tasks_completed,
+        }
     membership = db.scalar(select(Membership).where(
         Membership.community_id == community_id, Membership.user_id == user.id,
         Membership.status == MembershipStatus.ACTIVE,

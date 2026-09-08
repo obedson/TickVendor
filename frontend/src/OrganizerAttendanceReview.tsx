@@ -1,4 +1,107 @@
 import { useEffect, useState } from 'react';
+import { EmptyState } from './AppShell';
 
-type Review = { attendance_id: string; participant_id: string; status: string; review_status: string; review_reason?: string; suspicious_signal_count: number };
-export function OrganizerAttendanceReview({ token, eventId }: { token: string; eventId: string }) { const [items, setItems] = useState<Review[]>([]); const [error, setError] = useState(''); const [message, setMessage] = useState(''); const headers = { Authorization: `Bearer ${token}` }; const load = async () => { const response = await fetch(`/api/v1/events/${eventId}/attendance/review`, { headers }); if (!response.ok) { setError(response.status === 403 ? 'Attendance review permission required.' : 'Unable to load review queue.'); return; } setItems(await response.json()); }; useEffect(() => { load(); }, [token, eventId]); const resolve = async (item: Review, outcome: string) => { const response = await fetch(`/api/v1/events/${eventId}/attendance/${item.attendance_id}/review`, { method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify({ outcome, reason: `Organizer ${outcome} review` }) }); if (!response.ok) { setError('Unable to resolve review.'); return; } setMessage(`Review ${outcome}.`); await load(); }; return <section className="panel"><h2>Attendance review</h2>{error && <p role="alert" className="error">{error}</p>}{message && <p role="status">{message}</p>}{!error && !items.length && <p className="empty">No flagged attendance needs review.</p>}{items.map(item => <article className="card" key={item.attendance_id}><h3>Participant <code>{item.participant_id}</code></h3><p>Status: {item.status} · Signals: {item.suspicious_signal_count}</p><p>{item.review_reason || 'No reason recorded.'}</p><button onClick={() => resolve(item, 'confirmed')}>Confirm</button><button className="secondary" onClick={() => resolve(item, 'cleared')}>Clear</button><button className="secondary" onClick={() => resolve(item, 'rejected')}>Reject</button></article>)}</section>; }
+type Review = {
+  attendance_id: string;
+  participant_id: string;
+  participant_name?: string;
+  status: string;
+  review_status: string;
+  review_reason?: string;
+  suspicious_signal_count: number;
+};
+
+export function OrganizerAttendanceReview({ token, eventId }: { token: string; eventId: string }) {
+  const [items, setItems] = useState<Review[]>([]);
+  const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
+  const [loading, setLoading] = useState(true);
+  const headers = { Authorization: `Bearer ${token}` };
+
+  const load = async () => {
+    if (!eventId) { setLoading(false); return; }
+    setLoading(true);
+    const response = await fetch(`/api/v1/events/${eventId}/attendance/review`, { headers });
+    if (!response.ok) {
+      setError(response.status === 403 ? 'Attendance review permission required.' : 'Unable to load review queue.');
+    } else {
+      setItems(await response.json());
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => { load(); }, [token, eventId]);
+
+  const resolve = async (item: Review, outcome: string) => {
+    const response = await fetch(`/api/v1/events/${eventId}/attendance/${item.attendance_id}/review`, {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ outcome, reason: `Organizer ${outcome} review` }),
+    });
+    if (!response.ok) { setError('Unable to resolve review.'); return; }
+    setMessage(`Attendance ${outcome}.`);
+    await load();
+  };
+
+  return (
+    <div>
+      <div className="page-header">
+        <div className="page-header-text">
+          <p className="eyebrow">Operations</p>
+          <h1>Attendance review</h1>
+          <p>Review flagged attendance records for this event.</p>
+        </div>
+        {items.length > 0 && (
+          <div className="page-header-actions">
+            <span className="chip chip-yellow">{items.length} flagged</span>
+          </div>
+        )}
+      </div>
+
+      {error && <p role="alert" className="error" style={{ marginBottom: '1rem' }}>{error}</p>}
+      {message && <p role="status" className="success-msg" style={{ marginBottom: '1rem' }}>{message}</p>}
+      {loading && <p role="status" className="text-muted">Loading review queue…</p>}
+
+      {!eventId && (
+        <p className="info-msg">Select an event from the Events section to review its attendance records.</p>
+      )}
+
+      {!loading && !error && eventId && !items.length && (
+        <EmptyState
+          title="No flagged attendance"
+          description="All attendance records for this event are clear. Flagged records will appear here for review."
+        />
+      )}
+
+      <div className="stack">
+        {items.map(item => (
+          <article key={item.attendance_id} className="card">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap' }}>
+              <div>
+                <h3 style={{ margin: '0 0 .35rem', fontSize: '1rem' }}>
+                  {item.participant_name || `Participant ${item.participant_id.slice(0, 8)}…`}
+                </h3>
+                <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
+                  <span className="chip chip-default">{item.status}</span>
+                  {item.suspicious_signal_count > 0 && (
+                    <span className="chip chip-red">⚠ {item.suspicious_signal_count} signal{item.suspicious_signal_count !== 1 ? 's' : ''}</span>
+                  )}
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '.5rem', flexShrink: 0 }}>
+                <button className="accent sm" onClick={() => resolve(item, 'confirmed')}>Confirm</button>
+                <button className="secondary sm" onClick={() => resolve(item, 'cleared')}>Clear</button>
+                <button className="danger sm" onClick={() => resolve(item, 'rejected')}>Reject</button>
+              </div>
+            </div>
+            {item.review_reason && (
+              <p style={{ marginTop: '.75rem', fontSize: '.875rem', color: 'var(--tv-muted)', padding: '.65rem .85rem', background: 'var(--tv-surface-sunken)', borderRadius: 'var(--tv-radius-md)' }}>
+                {item.review_reason}
+              </p>
+            )}
+          </article>
+        ))}
+      </div>
+    </div>
+  );
+}

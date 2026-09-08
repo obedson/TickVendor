@@ -1,11 +1,29 @@
 import { useEffect, useState } from 'react';
 
-type Summary = { community_id: string; members: number; active_members: number; events: number; tickets: number; attendees: number; verified_attendance: number; tasks: number; completed_tasks: number; contributions: number; impact_points: number; badges: number; milestones: number };
+type Summary = {
+  community_id: string;
+  members: number;
+  active_members: number;
+  events: number;
+  tickets: number;
+  attendees: number;
+  verified_attendance: number;
+  tasks: number;
+  completed_tasks: number;
+  contributions: number;
+  impact_points: number;
+  badges: number;
+  milestones: number;
+};
+
+type MetricGroup = { label: string; metrics: { label: string; value: number; icon: string }[] };
+
 export function AdminAnalytics({ token, communityId }: { token: string; communityId?: string }) {
   const [community, setCommunity] = useState(communityId ?? '');
   const [data, setData] = useState<Summary | null>(null);
   const [error, setError] = useState('');
   const headers = { Authorization: `Bearer ${token}` };
+
   useEffect(() => {
     (async () => {
       try {
@@ -18,8 +36,88 @@ export function AdminAnalytics({ token, communityId }: { token: string; communit
       } catch (cause) { setError(cause instanceof Error ? cause.message : 'Unable to load community analytics.'); }
     })();
   }, [token, communityId]);
-  if (error) return <section className="panel"><h2>Community analytics</h2><p role="alert" className="error">{error}</p></section>;
-  if (!data) return <section className="panel"><h2>Community analytics</h2><p role="status">Loading community analytics…</p></section>;
-  const metrics = [['Members', data.members], ['Active members', data.active_members], ['Events', data.events], ['Tickets', data.tickets], ['Attendees', data.attendees], ['Verified attendance', data.verified_attendance], ['Tasks', data.tasks], ['Completed tasks', data.completed_tasks], ['Contributions', data.contributions], ['Impact Points', data.impact_points], ['Badges', data.badges], ['Milestones', data.milestones]];
-  return <section aria-labelledby="admin-analytics-title"><p className="eyebrow">Administration</p><h2 id="admin-analytics-title">Community analytics</h2><div className="grid">{metrics.map(([label, value]) => <article className="panel card" key={String(label)}><h3>{label}</h3><p className="metric">{value}</p></article>)}</div></section>;
+
+  if (error) {
+    return (
+      <div>
+        <div className="page-header"><div className="page-header-text"><p className="eyebrow">Administration</p><h1>Community analytics</h1></div></div>
+        <p role="alert" className="error">{error}</p>
+      </div>
+    );
+  }
+
+  if (!data) {
+    return (
+      <div>
+        <div className="page-header"><div className="page-header-text"><p className="eyebrow">Administration</p><h1>Community analytics</h1></div></div>
+        <p role="status" className="text-muted">Loading analytics…</p>
+      </div>
+    );
+  }
+
+  const groups: MetricGroup[] = [
+    {
+      label: 'Membership',
+      metrics: [
+        { label: 'Total members', value: data.members, icon: '👥' },
+        { label: 'Active members', value: data.active_members, icon: '✅' },
+      ],
+    },
+    {
+      label: 'Events & tickets',
+      metrics: [
+        { label: 'Events', value: data.events, icon: '📅' },
+        { label: 'Tickets issued', value: data.tickets, icon: '🎟️' },
+        { label: 'Attendees', value: data.attendees, icon: '👤' },
+        { label: 'Verified attendance', value: data.verified_attendance, icon: '✓' },
+      ],
+    },
+    {
+      label: 'Tasks & contributions',
+      metrics: [
+        { label: 'Total tasks', value: data.tasks, icon: '📋' },
+        { label: 'Completed tasks', value: data.completed_tasks, icon: '✅' },
+        { label: 'Contributions', value: data.contributions, icon: '🤝' },
+      ],
+    },
+    {
+      label: 'Recognition',
+      metrics: [
+        { label: 'Impact Points awarded', value: data.impact_points, icon: '⚡' },
+        { label: 'Badges earned', value: data.badges, icon: '🏅' },
+        { label: 'Milestones reached', value: data.milestones, icon: '🎯' },
+      ],
+    },
+  ];
+
+  return (
+    <div>
+      <div className="page-header">
+        <div className="page-header-text">
+          <p className="eyebrow">Administration</p>
+          <h1>Community analytics</h1>
+          <p>Overview of community engagement, participation, and recognition.</p>
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gap: '1.5rem' }}>
+        {groups.map(group => (
+          <div key={group.label}>
+            <h2 style={{ fontSize: '1rem', color: 'var(--tv-muted)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: '.75rem' }}>{group.label}</h2>
+            <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))' }}>
+              {group.metrics.map(({ label, value, icon }) => (
+                <article className="card" key={label}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '.5rem' }}>
+                    <h3 style={{ margin: 0, fontSize: '.8rem', color: 'var(--tv-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.06em' }}>{label}</h3>
+                    <span style={{ fontSize: '1.1rem' }} aria-hidden="true">{icon}</span>
+                  </div>
+                  <p className="metric" style={{ fontSize: '1.75rem' }}>{value.toLocaleString()}</p>
+                </article>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }

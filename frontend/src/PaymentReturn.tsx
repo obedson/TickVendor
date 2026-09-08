@@ -1,2 +1,81 @@
-import{useEffect,useState}from'react';import{apiJson,ApiError}from'./api';type PaymentReturnProps={token:string;paymentId:string};
-export function PaymentReturn({token,paymentId}:PaymentReturnProps){const[state,setState]=useState<'checking'|'pending'|'successful'|'failed'|'unknown'|'error'>('checking');const[details,setDetails]=useState<any>(null);const[attempt,setAttempt]=useState(0);const check=()=>{apiJson<any>(`payments/${encodeURIComponent(paymentId)}`,{},token).then(data=>{setDetails(data);setState(data.status==='success'||data.status==='successful'?'successful':data.status==='failed'?'failed':'pending')}).catch(e=>setState(e instanceof ApiError&&e.status===404?'unknown':'error'))};useEffect(()=>{check()},[paymentId,token,attempt]);useEffect(()=>{if(state!=='pending'||attempt>=5)return;const timer=window.setTimeout(()=>setAttempt(value=>value+1),2000);return()=>window.clearTimeout(timer)},[state,attempt]);return <section className="panel" aria-labelledby="payment-title"><h2 id="payment-title">{state==='successful'?'Payment verified':'Payment status'}</h2>{state==='checking'&&<p role="status">Checking payment status…</p>}{state==='pending'&&<><p role="status">Payment pending</p><p>Please wait while the payment is verified.</p></>}{state==='successful'&&<><p role="status">Payment verified</p><p>Your ticket is now available in My Tickets.</p></>}{state==='failed'&&<p role="alert">Payment was not completed.</p>}{state==='unknown'&&<p role="alert">Payment status could not be confirmed.</p>}{state==='error'&&<p role="alert">Unable to check payment status. Please try again.</p>}{details?.reference&&<p>Reference: <code>{details.reference}</code></p>}</section>}
+import { useEffect, useState } from 'react';
+import { apiJson, ApiError } from './api';
+
+type PaymentReturnProps = { token: string; paymentId: string };
+type PaymentState = 'checking' | 'pending' | 'successful' | 'failed' | 'unknown' | 'error';
+
+export function PaymentReturn({ token, paymentId }: PaymentReturnProps) {
+  const [state, setState] = useState<PaymentState>('checking');
+  const [details, setDetails] = useState<any>(null);
+  const [attempt, setAttempt] = useState(0);
+
+  const check = () => {
+    apiJson<any>(`payments/${encodeURIComponent(paymentId)}`, {}, token)
+      .then(data => {
+        setDetails(data);
+        setState(
+          data.status === 'success' || data.status === 'successful' ? 'successful' :
+          data.status === 'failed' ? 'failed' : 'pending'
+        );
+      })
+      .catch(e => setState(e instanceof ApiError && e.status === 404 ? 'unknown' : 'error'));
+  };
+
+  useEffect(() => { check(); }, [paymentId, token, attempt]);
+
+  useEffect(() => {
+    if (state !== 'pending' || attempt >= 8) return;
+    const timer = window.setTimeout(() => setAttempt(v => v + 1), 2500);
+    return () => window.clearTimeout(timer);
+  }, [state, attempt]);
+
+  const stateConfig: Record<PaymentState, { icon: string; title: string; color: string; message: string }> = {
+    checking: { icon: '⏳', title: 'Checking payment…', color: 'var(--tv-muted)', message: 'Verifying your payment status with the provider.' },
+    pending: { icon: '⏳', title: 'Payment processing', color: 'var(--tv-warning)', message: 'Your payment is being processed. This may take a moment.' },
+    successful: { icon: '✅', title: 'Payment confirmed!', color: 'var(--tv-success)', message: 'Your ticket has been issued and is available in My Tickets.' },
+    failed: { icon: '❌', title: 'Payment not completed', color: 'var(--tv-danger)', message: 'The payment was not completed. No charge has been made.' },
+    unknown: { icon: '❓', title: 'Payment not found', color: 'var(--tv-muted)', message: 'This payment reference could not be found. Contact support if you were charged.' },
+    error: { icon: '⚠️', title: 'Unable to verify', color: 'var(--tv-danger)', message: 'Unable to check payment status. Please try again or contact support.' },
+  };
+
+  const config = stateConfig[state];
+
+  return (
+    <main className="auth">
+      <section className="panel" aria-labelledby="payment-title" style={{ textAlign: 'center' }}>
+        <div className="auth-brand" style={{ justifyContent: 'center' }}>
+          <div className="auth-brand-logo" aria-hidden="true">TV</div>
+          <span className="auth-brand-name">TickVendor</span>
+        </div>
+
+        <div style={{ fontSize: '3.5rem', margin: '1rem 0 .5rem' }} aria-hidden="true">{config.icon}</div>
+        <h1 id="payment-title" style={{ color: config.color, fontSize: '1.5rem' }}>{config.title}</h1>
+        <p style={{ color: 'var(--tv-muted)', marginBottom: '1.25rem' }}>{config.message}</p>
+
+        {state === 'pending' && attempt < 8 && (
+          <p role="status" className="info-msg" style={{ marginBottom: '1rem' }}>
+            Checking again… ({attempt + 1}/8)
+          </p>
+        )}
+
+        {details?.reference && (
+          <p style={{ fontSize: '.875rem', color: 'var(--tv-muted)', marginBottom: '1rem' }}>
+            Reference: <code>{details.reference}</code>
+          </p>
+        )}
+
+        <div className="form-actions" style={{ justifyContent: 'center' }}>
+          {state === 'successful' && (
+            <button className="accent" onClick={() => window.location.assign('/')}>View my tickets</button>
+          )}
+          {(state === 'failed' || state === 'error' || state === 'unknown') && (
+            <button className="secondary" onClick={() => window.location.assign('/')}>Back to TickVendor</button>
+          )}
+          {state === 'error' && (
+            <button className="accent" onClick={() => { setState('checking'); setAttempt(0); check(); }}>Try again</button>
+          )}
+        </div>
+      </section>
+    </main>
+  );
+}

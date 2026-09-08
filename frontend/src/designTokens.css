@@ -1,1 +1,69 @@
-:root{--tv-ink:#172554;--tv-muted:#64748b;--tv-border:#e2e8f0;--tv-surface:#fff;--tv-page:#f8fafc;--tv-accent:#0f766e;--tv-focus:#14b8a6;--tv-radius-sm:.5rem;--tv-radius-md:.75rem;--tv-radius-lg:1rem;--tv-space-1:.35rem;--tv-space-2:.65rem;--tv-space-3:1rem;--tv-space-4:1.5rem;--tv-space-5:2rem;--tv-content:1440px;--tv-sidebar:250px;--tv-shadow:0 8px 24px #0f172a0c}
+:root {
+  /* Brand colours */
+  --tv-ink: #172554;
+  --tv-ink-secondary: #1e3a8a;
+  --tv-muted: #64748b;
+  --tv-muted-light: #94a3b8;
+
+  /* Accent / teal */
+  --tv-accent: #0f766e;
+  --tv-accent-light: #ccfbf1;
+  --tv-accent-mid: #14b8a6;
+  --tv-focus: #14b8a6;
+
+  /* Semantic colours */
+  --tv-success: #16a34a;
+  --tv-success-bg: #dcfce7;
+  --tv-warning: #d97706;
+  --tv-warning-bg: #fef3c7;
+  --tv-danger: #dc2626;
+  --tv-danger-bg: #fee2e2;
+  --tv-info: #2563eb;
+  --tv-info-bg: #dbeafe;
+
+  /* Surfaces */
+  --tv-surface: #ffffff;
+  --tv-surface-raised: #ffffff;
+  --tv-surface-sunken: #f1f5f9;
+  --tv-page: #f8fafc;
+  --tv-border: #e2e8f0;
+  --tv-border-strong: #cbd5e1;
+
+  /* Radii */
+  --tv-radius-xs: .25rem;
+  --tv-radius-sm: .5rem;
+  --tv-radius-md: .75rem;
+  --tv-radius-lg: 1rem;
+  --tv-radius-xl: 1.5rem;
+  --tv-radius-full: 9999px;
+
+  /* Spacing */
+  --tv-space-1: .25rem;
+  --tv-space-2: .5rem;
+  --tv-space-3: .75rem;
+  --tv-space-4: 1rem;
+  --tv-space-5: 1.5rem;
+  --tv-space-6: 2rem;
+  --tv-space-7: 3rem;
+  --tv-space-8: 4rem;
+
+  /* Layout */
+  --tv-content: 1440px;
+  --tv-sidebar: 256px;
+  --tv-header-h: 4rem;
+
+  /* Shadows */
+  --tv-shadow-xs: 0 1px 2px rgba(15,23,42,.06);
+  --tv-shadow-sm: 0 2px 8px rgba(15,23,42,.08);
+  --tv-shadow: 0 4px 16px rgba(15,23,42,.10);
+  --tv-shadow-lg: 0 8px 32px rgba(15,23,42,.14);
+  --tv-shadow-xl: 0 16px 48px rgba(15,23,42,.18);
+
+  /* Typography */
+  --tv-font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --tv-font-mono: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+
+  /* Transitions */
+  --tv-transition: 150ms ease;
+  --tv-transition-slow: 250ms ease;
+}
