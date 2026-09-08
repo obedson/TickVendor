@@ -1,11 +1,17 @@
 import { test, expect } from '@playwright/test';
 
+async function switchToManagement(page: any) {
+  await page.getByRole('button', { name: 'Select workspace' }).first().click();
+  await page.getByRole('option', { name: 'E2E Community' }).click();
+}
+
 test('organizer can open the real event-management list', async ({ page }) => {
   await page.goto('/');
   await page.getByLabel('Email').fill('e2e-organizer@example.com');
   await page.getByLabel('Password').fill('e2e-password-123');
   await page.getByRole('button', { name: 'Sign in' }).click();
-  await page.getByRole('button', { name: 'Manage events' }).click();
+  await switchToManagement(page);
+  await page.getByRole('button', { name: 'Events' }).click();
   await expect(page.getByRole('heading', { name: 'Events' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'E2E Community Meetup' })).toBeVisible();
   await expect(page.getByText('Status: published')).toBeVisible();
@@ -24,7 +30,8 @@ test('organizer can open attendance configuration for an owned event', async ({ 
   await page.getByLabel('Email').fill('e2e-organizer@example.com');
   await page.getByLabel('Password').fill('e2e-password-123');
   await page.getByRole('button', { name: 'Sign in' }).click();
-  await page.getByRole('button', { name: 'Manage events' }).click();
+  await switchToManagement(page);
+  await page.getByRole('button', { name: 'Events' }).click();
   await page.getByRole('button', { name: 'Attendance and tickets' }).first().click();
   await expect(page.getByRole('heading', { name: 'Attendance configuration' })).toBeVisible();
   await page.getByRole('button', { name: 'Save attendance settings' }).click();

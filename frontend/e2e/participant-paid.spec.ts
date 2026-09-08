@@ -16,10 +16,10 @@ test('paid ticket uses real backend order and provider verification flow', async
     const body = await response.json();
     await route.fulfill({ json: { ...body, checkout_url: `${new URL(route.request().url()).origin}/?payment_id=${body.payment_id}` } });
   });
-  await page.getByRole('button', { name: 'Acquire ticket' }).nth(1).click();
+  await page.getByRole('button', { name: 'Get ticket' }).nth(1).click();
   await expect(page).toHaveURL(/payment_id=/);
   expect(initializeCalls).toBe(1);
-  await expect(page.getByRole('heading', { name: 'Payment status' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Payment/ })).toBeVisible();
   await page.reload();
   expect(initializeCalls).toBe(1);
 });

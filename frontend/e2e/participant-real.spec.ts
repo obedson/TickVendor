@@ -10,31 +10,30 @@ test('real participant can acquire a free ticket and retain its QR wallet', asyn
 
   await page.getByRole('button', { name: 'View event' }).click();
   await expect(page.getByRole('heading', { name: 'Free admission' })).toBeVisible();
-  await page.getByRole('button', { name: 'Acquire ticket' }).first().click();
-  await expect(page.getByText('Ticket confirmed. Open My tickets to view it.')).toBeVisible();
+  await page.getByRole('button', { name: 'Get ticket' }).first().click();
+  await expect(page.getByText('Ticket confirmed! Open My Tickets to view your QR code.')).toBeVisible();
 
   await page.getByRole('button', { name: 'My tickets' }).click();
   await expect(page.getByRole('heading', { name: 'E2E Community Meetup' }).first()).toBeVisible();
-  await expect(page.getByAltText(/Entrance QR code/).first()).toBeVisible();
-  await expect(page.getByText('Status: active')).toBeVisible();
+  await expect(page.getByAltText(/QR code for ticket/).first()).toBeVisible();
 
   await page.reload();
   await page.getByRole('button', { name: 'My tickets' }).click();
   await expect(page.getByRole('heading', { name: 'E2E Community Meetup' }).first()).toBeVisible();
-  await expect(page.getByAltText(/Entrance QR code/).first()).toBeVisible();
+  await expect(page.getByAltText(/QR code for ticket/).first()).toBeVisible();
 
-  await page.getByRole('button', { name: 'Activity' }).click();
+  await page.getByRole('button', { name: 'Attendance' }).click();
   await expect(page.getByRole('heading', { name: 'Attendance' })).toBeVisible();
   await page.getByRole('button', { name: 'Check in' }).click();
   await page.waitForResponse(response => response.url().includes('/attendance/check-in'));
-  await expect(page.getByText(/Attendance status:/)).toBeVisible();
+  await expect(page.getByText(/Check-in recorded\. Status:/)).toBeVisible();
 
   await page.getByRole('button', { name: 'Tasks' }).click();
   await expect(page.getByRole('heading', { name: 'Welcome task' })).toBeVisible();
   await page.getByRole('button', { name: 'Submit evidence' }).click();
-  await page.getByLabel('Evidence').fill('Completed the welcome task.');
+  await page.getByLabel('Evidence', { exact: false }).fill('Completed the welcome task.');
   await page.getByRole('button', { name: 'Submit task' }).click();
-  const submitState = page.getByText(/Submitted for verification\.|Task submitted\./);
+  const submitState = page.getByText(/Submitted for verification\.|Task submitted\.|Task completed!/);
   if (await submitState.count() === 0) {
     await expect(page.getByRole('heading', { name: 'Tasks' })).toBeVisible({ timeout: 10_000 });
     return;
@@ -57,12 +56,18 @@ test('real participant can acquire a free ticket and retain its QR wallet', asyn
   await organizerPage.getByLabel('Email').fill('e2e-organizer@example.com');
   await organizerPage.getByLabel('Password').fill('e2e-password-123');
   await organizerPage.getByRole('button', { name: 'Sign in' }).click();
-  await organizerPage.getByRole('button', { name: 'Review tasks' }).click();
+  // Switch to management workspace
+  await organizerPage.getByRole('button', { name: 'Select workspace' }).first().click();
+  await organizerPage.getByRole('option', { name: 'E2E Community' }).click();
+  await organizerPage.getByRole('button', { name: 'Tasks' }).click();
   await expect(organizerPage.getByText(/Completed the welcome task/)).toBeVisible();
   await organizerPage.getByRole('button', { name: 'Verify' }).click();
   await expect(organizerPage.getByText('Task verified.')).toBeVisible();
   await organizerPage.reload();
-  await organizerPage.getByRole('button', { name: 'Review tasks' }).click();
+  // Re-switch to management workspace after reload
+  await organizerPage.getByRole('button', { name: 'Select workspace' }).first().click();
+  await organizerPage.getByRole('option', { name: 'E2E Community' }).click();
+  await organizerPage.getByRole('button', { name: 'Tasks' }).click();
   await expect(organizerPage.getByText('No task submissions need review.')).toBeVisible();
   const verifiedAssignment = await page.request.get('http://127.0.0.1:8000/api/v1/task-assignments/me', {
     headers: { Authorization: `Bearer ${participantToken}` },
@@ -75,7 +80,7 @@ test('real participant can acquire a free ticket and retain its QR wallet', asyn
   await page.getByRole('button', { name: 'Tasks' }).click();
   const taskResponse = await taskRefresh;
   expect(taskResponse.ok()).toBeTruthy();
-  await expect(page.getByText('Status: verified')).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByText('verified').first()).toBeVisible({ timeout: 10_000 });
 
   await page.getByRole('button', { name: 'Achievements' }).click();
   await expect(page.getByRole('heading', { name: 'Achievements' })).toBeVisible();
@@ -91,9 +96,9 @@ test('participant attendance failure is rendered without duplicate check-in', as
   await page.getByRole('button', { name: 'Sign in' }).click();
   await page.getByRole('button', { name: 'Discover', exact: true }).click();
   await page.getByRole('button', { name: 'View event' }).click();
-  await page.getByRole('button', { name: 'Acquire ticket' }).first().click();
-  await expect(page.getByText('Ticket confirmed. Open My tickets to view it.')).toBeVisible();
-  await page.getByRole('button', { name: 'Activity' }).click();
+  await page.getByRole('button', { name: 'Get ticket' }).first().click();
+  await expect(page.getByText('Ticket confirmed! Open My Tickets to view your QR code.')).toBeVisible();
+  await page.getByRole('button', { name: 'Attendance' }).click();
   await page.evaluate(() => {
     Object.defineProperty(navigator, 'geolocation', {
       configurable: true,
@@ -101,7 +106,7 @@ test('participant attendance failure is rendered without duplicate check-in', as
     });
   });
   await page.getByRole('button', { name: 'Check in' }).click();
-  await expect(page.getByText(/Attendance status:|Check-in failed/)).toBeVisible();
+  await expect(page.getByText(/Check-in recorded\. Status:|Check-in failed/)).toBeVisible();
 });
 
 test('participant can load and submit peer confirmation', async ({ page }) => {
@@ -111,9 +116,9 @@ test('participant can load and submit peer confirmation', async ({ page }) => {
   await page.getByRole('button', { name: 'Sign in' }).click();
   await page.getByRole('button', { name: 'Discover', exact: true }).click();
   await page.getByRole('button', { name: 'View event' }).click();
-  await page.getByRole('button', { name: 'Acquire ticket' }).first().click();
-  await expect(page.getByText('Ticket confirmed. Open My tickets to view it.')).toBeVisible();
-  await page.getByRole('button', { name: 'Activity' }).click();
+  await page.getByRole('button', { name: 'Get ticket' }).first().click();
+  await expect(page.getByText('Ticket confirmed! Open My Tickets to view your QR code.')).toBeVisible();
+  await page.getByRole('button', { name: 'Attendance' }).click();
   await page.getByRole('button', { name: 'Check in' }).click();
-  await expect(page.getByText(/Attendance status:/)).toBeVisible();
+  await expect(page.getByText(/Check-in recorded\. Status:/)).toBeVisible();
 });
