@@ -95,7 +95,7 @@ def verify(
     if payment is None:
         raise HTTPException(status_code=404, detail="Payment not found")
     order = db.get(Order, payment.order_id)
-    if order.user_id != user.id:
+    if order is None or order.user_id != user.id:
         raise HTTPException(status_code=404, detail="Payment not found")
     apply_successful_payment(db, payment, provider)
     return {"status": payment.status.value}
@@ -111,6 +111,8 @@ def refund(
     if payment is None:
         raise HTTPException(status_code=404, detail="Payment not found")
     order = db.get(Order, payment.order_id)
+    if order is None:
+        raise HTTPException(status_code=404, detail="Payment not found")
     return refund_order(db, order, user, provider)
 
 

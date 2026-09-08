@@ -119,13 +119,8 @@ def my_profile(
             TaskAssignment.assignee_id == user.id,
             TaskAssignment.status == TaskAssignmentStatus.VERIFIED,
         )) or 0
-        # Best rank across all communities
-        best_rank_progression = db.scalar(
-            select(RankProgression).join(Rank, Rank.id == RankProgression.rank_id).where(
-                RankProgression.user_id == user.id
-            ).order_by(Rank.minimum_points.desc()).limit(1)
-        )
-        best_rank = db.get(Rank, best_rank_progression.rank_id) if best_rank_progression else None
+        # Rank is community-scoped; omit it from the cross-community summary to avoid
+        # misleading the caller with a rank from an unrelated community context.
         return {
             "id": str(user.id),
             "username": user.profile.username,
@@ -135,7 +130,7 @@ def my_profile(
             "location": user.profile.location,
             "photo_url": user.profile.photo_url,
             "impact_points": points,
-            "rank": {"id": str(best_rank.id), "name": best_rank.name} if best_rank else None,
+            "rank": None,
             "next_rank": None,
             "badges": [{"id": str(award.id), "name": badge.name, "icon_url": badge.icon_url} for award, badge in all_badges],
             "milestones": [{"id": str(award.id), "name": milestone.name} for award, milestone in all_milestones],

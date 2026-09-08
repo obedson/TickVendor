@@ -48,7 +48,7 @@ export function AdminAuditLogs({ token, communityId }: { token: string; communit
               value={action}
               onChange={e => { setOffset(0); setAction(e.target.value); }}
               placeholder="Filter by action…"
-              aria-label="Filter audit log by action"
+              aria-label="Action filter"
               style={{ width: '18rem' }}
             />
           </div>
