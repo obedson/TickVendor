@@ -8,6 +8,8 @@ from sqlalchemy.orm import Session
 import src.models  # noqa: F401
 from src.database import Base
 from src.models import (
+    Attendance,
+    AttendanceStatus,
     Badge,
     BadgeAward,
     Membership,
@@ -66,6 +68,12 @@ def test_community_dashboard_includes_distributions_trends_and_retention(tmp_pat
             idempotency_key="community-dashboard-badge",
             awarded_at=now,
         ))
+        db.add(Attendance(
+            event_id=_event.id,
+            user_id=member.id,
+            status=AttendanceStatus.GPS_VERIFIED,
+            checked_in_at=now,
+        ))
         db.commit()
 
         summary = community_summary(db, community.id, owner)
@@ -73,6 +81,8 @@ def test_community_dashboard_includes_distributions_trends_and_retention(tmp_pat
         assert summary["active_members"] == 2
         assert summary["badge_distribution"] == [{"name": "First Step", "awards": 1}]
         assert summary["rank_distribution"] == [{"name": "Starter", "members": 2}]
-        assert summary["participation_trends"] == []
+        assert summary["participation_trends"] == [
+            {"period": now.strftime("%Y-%m"), "attendances": 1}
+        ]
         assert summary["retention"] == {"eligible_members": 1, "retained_members": 0, "rate": 0.0}
     engine.dispose()

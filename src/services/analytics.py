@@ -54,16 +54,20 @@ def community_summary(db: Session, community_id, user: User) -> dict[str, object
         rank = current_rank(db, member_id, community_id)
         if rank is not None:
             rank_counts[rank.name] = rank_counts.get(rank.name, 0) + 1
-    attendance_rows = db.execute(
-        select(func.strftime("%Y-%m", Attendance.checked_in_at), func.count())
+    attendance_timestamps = db.scalars(
+        select(Attendance.checked_in_at)
         .where(
             Attendance.event_id.in_(event_ids),
             Attendance.checked_in_at.is_not(None),
             Attendance.status.notin_([AttendanceStatus.NOT_CHECKED_IN, AttendanceStatus.REJECTED]),
         )
-        .group_by(func.strftime("%Y-%m", Attendance.checked_in_at))
-        .order_by(func.strftime("%Y-%m", Attendance.checked_in_at))
+        .order_by(Attendance.checked_in_at)
     ).all()
+    attendance_counts: dict[str, int] = {}
+    for checked_in_at in attendance_timestamps:
+        period = checked_in_at.strftime("%Y-%m")
+        attendance_counts[period] = attendance_counts.get(period, 0) + 1
+    attendance_rows = list(attendance_counts.items())
     cutoff = datetime.now(UTC) - timedelta(days=30)
     eligible_ids = list(db.scalars(select(Membership.user_id).where(
         Membership.community_id == community_id,
