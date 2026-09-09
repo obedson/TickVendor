@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { apiFetch } from './api';
 
 type Community = { id: string; community: { name: string } };
 type SavedItem = { id: string; slug: string; name: string; is_active?: boolean };
@@ -27,7 +28,7 @@ export function AdminRecognition({ token, communityId }: Props) {
 
   const loadCommunity = async () => {
     if (community) return community;
-    const response = await fetch('/api/v1/communities/me', { headers });
+    const response = await apiFetch('communities/me', { headers });
     if (!response.ok) throw Error('Unable to load communities.');
     const items = await response.json() as Community[];
     const id = items[0]?.id;

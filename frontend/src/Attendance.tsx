@@ -82,7 +82,7 @@ export function Attendance({ token, tickets }: AttendanceProps) {
     setBusy(true);
     setError('');
     try {
-      const response = await fetch(`/api/v1/events/${ticket.event_id}/attendance/peer-confirmations`, {
+      const response = await apiFetch(`events/${ticket.event_id}/attendance/peer-confirmations`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ subject_id, confirmed: true }),

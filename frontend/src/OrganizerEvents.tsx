@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { OrganizerAttendanceConfig } from './OrganizerAttendanceConfig';
-import { apiJson, ApiError } from './api';
+import { apiJson, ApiError, apiFetch } from './api';
 import { EmptyState } from './AppShell';
 
 type Event = {
@@ -67,7 +67,7 @@ export function OrganizerEvents({ token, communityId }: { token: string; communi
 
   useEffect(() => {
     load();
-    fetch('/api/v1/communities/me', { headers })
+    apiFetch('communities/me', { headers })
       .then(r => r.ok ? r.json() : [])
       .then(setCommunities)
       .catch(() => setCommunities([]));
@@ -79,7 +79,7 @@ export function OrganizerEvents({ token, communityId }: { token: string; communi
     if (!community) { setError('Join an active community before creating an event.'); return; }
     setSaving(true); setError(''); setMessage('');
     try {
-      const response = await fetch('/api/v1/events', {
+      const response = await apiFetch('events', {
         method: 'POST',
         headers: { ...headers, 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -119,7 +119,7 @@ export function OrganizerEvents({ token, communityId }: { token: string; communi
     if (!editing) return;
     setSaving(true); setError('');
     try {
-      const response = await fetch(`/api/v1/events/${editing.id}`, {
+      const response = await apiFetch(`events/${editing.id}`, {
         method: 'PATCH',
         headers: { ...headers, 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -142,14 +142,14 @@ export function OrganizerEvents({ token, communityId }: { token: string; communi
 
   const publish = async (event: Event) => {
     setError('');
-    const response = await fetch(`/api/v1/events/${event.id}/publish`, { method: 'POST', headers });
+    const response = await apiFetch(`events/${event.id}/publish`, { method: 'POST', headers });
     if (!response.ok) { const data = await response.json(); setError(data.detail || 'Unable to publish event'); return; }
     setMessage(`"${event.title}" is now published.`);
     await load();
   };
 
   const loadTypes = async (event: Event) => {
-    const response = await fetch(`/api/v1/events/${event.id}/ticket-types`, { headers });
+    const response = await apiFetch(`events/${event.id}/ticket-types`, { headers });
     if (!response.ok) { setError('Unable to load ticket types'); return; }
     setTypes(await response.json());
   };

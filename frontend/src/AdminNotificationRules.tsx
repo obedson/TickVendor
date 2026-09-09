@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { apiFetch } from './api';
 
 type Rule = { id: string; notification_type: string; in_app_enabled: boolean; email_enabled: boolean; push_enabled: boolean; is_active: boolean };
 export function AdminNotificationRules({ token, communityId }: { token: string; communityId?: string }) {
@@ -13,14 +14,14 @@ export function AdminNotificationRules({ token, communityId }: { token: string; 
   const [message, setMessage] = useState('');
   const headers = { Authorization: `Bearer ${token}` };
   const load = async (id: string) => {
-    const response = await fetch(`/api/v1/admin/communities/${id}/notification-rules`, { headers });
+    const response = await apiFetch(`admin/communities/${id}/notification-rules`, { headers });
     if (!response.ok) throw Error('Unable to load notification rules.');
     setRules(await response.json());
   };
   useEffect(() => {
     (async () => {
       try {
-        const id = community || (await (await fetch('/api/v1/communities/me', { headers })).json())[0]?.id;
+        const id = community || (await (await apiFetch('communities/me', { headers })).json())[0]?.id;
         if (!id) throw Error('No community is available for administration.');
         setCommunity(id); await load(id);
       } catch (cause) { setError(cause instanceof Error ? cause.message : 'Unable to load notification rules.'); }
@@ -28,7 +29,7 @@ export function AdminNotificationRules({ token, communityId }: { token: string; 
   }, [token]);
   const save = async (event: React.FormEvent) => {
     event.preventDefault(); if (!community) return; setError(''); setMessage('');
-    const response = await fetch(`/api/v1/admin/communities/${community}/notification-rules`, { method: 'PUT', headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify({ notification_type: type, in_app_enabled: inApp, email_enabled: email, push_enabled: push, is_active: active }) });
+    const response = await apiFetch(`admin/communities/${community}/notification-rules`, { method: 'PUT', headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify({ notification_type: type, in_app_enabled: inApp, email_enabled: email, push_enabled: push, is_active: active }) });
     const data = await response.json(); if (!response.ok) { setError(data.detail || 'Unable to save notification rule.'); return; }
     setMessage('Notification rule saved.'); await load(community);
   };

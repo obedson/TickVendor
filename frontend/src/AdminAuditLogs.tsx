@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { EmptyState } from './AppShell';
+import { apiFetch } from './api';
 
 type Log = { id: string; actor_id?: string; action: string; target_type?: string; target_id?: string; occurred_at: string; metadata: unknown };
 
@@ -17,14 +18,14 @@ export function AdminAuditLogs({ token, communityId }: { token: string; communit
     try {
       let id = communityId;
       if (!id) {
-        const memberships = await fetch('/api/v1/communities/me', { headers });
+        const memberships = await apiFetch('communities/me', { headers });
         if (!memberships.ok) { setError('Unable to load communities.'); return; }
         id = (await memberships.json())[0]?.id;
       }
       if (!id) { setError('No active community selected.'); return; }
       const query = new URLSearchParams({ limit: '25', offset: String(offset) });
       if (action) query.set('action', action);
-      const response = await fetch(`/api/v1/admin/communities/${id}/audit-logs?${query}`, { headers });
+      const response = await apiFetch(`admin/communities/${id}/audit-logs?${query}`, { headers });
       if (!response.ok) { setError(response.status === 403 ? 'Administrator access required.' : 'Unable to load audit logs.'); return; }
       setLogs(await response.json());
     } finally { setLoading(false); }

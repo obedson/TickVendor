@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { apiFetch } from './api';
 
 type Validation = { result: string; ticket?: { public_id: string; attendee_id: string; status: string } | null };
 
@@ -13,7 +14,7 @@ export function OrganizerAttendanceOperations({ token, eventId }: { token: strin
     if (!eventId) { setError('No event selected. Select an event from the Events section first.'); return; }
     setBusy(true); setError(''); setResult(null);
     try {
-      const response = await fetch(`/api/v1/events/${eventId}/tickets/validate`, {
+      const response = await apiFetch(`events/${eventId}/tickets/validate`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ qr_token: qr }),

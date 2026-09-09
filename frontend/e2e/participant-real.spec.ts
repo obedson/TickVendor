@@ -120,8 +120,8 @@ await expect(
 
   await page.getByRole('button', { name: 'Achievements' }).click();
   await expect(page.getByRole('heading', { name: 'Achievements' })).toBeVisible();
-  await expect(page.getByText(/Impact Points/)).toBeVisible();
-  await expect(page.getByText('16 Impact Points')).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByText('Total Impact Points', { exact: true })).toBeVisible();
+  await expect(page.getByText('16', { exact: true })).toBeVisible({ timeout: 10_000 });
   await organizer.close();
 });
 

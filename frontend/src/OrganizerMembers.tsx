@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { EmptyState } from './AppShell';
+import { apiFetch } from './api';
 
 type Member = { id: string; user_id: string; username?: string; display_name?: string; role: string; status: string; joined_at?: string };
 
@@ -19,12 +20,12 @@ export function OrganizerMembers({ token, communityId }: { token: string; commun
     try {
       let id = communityId;
       if (!id) {
-        const memberships = await fetch('/api/v1/communities/me', { headers });
+        const memberships = await apiFetch('communities/me', { headers });
         if (!memberships.ok) { setError('Unable to load communities.'); return; }
         id = (await memberships.json())[0]?.id;
       }
       if (!id) { setError('No active community selected.'); return; }
-      const response = await fetch(`/api/v1/communities/${id}/members`, { headers });
+      const response = await apiFetch(`communities/${id}/members`, { headers });
       if (!response.ok) { setError(response.status === 403 ? 'Administrator access required.' : 'Unable to load members.'); return; }
       setMembers((await response.json()).members);
     } finally { setLoading(false); }
@@ -35,10 +36,10 @@ export function OrganizerMembers({ token, communityId }: { token: string; commun
   const updateStatus = async (member: Member, status: string) => {
     let id = communityId;
     if (!id) {
-      const memberships = await fetch('/api/v1/communities/me', { headers });
+      const memberships = await apiFetch('communities/me', { headers });
       id = (await memberships.json())[0]?.id;
     }
-    const response = await fetch(`/api/v1/communities/${id}/members/${member.id}/status`, {
+    const response = await apiFetch(`communities/${id}/members/${member.id}/status`, {
       method: 'PATCH',
       headers: { ...headers, 'Content-Type': 'application/json' },
       body: JSON.stringify({ status }),

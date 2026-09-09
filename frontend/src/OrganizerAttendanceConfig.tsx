@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { apiFetch } from './api';
 
 type Config = {
   qr_attendance_enabled: boolean;
@@ -36,7 +37,7 @@ export function OrganizerAttendanceConfig({ token, communityId, eventId }: { tok
     e.preventDefault();
     setBusy(true); setError(''); setMessage('');
     try {
-      const response = await fetch(`/api/v1/communities/${communityId}/events/${eventId}/attendance-config`, {
+      const response = await apiFetch(`communities/${communityId}/events/${eventId}/attendance-config`, {
         method: 'PATCH',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(config),

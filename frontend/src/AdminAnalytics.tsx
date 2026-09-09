@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { apiFetch } from './api';
 
 type Summary = {
   community_id: string;
@@ -32,10 +33,10 @@ export function AdminAnalytics({ token, communityId }: { token: string; communit
   useEffect(() => {
     (async () => {
       try {
-        const id = community || (await (await fetch('/api/v1/communities/me', { headers })).json())[0]?.id;
+        const id = community || (await (await apiFetch('communities/me', { headers })).json())[0]?.id;
         if (!id) throw Error('No community is available for analytics.');
         setCommunity(id);
-        const response = await fetch(`/api/v1/communities/${id}/analytics`, { headers });
+        const response = await apiFetch(`communities/${id}/analytics`, { headers });
         if (!response.ok) throw Error(response.status === 403 ? 'Administrator access required.' : 'Unable to load community analytics.');
         setData(await response.json());
       } catch (cause) { setError(cause instanceof Error ? cause.message : 'Unable to load community analytics.'); }

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { EmptyState } from './AppShell';
+import { apiFetch } from './api';
 
 type Submission = {
   assignment_id: string;
@@ -25,12 +26,12 @@ export function OrganizerTaskQueue({ token, communityId }: { token: string; comm
     try {
       let id = communityId;
       if (!id) {
-        const memberships = await fetch('/api/v1/communities/me', { headers });
+        const memberships = await apiFetch('communities/me', { headers });
         if (!memberships.ok) throw Error('Unable to load communities');
         id = (await memberships.json())[0]?.id;
       }
       if (!id) throw Error('No active community selected');
-      const response = await fetch(`/api/v1/communities/${id}/task-verification-queue`, { headers });
+      const response = await apiFetch(`communities/${id}/task-verification-queue`, { headers });
       if (!response.ok) throw Error(response.status === 403 ? 'Organizer access required' : 'Unable to load task queue');
       setItems(await response.json());
     } catch (cause) {
@@ -41,7 +42,7 @@ export function OrganizerTaskQueue({ token, communityId }: { token: string; comm
   useEffect(() => { load(); }, [token, communityId]);
 
   const verify = async (assignmentId: string, approve: boolean) => {
-    const response = await fetch(`/api/v1/task-assignments/${assignmentId}/verify`, {
+    const response = await apiFetch(`task-assignments/${assignmentId}/verify`, {
       method: 'POST',
       headers: { ...headers, 'Content-Type': 'application/json' },
       body: JSON.stringify({ approve }),
