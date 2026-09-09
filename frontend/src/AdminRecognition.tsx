@@ -7,7 +7,7 @@ type SavedItem = { id: string; slug: string; name: string; is_active?: boolean }
 type Props = { token: string; communityId?: string };
 
 const api = (community: string, resource: string) =>
-  `/api/v1/admin/communities/${community}/${resource}`;
+  `admin/communities/${community}/${resource}`;
 
 export function AdminRecognition({ token, communityId }: Props) {
   const [community, setCommunity] = useState(communityId ?? '');
@@ -47,7 +47,7 @@ export function AdminRecognition({ token, communityId }: Props) {
     if (!community) return;
     setLoading(true);
     Promise.all((['achievement-rules', 'badges', 'milestones', 'ranks'] as const).map(async resource => {
-      const response = await fetch(api(community, resource), { headers });
+      const response = await apiFetch(api(community, resource), { headers });
       if (!response.ok) throw Error('Unable to load recognition configuration.');
       return [resource, await response.json() as SavedItem[]] as const;
     })).then(items => items.forEach(([resource, values]) => {
@@ -65,7 +65,7 @@ export function AdminRecognition({ token, communityId }: Props) {
     setBusy(true);
     try {
       const id = await loadCommunity();
-      const response = await fetch(api(id, resource), {
+      const response = await apiFetch(api(id, resource), {
         method: 'POST',
         headers: { ...headers, 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -73,7 +73,7 @@ export function AdminRecognition({ token, communityId }: Props) {
       const data = await response.json();
       if (!response.ok) throw Error(data.detail || `Unable to create ${label}.`);
       setMessage(`${label} saved.`);
-      const refreshed = await fetch(api(id, resource), { headers });
+      const refreshed = await apiFetch(api(id, resource), { headers });
       if (!refreshed.ok) throw Error('Saved, but unable to reload recognition configuration.');
       const values = await refreshed.json() as SavedItem[];
       if (resource === 'achievement-rules') setRules(values);
@@ -88,7 +88,7 @@ export function AdminRecognition({ token, communityId }: Props) {
   const toggle = async (resource: string, item: SavedItem, active: boolean) => {
     if (!community || !item.id) return;
     setError('');
-    const response = await fetch(`${api(community, resource)}/${item.id}`, {
+    const response = await apiFetch(`${api(community, resource)}/${item.id}`, {
       method: 'PATCH',
       headers: { ...headers, 'Content-Type': 'application/json' },
       body: JSON.stringify({ is_active: active }),

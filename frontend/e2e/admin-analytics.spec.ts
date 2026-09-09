@@ -9,8 +9,8 @@ test('community administrator can view authoritative analytics', async ({ page }
   await page.getByRole('button', { name: 'Select workspace' }).first().click();
   await page.getByRole('option', { name: 'E2E Community' }).click();
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
-await page.getByRole('button', { name: 'Analytics', exact: true }).click();
+  await page.getByRole('button', { name: 'Analytics', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Community analytics' })).toBeVisible();
-  await expect(page.getByText('Members')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Total members', exact: true })).toBeVisible();
   await expect(page.getByText('Impact Points awarded', { exact: true })).toBeVisible();
 });
