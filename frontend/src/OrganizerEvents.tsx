@@ -3,11 +3,38 @@ import { OrganizerAttendanceConfig } from './OrganizerAttendanceConfig';
 import { apiJson, ApiError } from './api';
 import { EmptyState } from './AppShell';
 
-type Event = { id: string; community_id: string; title: string; description: string; status: string; starts_at: string; ends_at: string; category: string; venue?: { name: string; city?: string } | null };
+type Event = {
+  id: string;
+  community_id: string;
+  title: string;
+  description: string;
+  status: string;
+  starts_at: string;
+  ends_at: string;
+  category: string;
+  online_url?: string | null;
+  venue?: {
+    name: string;
+    address: string;
+    city?: string | null;
+    region?: string | null;
+  } | null;
+};
 type Community = { id: string; community: { name: string } };
 type TicketType = { id: string; name: string; price: string; currency: string; quantity: number; visibility: string; availability: number };
 
-const emptyForm = { title: '', description: '', category: 'community', starts_at: '', ends_at: '', online_url: '' };
+const emptyForm = {
+  title: '',
+  description: '',
+  category: 'community',
+  starts_at: '',
+  ends_at: '',
+  online_url: '',
+  venue_name: '',
+  venue_address: '',
+  venue_city: '',
+  venue_region: '',
+};
 
 const STATUS_COLORS: Record<string, string> = {
   draft: 'chip-default',
@@ -56,13 +83,25 @@ export function OrganizerEvents({ token, communityId }: { token: string; communi
         method: 'POST',
         headers: { ...headers, 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ...form,
-          community_id: community.id,
-          starts_at: new Date(form.starts_at).toISOString(),
-          ends_at: new Date(form.ends_at).toISOString(),
-          location_type: form.online_url ? 'online' : 'physical',
-          ...(form.online_url ? { online_url: form.online_url } : {}),
-        }),
+  title: form.title,
+  description: form.description,
+  category: form.category,
+  community_id: community.id,
+  starts_at: new Date(form.starts_at).toISOString(),
+  ends_at: new Date(form.ends_at).toISOString(),
+  location_type: form.online_url ? 'online' : 'physical',
+  ...(form.online_url
+    ? { online_url: form.online_url }
+    : {
+        venue: {
+          name: form.venue_name,
+          address: form.venue_address,
+          ...(form.venue_city ? { city: form.venue_city } : {}),
+          ...(form.venue_region ? { region: form.venue_region } : {}),
+          country_code: 'NG',
+        },
+      }),
+}),
       });
       const data = await response.json();
       if (!response.ok) throw Error(data.detail?.[0]?.msg || data.detail || 'Unable to create event');
@@ -117,7 +156,18 @@ export function OrganizerEvents({ token, communityId }: { token: string; communi
 
   const beginEdit = (event: Event) => {
     setEditing(event);
-    setForm({ title: event.title, description: event.description, category: event.category, starts_at: event.starts_at.slice(0, 16), ends_at: event.ends_at.slice(0, 16), online_url: '' });
+setForm({
+  title: event.title,
+  description: event.description,
+  category: event.category,
+  starts_at: event.starts_at.slice(0, 16),
+  ends_at: event.ends_at.slice(0, 16),
+  online_url: event.online_url ?? '',
+  venue_name: event.venue?.name ?? '',
+  venue_address: event.venue?.address ?? '',
+  venue_city: event.venue?.city ?? '',
+  venue_region: event.venue?.region ?? '',
+});
     setShowForm(true);
     setConfigEvent(null);
   };
@@ -168,11 +218,62 @@ export function OrganizerEvents({ token, communityId }: { token: string; communi
               </label>
             </div>
             {!editing && (
-              <label>
-                <span className="label-text">Online URL (leave blank for in-person)</span>
-                <input type="url" value={form.online_url} onChange={e => setForm({ ...form, online_url: e.target.value })} placeholder="https://meet.example.com/event" />
-              </label>
-            )}
+  <>
+    <label>
+      <span className="label-text">Online URL (leave blank for in-person)</span>
+      <input
+        type="url"
+        value={form.online_url}
+        onChange={e => setForm({ ...form, online_url: e.target.value })}
+        placeholder="https://meet.example.com/event"
+      />
+    </label>
+
+    {!form.online_url && (
+      <>
+        <label>
+          <span className="label-text">Venue name</span>
+          <input
+            required
+            value={form.venue_name}
+            onChange={e => setForm({ ...form, venue_name: e.target.value })}
+            placeholder="e.g. Cafe One Enugu"
+          />
+        </label>
+
+        <label>
+          <span className="label-text">Venue address</span>
+          <input
+            required
+            value={form.venue_address}
+            onChange={e => setForm({ ...form, venue_address: e.target.value })}
+            placeholder="Street address"
+          />
+        </label>
+
+        <div className="form-row">
+          <label>
+            <span className="label-text">City</span>
+            <input
+              value={form.venue_city}
+              onChange={e => setForm({ ...form, venue_city: e.target.value })}
+              placeholder="e.g. Enugu"
+            />
+          </label>
+
+          <label>
+            <span className="label-text">State / Region</span>
+            <input
+              value={form.venue_region}
+              onChange={e => setForm({ ...form, venue_region: e.target.value })}
+              placeholder="e.g. Enugu"
+            />
+          </label>
+        </div>
+      </>
+    )}
+  </>
+)}
             <div className="form-actions">
               <button type="submit" className="accent" disabled={saving}>
                 {saving ? 'Saving…' : editing ? 'Save changes' : 'Create event'}

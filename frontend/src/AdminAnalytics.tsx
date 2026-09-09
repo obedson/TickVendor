@@ -6,14 +6,19 @@ type Summary = {
   active_members: number;
   events: number;
   tickets: number;
-  attendees: number;
-  verified_attendance: number;
+  attendance: number;
   tasks: number;
-  completed_tasks: number;
   contributions: number;
   impact_points: number;
-  badges: number;
-  milestones: number;
+  revenue: string;
+  badge_distribution: { name: string; awards: number }[];
+  rank_distribution: { name: string; members: number }[];
+  participation_trends: { period: string; attendances: number }[];
+  retention: {
+    eligible_members: number;
+    retained_members: number;
+    rate: number;
+  };
 };
 
 type MetricGroup = { label: string; metrics: { label: string; value: number; icon: string }[] };
@@ -56,39 +61,35 @@ export function AdminAnalytics({ token, communityId }: { token: string; communit
   }
 
   const groups: MetricGroup[] = [
-    {
-      label: 'Membership',
-      metrics: [
-        { label: 'Total members', value: data.members, icon: '👥' },
-        { label: 'Active members', value: data.active_members, icon: '✅' },
-      ],
-    },
-    {
-      label: 'Events & tickets',
-      metrics: [
-        { label: 'Events', value: data.events, icon: '📅' },
-        { label: 'Tickets issued', value: data.tickets, icon: '🎟️' },
-        { label: 'Attendees', value: data.attendees, icon: '👤' },
-        { label: 'Verified attendance', value: data.verified_attendance, icon: '✓' },
-      ],
-    },
-    {
-      label: 'Tasks & contributions',
-      metrics: [
-        { label: 'Total tasks', value: data.tasks, icon: '📋' },
-        { label: 'Completed tasks', value: data.completed_tasks, icon: '✅' },
-        { label: 'Contributions', value: data.contributions, icon: '🤝' },
-      ],
-    },
-    {
-      label: 'Recognition',
-      metrics: [
-        { label: 'Impact Points awarded', value: data.impact_points, icon: '⚡' },
-        { label: 'Badges earned', value: data.badges, icon: '🏅' },
-        { label: 'Milestones reached', value: data.milestones, icon: '🎯' },
-      ],
-    },
-  ];
+  {
+    label: 'Membership',
+    metrics: [
+      { label: 'Total members', value: data.members, icon: '👥' },
+      { label: 'Active members', value: data.active_members, icon: '✅' },
+    ],
+  },
+  {
+    label: 'Events & tickets',
+    metrics: [
+      { label: 'Events', value: data.events, icon: '📅' },
+      { label: 'Tickets issued', value: data.tickets, icon: '🎟️' },
+      { label: 'Attendance records', value: data.attendance, icon: '👤' },
+    ],
+  },
+  {
+    label: 'Tasks & contributions',
+    metrics: [
+      { label: 'Total tasks', value: data.tasks, icon: '📋' },
+      { label: 'Contributions', value: data.contributions, icon: '🤝' },
+    ],
+  },
+  {
+    label: 'Recognition',
+    metrics: [
+      { label: 'Impact Points awarded', value: data.impact_points, icon: '⚡' },
+    ],
+  },
+];
 
   return (
     <div>

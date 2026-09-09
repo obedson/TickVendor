@@ -10,5 +10,7 @@ test('organizer can open attendance review queue', async ({ page }) => {
   await page.getByRole('option', { name: 'E2E Community' }).click();
   await page.getByRole('button', { name: 'Attendance review' }).click();
   await expect(page.getByRole('heading', { name: 'Attendance review' })).toBeVisible();
-  await expect(page.getByText(/No flagged attendance needs review\.|No review items/)).toBeVisible();
+ await expect(
+  page.getByRole('heading', { name: 'No flagged attendance', exact: true })
+).toBeVisible();
 });

@@ -20,10 +20,10 @@ test('participant API-backed screens use the API service origin', async ({ page 
   const requests: string[] = [];
   page.on('request', request => { if (request.url().includes('/api/v1/')) requests.push(request.url()); });
   await page.goto('/');
-  await page.getByRole('button', { name: 'Achievements' }).click();
-  await page.getByRole('button', { name: 'Tasks' }).click();
-  await page.getByRole('button', { name: 'Communities' }).click();
-  await page.getByRole('button', { name: 'Notifications' }).click();
+  await page.getByRole('button', { name: 'Achievements', exact: true }).click();
+await page.getByRole('button', { name: 'Tasks', exact: true }).click();
+await page.getByRole('button', { name: 'Communities', exact: true }).click();
+await page.locator('.sidebar').getByRole('button', { name: 'Notifications', exact: true }).click();
   expect(requests.every(url => url.includes('/api/v1/'))).toBeTruthy();
 });
 
@@ -36,7 +36,7 @@ test('desktop participant Home and Discover remain distinct', async ({ page }) =
   await page.getByRole('button', { name: 'Discover', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Find your next event' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Make your presence count.' })).not.toBeVisible();
-  await expect(page.getByRole('textbox', { name: 'Search events' })).toHaveCount(1);
+  await expect(page.getByRole('searchbox', { name: 'Search events' })).toHaveCount(1);
   await expect(page.getByRole('heading', { name: 'No events available' })).toBeVisible();
   await page.getByRole('button', { name: 'Home' }).click();
   await expect(page.getByRole('heading', { name: 'Make your presence count.' })).toBeVisible();

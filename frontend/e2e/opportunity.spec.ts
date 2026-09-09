@@ -10,6 +10,9 @@ test('participant discovers and joins a community opportunity', async ({ page })
   await expect(page.getByRole('heading', { name: 'E2E Park Cleanup' })).toBeVisible();
   await page.getByRole('button', { name: 'View opportunity' }).click();
   await expect(page.getByRole('heading', { name: 'E2E Park Cleanup' })).toBeVisible();
-  await page.getByRole('button', { name: 'Join opportunity' }).click();
+  await page.getByRole('button', {
+  name: 'Join this opportunity',
+  exact: true,
+}).click();
   await expect(page.getByRole('status')).toContainText('registered');
 });

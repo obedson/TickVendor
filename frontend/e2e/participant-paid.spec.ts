@@ -7,7 +7,9 @@ test('paid ticket uses real backend order and provider verification flow', async
   await page.getByRole('button', { name: 'Sign in' }).click();
   await page.getByRole('button', { name: 'Discover', exact: true }).click();
   await page.getByRole('button', { name: 'View event' }).click();
-  await expect(page.getByRole('heading', { name: 'Supporter admission' })).toBeVisible();
+  await expect(
+  page.getByText('Supporter admission', { exact: true })
+).toBeVisible();
 
   let initializeCalls = 0;
   await page.route('**/api/v1/payments/initialize', async route => {

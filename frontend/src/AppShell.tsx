@@ -127,10 +127,15 @@ function WorkspaceSelector({
   }, []);
 
   const choose = (id: string) => {
-    setOpen(false);
-    buttonRef.current?.focus();
-    id === 'participant' ? onWorkspaceChange('participant') : onWorkspaceChange('management', id);
-  };
+  setOpen(false);
+  buttonRef.current?.focus();
+
+  if (id === 'participant') {
+    onWorkspaceChange('participant');
+  } else {
+    onWorkspaceChange('management', id);
+  }
+};
 
   const handleTriggerKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
     if (event.key === 'Escape') { setOpen(false); return; }

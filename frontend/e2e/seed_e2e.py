@@ -13,15 +13,35 @@ os.environ["PAYMENT_PROVIDER"] = "test"
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
-import src.models  # noqa: F401,E402
-from src.database import Base  # noqa: E402
-from src.models import (  # noqa: E402
-    Attendance, AttendanceStatus, Community, Event, EventCategory, EventStatus, LocationType, Membership, MembershipRole,
-    AchievementRule, MembershipStatus, Organization, PlatformRole, PointRule, Profile, Task,
-    TaskAssignment, Ticket, TicketStatus, TicketType, TicketVisibility, User,
-    ActivityOpportunity, OpportunityStatus,
+import src.models  # noqa: F401
+from src.database import Base
+from src.models import (
+    AchievementRule,
+    ActivityOpportunity,
+    Attendance,
+    AttendanceStatus,
+    Community,
+    Event,
+    EventCategory,
+    EventStatus,
+    LocationType,
+    Membership,
+    MembershipRole,
+    MembershipStatus,
+    OpportunityStatus,
+    Organization,
+    PlatformRole,
+    PointRule,
+    Profile,
+    Task,
+    TaskAssignment,
+    Ticket,
+    TicketStatus,
+    TicketType,
+    TicketVisibility,
+    User,
 )
-from src.security import hash_password  # noqa: E402
+from src.security import hash_password
 
 
 def main() -> None:

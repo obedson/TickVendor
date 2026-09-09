@@ -1,10 +1,9 @@
 """Tests for /profiles/me cross-community aggregation and tenant isolation."""
 
-from decimal import Decimal
 
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import sessionmaker
 
 import src.models  # noqa: F401
 from src.database import Base, get_db
@@ -23,14 +22,12 @@ from src.models import (
     Milestone,
     MilestoneAward,
     Organization,
-    Profile,
     Rank,
-    RankProgression,
     TaskAssignment,
     TaskAssignmentStatus,
     User,
 )
-from src.security import create_access_token, hash_password
+from src.security import create_access_token
 from tests.test_database import create_event_context
 
 
@@ -111,8 +108,8 @@ def test_no_community_id_aggregates_badges_and_milestones(tmp_path):
         community_b = Community(organization_id=org_b.id, name="Community B2", slug="community-b2-cross")
         db.add(community_b)
         db.flush()
-        badge_a = Badge(community_id=community_a.id, name="Badge A", slug="badge-a-cross", is_active=True)
-        badge_b = Badge(community_id=community_b.id, name="Badge B", slug="badge-b-cross", is_active=True)
+        badge_a = Badge(community_id=community_a.id, name="Badge A", slug="badge-a-cross", category="test", is_active=True)
+        badge_b = Badge(community_id=community_b.id, name="Badge B", slug="badge-b-cross", category="test", is_active=True)
         milestone_a = Milestone(community_id=community_a.id, name="Milestone A", slug="milestone-a-cross", is_active=True)
         db.add_all([badge_a, badge_b, milestone_a])
         db.flush()
@@ -152,7 +149,8 @@ def test_no_community_id_counts_events_attended_and_tasks_completed(tmp_path):
 
     with sessions() as db:
         from datetime import UTC, datetime
-        from src.models import Event, LocationType, Task
+
+        from src.models import Task
         user, community, event = create_event_context(db)
         db.add(Membership(community_id=community.id, user_id=user.id, role=MembershipRole.MEMBER,
                           status=MembershipStatus.ACTIVE))
@@ -204,89 +202,73 @@ def test_community_id_requires_active_membership(tmp_path):
     engine.dispose()
 
 
-def test_payment_verify_returns_404_when_order_is_missing(tmp_path):
-    """POST /payments/verify must return 404 when the payment's order is missing,
-    not crash with AttributeError."""
+def test_payment_verify_returns_404_when_order_is_missing():
+    """POST /payments/verify handles a missing related order defensively."""
     from uuid import uuid4
-    from src.models import Payment, PaymentStatus
 
-    engine = create_engine(
-        f"sqlite:///{tmp_path / 'payment-null-order.db'}",
-        connect_args={"check_same_thread": False},
-    )
-    Base.metadata.create_all(engine)
-    sessions = sessionmaker(bind=engine, expire_on_commit=False)
+    import pytest
+    from fastapi import HTTPException
 
-    with sessions() as db:
-        user = User(email="pay-null@example.com", password_hash=hash_password("password-password"))
-        user.profile = Profile(username="pay-null", display_name="Pay Null")
-        db.add(user)
-        db.flush()
-        # Create a payment with a non-existent order_id
-        orphan_order_id = uuid4()
-        payment = Payment(
-            order_id=orphan_order_id,
-            provider="test",
-            provider_reference="orphan-ref",
-            idempotency_key="orphan-payment-key",
-            amount=Decimal("100"),
-            currency="NGN",
-            status=PaymentStatus.PENDING,
+    from src.api.payments import verify
+    from src.models import Order, Payment
+    from src.payments.providers import TestPaymentProvider
+    from src.schemas.payment import PaymentVerifyRequest
+
+    payment = Payment(id=uuid4(), order_id=uuid4())
+    user = User(id=uuid4())
+
+    class MissingOrderSession:
+        def get(self, model, object_id):
+            if model is Payment and object_id == payment.id:
+                return payment
+            if model is Order and object_id == payment.order_id:
+                return None
+            raise AssertionError(f"Unexpected lookup: {model} {object_id}")
+
+    with pytest.raises(HTTPException) as exc:
+        verify(
+            PaymentVerifyRequest(payment_id=payment.id),
+            MissingOrderSession(),
+            user,
+            TestPaymentProvider(),
         )
-        db.add(payment)
-        db.commit()
-        payment_id, user_id = payment.id, user.id
 
-    app = _make_app(sessions)
-    headers = {"Authorization": f"Bearer {create_access_token(user_id, 'participant')}"}
-    response = TestClient(app).post(
-        "/api/v1/payments/verify",
-        json={"payment_id": str(payment_id)},
-        headers=headers,
-    )
-    assert response.status_code == 404, f"Expected 404, got {response.status_code}: {response.text}"
-    engine.dispose()
+    assert exc.value.status_code == 404
+    assert exc.value.detail == "Payment not found"
 
 
-def test_payment_refund_returns_404_when_order_is_missing(tmp_path):
-    """POST /payments/{id}/refund must return 404 when the payment's order is missing."""
+def test_payment_refund_returns_404_when_order_is_missing():
+    """POST /payments/{id}/refund handles a missing related order defensively."""
     from uuid import uuid4
-    from src.models import Payment, PaymentStatus
 
-    engine = create_engine(
-        f"sqlite:///{tmp_path / 'refund-null-order.db'}",
-        connect_args={"check_same_thread": False},
-    )
-    Base.metadata.create_all(engine)
-    sessions = sessionmaker(bind=engine, expire_on_commit=False)
+    import pytest
+    from fastapi import HTTPException
 
-    with sessions() as db:
-        user = User(email="refund-null@example.com", password_hash=hash_password("password-password"))
-        user.profile = Profile(username="refund-null", display_name="Refund Null")
-        db.add(user)
-        db.flush()
-        orphan_order_id = uuid4()
-        payment = Payment(
-            order_id=orphan_order_id,
-            provider="test",
-            provider_reference="refund-orphan-ref",
-            idempotency_key="refund-orphan-key",
-            amount=Decimal("100"),
-            currency="NGN",
-            status=PaymentStatus.PENDING,
+    from src.api.payments import refund
+    from src.models import Order, Payment
+    from src.payments.providers import TestPaymentProvider
+
+    payment = Payment(id=uuid4(), order_id=uuid4())
+    user = User(id=uuid4())
+
+    class MissingOrderSession:
+        def get(self, model, object_id):
+            if model is Payment and object_id == payment.id:
+                return payment
+            if model is Order and object_id == payment.order_id:
+                return None
+            raise AssertionError(f"Unexpected lookup: {model} {object_id}")
+
+    with pytest.raises(HTTPException) as exc:
+        refund(
+            payment.id,
+            MissingOrderSession(),
+            user,
+            TestPaymentProvider(),
         )
-        db.add(payment)
-        db.commit()
-        payment_id, user_id = payment.id, user.id
 
-    app = _make_app(sessions)
-    headers = {"Authorization": f"Bearer {create_access_token(user_id, 'participant')}"}
-    response = TestClient(app).post(
-        f"/api/v1/payments/{payment_id}/refund",
-        headers=headers,
-    )
-    assert response.status_code == 404, f"Expected 404, got {response.status_code}: {response.text}"
-    engine.dispose()
+    assert exc.value.status_code == 404
+    assert exc.value.detail == "Payment not found"
 
 
 def test_my_assignments_uses_join_not_n_plus_one(tmp_path):

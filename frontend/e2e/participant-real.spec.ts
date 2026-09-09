@@ -9,7 +9,7 @@ test('real participant can acquire a free ticket and retain its QR wallet', asyn
   await expect(page.getByRole('heading', { name: 'E2E Community Meetup' }).first()).toBeVisible();
 
   await page.getByRole('button', { name: 'View event' }).click();
-  await expect(page.getByRole('heading', { name: 'Free admission' })).toBeVisible();
+ await expect(page.getByText('Free admission', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Get ticket' }).first().click();
   await expect(page.getByText('Ticket confirmed! Open My Tickets to view your QR code.')).toBeVisible();
 
@@ -22,13 +22,28 @@ test('real participant can acquire a free ticket and retain its QR wallet', asyn
   await expect(page.getByRole('heading', { name: 'E2E Community Meetup' }).first()).toBeVisible();
   await expect(page.getByAltText(/QR code for ticket/).first()).toBeVisible();
 
-  await page.getByRole('button', { name: 'Attendance' }).click();
-  await expect(page.getByRole('heading', { name: 'Attendance' })).toBeVisible();
-  await page.getByRole('button', { name: 'Check in' }).click();
-  await page.waitForResponse(response => response.url().includes('/attendance/check-in'));
-  await expect(page.getByText(/Check-in recorded\. Status:/)).toBeVisible();
+await page.getByRole('button', { name: 'Attendance' }).click();
 
-  await page.getByRole('button', { name: 'Tasks' }).click();
+await expect(
+  page.getByRole('heading', { name: 'Check in', exact: true })
+).toBeVisible();
+
+const [checkInResponse] = await Promise.all([
+  page.waitForResponse(
+    response =>
+      response.url().includes('/attendance/check-in') &&
+      response.request().method() === 'POST'
+  ),
+  page.getByRole('button', { name: 'Check in now', exact: true }).click(),
+]);
+
+expect(checkInResponse.ok()).toBeTruthy();
+
+await expect(
+  page.getByText(/Check-in recorded\. Status:/)
+).toBeVisible();
+
+  await page.getByRole('button', { name: 'Tasks', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Welcome task' })).toBeVisible();
   await page.getByRole('button', { name: 'Submit evidence' }).click();
   await page.getByLabel('Evidence', { exact: false }).fill('Completed the welcome task.');
@@ -59,28 +74,49 @@ test('real participant can acquire a free ticket and retain its QR wallet', asyn
   // Switch to management workspace
   await organizerPage.getByRole('button', { name: 'Select workspace' }).first().click();
   await organizerPage.getByRole('option', { name: 'E2E Community' }).click();
-  await organizerPage.getByRole('button', { name: 'Tasks' }).click();
-  await expect(organizerPage.getByText(/Completed the welcome task/)).toBeVisible();
-  await organizerPage.getByRole('button', { name: 'Verify' }).click();
-  await expect(organizerPage.getByText('Task verified.')).toBeVisible();
+await organizerPage.getByRole('button', { name: 'Tasks', exact: true }).click();
+
+await expect(
+  organizerPage.getByRole('heading', { name: 'Task verification' })
+).toBeVisible();
+
+await expect(
+  organizerPage.getByRole('heading', { name: 'Welcome task' })
+).toBeVisible();
+
+await organizerPage.getByRole('button', { name: 'View evidence' }).click();
+
+await expect(
+  organizerPage.getByText('Completed the welcome task.', { exact: true })
+).toBeVisible();
+
+await organizerPage.getByRole('button', { name: 'Verify' }).click();
+  await expect(
+  organizerPage.getByText('Task verified and points awarded.')
+).toBeVisible();
   await organizerPage.reload();
   // Re-switch to management workspace after reload
   await organizerPage.getByRole('button', { name: 'Select workspace' }).first().click();
   await organizerPage.getByRole('option', { name: 'E2E Community' }).click();
-  await organizerPage.getByRole('button', { name: 'Tasks' }).click();
-  await expect(organizerPage.getByText('No task submissions need review.')).toBeVisible();
+  await organizerPage.getByRole('button', { name: 'Tasks', exact: true }).click();
+  await expect(
+  organizerPage.getByText('Queue is clear', { exact: true })
+).toBeVisible();
   const verifiedAssignment = await page.request.get('http://127.0.0.1:8000/api/v1/task-assignments/me', {
     headers: { Authorization: `Bearer ${participantToken}` },
   });
   expect((await verifiedAssignment.json())[0].status).toBe('verified');
 
   await page.reload();
-  await page.reload();
   const taskRefresh = page.waitForResponse(response => response.url().includes('/task-assignments/me'));
-  await page.getByRole('button', { name: 'Tasks' }).click();
+  await page.getByRole('button', { name: 'Tasks', exact: true }).click();
   const taskResponse = await taskRefresh;
-  expect(taskResponse.ok()).toBeTruthy();
-  await expect(page.getByText('verified').first()).toBeVisible({ timeout: 10_000 });
+expect(taskResponse.ok()).toBeTruthy();
+
+await page.getByRole('button', { name: 'Completed', exact: true }).click();
+await expect(
+  page.getByText('verified', { exact: true }).first()
+).toBeVisible({ timeout: 10_000 });
 
   await page.getByRole('button', { name: 'Achievements' }).click();
   await expect(page.getByRole('heading', { name: 'Achievements' })).toBeVisible();

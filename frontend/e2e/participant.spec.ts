@@ -14,13 +14,15 @@ test('participant auth and navigation shell reaches core views', async ({ page }
   await page.route('**/api/v1/task-assignments/me/details', async route => route.fulfill({ json: [] }));
   await page.route('**/api/v1/communities/me', async route => route.fulfill({ json: [] }));
   await page.goto('/');
-  await expect(page.getByRole('button', { name: 'Tasks' })).toBeVisible();
-  await page.getByRole('button', { name: 'Tasks' }).click();
-  await expect(page.getByRole('heading', { name: 'Tasks' })).toBeVisible();
-  await page.getByRole('button', { name: 'Achievements' }).click();
-  await expect(page.getByRole('heading', { name: 'Achievements' })).toBeVisible();
-  await page.getByRole('button', { name: 'Communities' }).click();
-  await expect(page.getByRole('heading', { name: 'Your communities' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Tasks', exact: true })).toBeVisible();
+await page.getByRole('button', { name: 'Tasks', exact: true }).click();
+await expect(page.getByRole('heading', { name: 'Tasks', exact: true })).toBeVisible();
+
+await page.getByRole('button', { name: 'Achievements', exact: true }).click();
+await expect(page.getByRole('heading', { name: 'Achievements' })).toBeVisible();
+
+await page.getByRole('button', { name: 'Communities', exact: true }).click();
+await expect(page.getByRole('heading', { name: 'Your communities' })).toBeVisible();
 });
 
 test('payment return uses backend status and never provider success query', async ({ page }) => {

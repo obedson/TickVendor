@@ -79,7 +79,7 @@ export function AdminAuditLogs({ token, communityId }: { token: string; communit
                   {log.actor_id && <span>by {log.actor_id.slice(0, 8)}…</span>}
                 </div>
               </div>
-              {log.metadata && (
+              {Boolean(log.metadata) && (
                 <button
                   className="secondary sm"
                   onClick={() => setExpanded(expanded === log.id ? null : log.id)}
@@ -88,7 +88,7 @@ export function AdminAuditLogs({ token, communityId }: { token: string; communit
                 </button>
               )}
             </div>
-            {expanded === log.id && log.metadata && (
+            {expanded === log.id && Boolean(log.metadata) && (
               <pre style={{ marginTop: '.75rem' }}>{JSON.stringify(log.metadata, null, 2)}</pre>
             )}
           </article>

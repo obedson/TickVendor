@@ -1,7 +1,7 @@
 import { StrictMode, Suspense, lazy, useEffect, useState, useCallback } from 'react';
 import { createRoot } from 'react-dom/client';
 import { fetchWithRetry } from './fetchWithRetry';
-import { API_BASE, apiJson, ApiError } from './api';
+import { API_BASE, apiJson } from './api';
 const Notifications = lazy(() => import('./Notifications').then(m => ({ default: m.Notifications })));
 const Communities = lazy(() => import('./Communities').then(m => ({ default: m.Communities })));
 const OrganizerDashboard = lazy(() => import('./OrganizerDashboard').then(m => ({ default: m.OrganizerDashboard })));

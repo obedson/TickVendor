@@ -10,5 +10,5 @@ test('organizer can open community members', async ({ page }) => {
   await page.getByRole('option', { name: 'E2E Community' }).click();
   await page.getByRole('button', { name: 'Members' }).click();
   await expect(page.getByRole('heading', { name: 'Members' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Private member' }).first()).toBeVisible();
+  await expect(page.getByText('Private member', { exact: true }).first()).toBeVisible();
 });
