@@ -1,3 +1,28 @@
 import { test, expect } from '@playwright/test';
 
-test('administrator can save leaderboard configuration', async ({ page }) => { await page.goto('/'); await page.getByLabel('Email').fill('e2e-admin@example.com'); await page.getByLabel('Password').fill('e2e-password-123'); await page.getByRole('button', { name: 'Sign in' }).click(); await page.getByRole('button', { name: 'Leaderboards' }).click(); await expect(page.getByRole('heading', { name: 'Leaderboard configuration' })).toBeVisible(); await page.getByLabel('Name').fill('Admin activity board'); await page.getByLabel('Slug').fill('admin-activity-board'); await page.getByLabel('Metric').selectOption('tasks'); await page.getByLabel('Period').selectOption('monthly'); await page.getByLabel('Maximum entries').fill('25'); await page.getByRole('button', { name: 'Save leaderboard' }).click(); await expect(page.locator('body')).toContainText(/saved|leaderboard|unable/i); });
+test('administrator can save leaderboard configuration', async ({ page }) => {
+  await page.goto('/');
+  await page.getByLabel('Email').fill('e2e-admin@example.com');
+  await page.getByLabel('Password').fill('e2e-password-123');
+  await page.getByRole('button', { name: 'Sign in' }).click();
+
+  await page.getByRole('button', { name: 'Select workspace' }).first().click();
+  await page.getByRole('option', { name: 'E2E Community' }).click();
+
+  await page.getByRole('button', { name: 'Impact', exact: true }).click();
+  await page.getByRole('button', { name: 'Leaderboard', exact: true }).click();
+
+  await expect(
+    page.getByRole('heading', { name: 'Leaderboard configuration' }),
+  ).toBeVisible();
+
+  await page.getByLabel('Name').fill('Admin activity board');
+  await page.getByLabel('Slug').fill('admin-activity-board');
+  await page.getByLabel('Metric').selectOption('tasks');
+  await page.getByLabel('Period').selectOption('monthly');
+  await page.getByLabel('Maximum entries').fill('25');
+
+  await page.getByRole('button', { name: 'Save leaderboard' }).click();
+
+  await expect(page.locator('body')).toContainText(/saved|leaderboard|unable/i);
+});

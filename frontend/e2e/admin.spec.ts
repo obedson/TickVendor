@@ -6,8 +6,12 @@ test('administrator can open point rules and audit log without exposing them to 
   await admin.getByLabel('Email').fill('e2e-admin@example.com');
   await admin.getByLabel('Password').fill('e2e-password-123');
   await admin.getByRole('button', { name: 'Sign in' }).click();
-  await expect(admin.getByRole('button', { name: 'Point rules' })).toBeVisible();
-  await admin.getByRole('button', { name: 'Point rules' }).click();
+  // Switch to management workspace to access admin navigation
+  await admin.getByRole('button', { name: 'Select workspace' }).first().click();
+  await admin.getByRole('option', { name: 'E2E Community' }).click();
+  await admin.getByRole('button', { name: 'Settings', exact: true }).click();
+await expect(admin.getByRole('button', { name: 'Point rules', exact: true })).toBeVisible();
+await admin.getByRole('button', { name: 'Point rules', exact: true }).click();
   await expect(admin.getByRole('heading', { name: 'Point rules' })).toBeVisible();
   await admin.getByRole('button', { name: 'Audit log' }).click();
   await expect(admin.getByRole('heading', { name: 'Audit log' })).toBeVisible();

@@ -5,14 +5,34 @@ test('administrator can persist a community notification rule', async ({ page })
   await page.getByLabel('Email').fill('e2e-admin@example.com');
   await page.getByLabel('Password').fill('e2e-password-123');
   await page.getByRole('button', { name: 'Sign in' }).click();
-  await page.getByRole('button', { name: 'Notification rules' }).click();
-  await expect(page.getByRole('heading', { name: 'Notification rules' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Select workspace' }).first().click();
+  await page.getByRole('option', { name: 'E2E Community' }).click();
+
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByText('Notifications', { exact: true }).click();
+
+  await expect(
+    page.getByRole('heading', { name: 'Notification rules' }),
+  ).toBeVisible();
+
   await page.getByLabel('Notification type').fill('task_verified');
   await page.getByLabel('Email enabled').check();
   await page.getByRole('button', { name: 'Save notification rule' }).click();
+
   await expect(page.getByRole('status')).toContainText('saved');
-  await expect(page.getByText('task_verified · Active · Email · No push')).toBeVisible();
+  await expect(
+    page.getByText('task_verified · Active · Email · No push'),
+  ).toBeVisible();
+
   await page.reload();
-  await page.getByRole('button', { name: 'Notification rules' }).click();
-  await expect(page.getByText('task_verified · Active · Email · No push')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Select workspace' }).first().click();
+  await page.getByRole('option', { name: 'E2E Community' }).click();
+
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByText('Notifications', { exact: true }).click();
+  await expect(
+    page.getByText('task_verified · Active · Email · No push'),
+  ).toBeVisible();
 });

@@ -5,8 +5,13 @@ test('organizer can open attendance check-in operations', async ({ page }) => {
   await page.getByLabel('Email').fill('e2e-organizer@example.com');
   await page.getByLabel('Password').fill('e2e-password-123');
   await page.getByRole('button', { name: 'Sign in' }).click();
+  // Switch to management workspace to access organizer navigation
+  await page.getByRole('button', { name: 'Select workspace' }).first().click();
+  await page.getByRole('option', { name: 'E2E Community' }).click();
   await page.getByRole('button', { name: 'Check-in' }).click();
-  await expect(page.getByRole('heading', { name: 'Attendance operations' })).toBeVisible();
+  await expect(
+  page.getByRole('heading', { name: 'Ticket check-in', exact: true })
+).toBeVisible();
   await page.getByLabel('QR token').fill('invalid');
   await page.getByRole('button', { name: 'Validate ticket' }).click();
   await expect(page.locator('body')).toContainText(/invalid|failed|not found|ticket|result/i);

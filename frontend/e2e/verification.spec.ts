@@ -19,7 +19,7 @@ test('invalid verification does not redirect', async ({ page }) => {
   );
 
   await page.goto('/verify-email?token=invalid-token');
-  await expect(page.getByRole('heading', { name: 'Verification link unavailable' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Verification unavailable' })).toBeVisible();
   await page.waitForTimeout(4500);
   expect(new URL(page.url()).pathname).toBe('/verify-email');
 });

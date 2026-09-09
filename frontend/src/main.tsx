@@ -1,42 +1,660 @@
-import{StrictMode,Suspense,lazy,useEffect,useState}from'react';
-import{createRoot}from'react-dom/client';
-import{fetchWithRetry}from'./fetchWithRetry';
-import{API_BASE}from'./api';
-const Notifications=lazy(()=>import('./Notifications').then(module=>({default:module.Notifications})));
-const Communities=lazy(()=>import('./Communities').then(module=>({default:module.Communities})));
-const OrganizerDashboard=lazy(()=>import('./OrganizerDashboard').then(module=>({default:module.OrganizerDashboard})));
-const OrganizerEvents=lazy(()=>import('./OrganizerEvents').then(module=>({default:module.OrganizerEvents})));
-const OrganizerTaskQueue=lazy(()=>import('./OrganizerTaskQueue').then(module=>({default:module.OrganizerTaskQueue})));
-const OrganizerOpportunities=lazy(()=>import('./OrganizerOpportunities').then(module=>({default:module.OrganizerOpportunities})));
-const OrganizerMembers=lazy(()=>import('./OrganizerMembers').then(module=>({default:module.OrganizerMembers})));
-const OrganizerAttendanceReview=lazy(()=>import('./OrganizerAttendanceReview').then(module=>({default:module.OrganizerAttendanceReview})));
-const OrganizerAttendanceOperations=lazy(()=>import('./OrganizerAttendanceOperations').then(module=>({default:module.OrganizerAttendanceOperations})));
-const AdminPointRules=lazy(()=>import('./AdminPointRules').then(module=>({default:module.AdminPointRules})));
-const AdminRecognition=lazy(()=>import('./AdminRecognition').then(module=>({default:module.AdminRecognition})));
-const AdminLeaderboards=lazy(()=>import('./AdminLeaderboards').then(module=>({default:module.AdminLeaderboards})));
-const AdminContributionBands=lazy(()=>import('./AdminContributionBands').then(module=>({default:module.AdminContributionBands})));
-const AdminImpactAdjustment=lazy(()=>import('./AdminImpactAdjustment').then(module=>({default:module.AdminImpactAdjustment})));
-const AdminAuditLogs=lazy(()=>import('./AdminAuditLogs').then(module=>({default:module.AdminAuditLogs})));
-const AdminNotificationRules=lazy(()=>import('./AdminNotificationRules').then(module=>({default:module.AdminNotificationRules})));
-const AdminAnalytics=lazy(()=>import('./AdminAnalytics').then(module=>({default:module.AdminAnalytics})));
-const Attendance=lazy(()=>import('./Attendance').then(module=>({default:module.Attendance})));
-const Tasks=lazy(()=>import('./Tasks').then(module=>({default:module.Tasks})));
-const Opportunities=lazy(()=>import('./Opportunities').then(module=>({default:module.Opportunities})));
-const Recognition=lazy(()=>import('./Recognition').then(module=>({default:module.Recognition})));
-const ProfileEditor=lazy(()=>import('./ProfileEditor').then(module=>({default:module.ProfileEditor})));
-const PaymentReturn=lazy(()=>import('./PaymentReturn').then(module=>({default:module.PaymentReturn})));
-import{cacheTicketWallet,clearCachedTicketWallet,loadCachedTicketWallet,type OfflineTicket}from'./offlineTickets';
-import'./styles.css';
-import{AppShell,EmptyState,type WorkspaceCommunity}from'./AppShell';
-import{HomeDashboard}from'./HomeDashboard';
-import'./designTokens.css';
-import'./workspace-selector.css';
-interface BeforeInstallPromptEvent extends Event{prompt:()=>Promise<void>;userChoice:Promise<{outcome:'accepted'|'dismissed'}>}
-type EventItem={id:string;title:string;description:string;category:string;starts_at:string;venue?:{name:string;city?:string}|null};type User={id:string;email:string;role:string;username:string;display_name:string};type Session={access_token:string;refresh_token:string;user:User};type TicketType={id:string;name:string;description?:string;price:string;currency:string;availability:number;max_per_user:number};
-const API=API_BASE;
-// Install TickVendor is exposed through the contextual account menu.
-function Auth({onLogin}:{onLogin:(session:Session)=>void}){const[mode,setMode]=useState<'login'|'register'|'resend'>('login');const[email,setEmail]=useState('');const[password,setPassword]=useState('');const[username,setUsername]=useState('');const[name,setName]=useState('');const[error,setError]=useState('');const[message,setMessage]=useState('');const[busy,setBusy]=useState(false);const submit=async(e:React.FormEvent)=>{e.preventDefault();setBusy(true);setError('');setMessage('');try{const endpoint=mode==='login'?'/auth/login':mode==='register'?'/auth/register':'/auth/verification/resend';const body=mode==='login'?{email,password}:mode==='register'?{email,password,username,display_name:name}:{email};const response=await fetch(`${API}${endpoint}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});if(!response.ok){const data=await response.json().catch(()=>null);throw new Error(response.status===401?'Invalid email or password':response.status===409?'Email or username is already registered':response.status===503?(data?.detail||'Verification email could not be sent. Please try again.'):'Unable to complete request')}const data=await response.json();if(mode==='login')onLogin(data);else if(mode==='register'){setMode('login');setMessage('Account created. Check your email, then sign in.')}else setMessage('If the account needs verification, a new email was sent.')}catch(error){setError(error instanceof Error?error.message:'Network error')}finally{setBusy(false)}};const title=mode==='login'?'Welcome back':mode==='register'?'Join your community':'Resend verification email';return <main className="auth"><section className="panel"><p className="eyebrow">TICKVENDOR</p><h1>{title}</h1><p>{mode==='login'?'Sign in to discover events and manage your participation.':mode==='register'?'Create an account to earn Impact Points.':'Enter your email to receive another verification link.'}</p><form onSubmit={submit}><label>Email<input required type="email" value={email} onChange={e=>setEmail(e.target.value)}/></label>{mode!=='resend'&&<label>Password<input required minLength={12} type="password" value={password} onChange={e=>setPassword(e.target.value)}/></label>}{mode==='register'&&<><label>Username<input required minLength={3} value={username} onChange={e=>setUsername(e.target.value)}/></label><label>Display name<input required value={name} onChange={e=>setName(e.target.value)}/></label></>}<button disabled={busy}>{busy?'Working…':mode==='login'?'Sign in':mode==='register'?'Create account':'Send verification email'}</button></form>{error&&<p role="alert" className="error">{error}</p>}{message&&<p role="status">{message}</p>}<button className="link" onClick={()=>{setMode(mode==='login'?'register':'login');setError('');setMessage('')}}>{mode==='login'?'Create an account':'Already registered? Sign in'}</button>{mode==='login'&&<><button className="link" onClick={()=>{setMode('resend');setError('');setMessage('')}}>Resend verification email</button><a href={`${API}/auth/password-reset/request`}>Forgot password?</a></>}</section></main>}
-function Verification({token}:{token:string}){const[state,setState]=useState<'checking'|'success'|'error'>('checking');const[seconds,setSeconds]=useState(4);const goToSignIn=()=>window.location.assign('/');useEffect(()=>{let timer:number|undefined;fetch(`${API}/auth/verify-email`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token})}).then(response=>{if(!response.ok)throw Error('invalid');setState('success');timer=window.setInterval(()=>setSeconds(current=>{if(current<=1){window.clearInterval(timer);goToSignIn();return 0}return current-1}),1000)}).catch(()=>setState('error'));return()=>{if(timer)window.clearInterval(timer)}},[token]);return <main className="auth"><section className="panel"><p className="eyebrow">TICKVENDOR</p>{state==='checking'?<p role="status">Verifying your email…</p>:state==='success'?<><h1>Email verified</h1><p>Your email address is verified. You can now sign in.</p><p role="status" aria-live="polite">Redirecting to sign in in {seconds} seconds…</p><button onClick={goToSignIn}>Sign in now</button></>:<><h1>Verification link unavailable</h1><p>This link is invalid, expired, or has already been used. Request a new verification email from the sign-in screen.</p></>}</section></main>}
-function TicketQr({ticket}:{ticket:OfflineTicket}){const[src,setSrc]=useState('');useEffect(()=>{let active=true;import('qrcode').then(({default:QRCode})=>QRCode.toDataURL(ticket.qr_token,{width:320,margin:2})).then(data=>{if(active)setSrc(data)});return()=>{active=false}},[ticket.qr_token]);return <article className="ticket"><h3>{ticket.event_title||`Ticket ${ticket.public_id}`}</h3>{ticket.ticket_type_name&&<p>{ticket.ticket_type_name}</p>}{ticket.event_starts_at&&<time>{new Date(ticket.event_starts_at).toLocaleString()}</time>}{ticket.venue_name&&<p>{ticket.venue_name}</p>}{src&&<img src={src} alt={`Entrance QR code for ticket ${ticket.public_id}`}/>}<p>Status: <strong>{ticket.status}</strong></p><p>Reference: <code>{ticket.public_id}</code></p></article>}
-function App(){const[session,setSession]=useState<Session|null>(()=>{try{return JSON.parse(sessionStorage.getItem('tickvendor.session')||'null')}catch{return null}});const[paymentId]=useState(()=>new URLSearchParams(location.search).get('payment_id'));const[events,setEvents]=useState<EventItem[]>([]);const[tickets,setTickets]=useState<OfflineTicket[]>([]);const[query,setQuery]=useState('');const[error,setError]=useState('');const[loading,setLoading]=useState(false);const[view,setView]=useState<'home'|'events'|'opportunities'|'tickets'|'attendance'|'tasks'|'recognition'|'profile'|'communities'|'notifications'|'organizer-dashboard'|'organizer-events'|'organizer-opportunities'|'organizer-tasks'|'organizer-members'|'organizer-review'|'organizer-attendance'|'admin-rules'|'admin-bands'|'admin-leaderboards'|'admin-adjustments'|'admin-recognition'|'admin-notifications'|'admin-analytics'|'admin-audit'>('home');const[selected,setSelected]=useState<EventItem|null>(null);const[types,setTypes]=useState<TicketType[]>([]);const[typesError,setTypesError]=useState('');const[purchase,setPurchase]=useState('');const[installPrompt,setInstallPrompt]=useState<BeforeInstallPromptEvent|null>(null);const[workspace,setWorkspace]=useState<'participant'|'management'>('participant');const[managedCommunities,setManagedCommunities]=useState<WorkspaceCommunity[]>([]);const[selectedCommunityId,setSelectedCommunityId]=useState('');const roleItems=[{id:'organizer-dashboard',label:'Dashboard',icon:'⌂'},{id:'organizer-events',label:'Events',icon:'◈'},{id:'organizer-opportunities',label:'Opportunities',icon:'◇'},{id:'organizer-tasks',label:'Tasks',icon:'✓'},{id:'organizer-members',label:'Members',icon:'♧'},{id:'organizer-review',label:'Attendance',icon:'◎'},{id:'organizer-attendance',label:'Check-in',icon:'▣'},{id:'admin-rules',label:'Point rules',icon:'◆'},{id:'admin-bands',label:'Contribution bands',icon:'◫'},{id:'admin-leaderboards',label:'Leaderboard',icon:'▥'},{id:'admin-adjustments',label:'Adjustments',icon:'±'},{id:'admin-recognition',label:'Recognition',icon:'★'},{id:'admin-notifications',label:'Notifications',icon:'◌'},{id:'admin-analytics',label:'Analytics',icon:'▤'},{id:'admin-audit',label:'Audit log',icon:'≡'}];useEffect(()=>{const handler=(event:Event)=>{event.preventDefault();setInstallPrompt(event as BeforeInstallPromptEvent)};window.addEventListener('beforeinstallprompt',handler);if('serviceWorker'in navigator)navigator.serviceWorker.register('/sw.js');if(session){fetch(`${API}/auth/me`,{headers:{Authorization:`Bearer ${session.access_token}`}}).then(response=>{if(!response.ok)throw Error('expired');return response.json()}).catch(()=>{sessionStorage.removeItem('tickvendor.session');setSession(null)})}return()=>window.removeEventListener('beforeinstallprompt',handler)},[]);useEffect(()=>{if(!session)return;fetch(`${API}/communities/me`,{headers:{Authorization:`Bearer ${session.access_token}`}}).then(r=>r.ok?r.json():Promise.reject()).then(items=>{const manageable=items.filter((item:any)=>item.membership?.status==='active'&&item.membership?.role==='admin').map((item:any)=>({id:item.id,name:item.community.name,role:item.membership.role,status:item.membership.status}));setManagedCommunities(manageable);if(!manageable.some((item:WorkspaceCommunity)=>item.id===selectedCommunityId))setSelectedCommunityId(manageable[0]?.id||'')}).catch(()=>setManagedCommunities([]))},[session,selectedCommunityId]);useEffect(()=>{if(!session)return;setLoading(true);fetchWithRetry(`${API}/events?search=${encodeURIComponent(query)}`).then(r=>{if(!r.ok)throw Error('Unable to load events');return r.json()}).then(setEvents).catch(e=>setError(e.message)).finally(()=>setLoading(false))},[session,query]);useEffect(()=>{if(!session)return;fetchWithRetry(`${API}/tickets/me`,{credentials:'include'}).then(r=>{if(!r.ok)throw Error('Unable to load tickets');return r.json()}).then(async data=>{setTickets(data);await cacheTicketWallet(data)}).catch(async()=>setTickets(await loadCachedTicketWallet()))},[session]);useEffect(()=>{if(!selected||!session)return;setTypes([]);setTypesError('');fetch(`${API}/events/${selected.id}/ticket-types`,{headers:{Authorization:`Bearer ${session.access_token}`}}).then(r=>{if(!r.ok)throw Error('Unable to load ticket types');return r.json()}).then(setTypes).catch(e=>setTypesError(e.message))},[selected,session]);if(!session){const verificationToken=new URLSearchParams(location.search).get('token');if(location.pathname==='/verify-email'&&verificationToken)return <Verification token={verificationToken}/>;return <Auth onLogin={data=>{sessionStorage.setItem('tickvendor.session',JSON.stringify(data));setSession(data)}}/>;} if(paymentId)return <Suspense fallback={<p role="status">Loading payment status…</p>}><PaymentReturn token={session.access_token} paymentId={paymentId}/></Suspense>;const logout=async()=>{sessionStorage.removeItem('tickvendor.session');await clearCachedTicketWallet();setSession(null)};const install=async()=>{if(installPrompt){await installPrompt.prompt();await installPrompt.userChoice;setInstallPrompt(null)}};const acquire=async(type:TicketType)=>{setPurchase('');try{const response=await fetch(`${API}/events/${selected?.id}/orders`,{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${session.access_token}`},body:JSON.stringify({ticket_type_id:type.id,quantity:1,idempotency_key:`web-${type.id}-${session.user.id}`})});if(!response.ok)throw Error(response.status===409?'This ticket is unavailable or already acquired.':'Unable to acquire ticket');const order=await response.json();if(Number(type.price)===0){setPurchase('Ticket confirmed. Open My tickets to view it.');const wallet=await fetch(`${API}/tickets/me`,{headers:{Authorization:`Bearer ${session.access_token}`}}).then(r=>r.json());setTickets(wallet);await cacheTicketWallet(wallet);return}const payment=await fetch(`${API}/payments/initialize`,{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${session.access_token}`},body:JSON.stringify({order_id:order.id,idempotency_key:`web-payment-${order.id}`})}).then(r=>r.ok?r.json():Promise.reject(Error('Unable to start payment')));window.location.assign(payment.checkout_url)}catch(error){setPurchase(error instanceof Error?error.message:'Unable to acquire ticket')}};return <AppShell user={session.user} view={view} setView={next=>setView(next as typeof view)} installPrompt={installPrompt} onInstall={install} onSignOut={logout} onProfile={()=>setView('profile')} roleItems={roleItems} workspace={workspace} selectedCommunity={managedCommunities.find(item=>item.id===selectedCommunityId)} managedCommunities={managedCommunities} onWorkspaceChange={(next,communityId)=>{setWorkspace(next);if(next==='participant'){setView('home')}else{setSelectedCommunityId(communityId||managedCommunities[0]?.id||'');setView('organizer-opportunities')}}}><Suspense fallback={<p role="status">Loading participant view…</p>}><main id="main">{view==='home'&&<HomeDashboard token={session.access_token} onDiscover={()=>setView('events')}/>} {view==='opportunities'&&<Opportunities token={session.access_token}/>} {view==='events'&&<header className="page-header"><div><p className="eyebrow">Discover</p><h1>Find your next event</h1><p>Explore opportunities to participate, connect, and make an impact.</p></div><label className="search">Search events<input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search by event name"/></label></header>}{view==='organizer-dashboard'&&<OrganizerDashboard token={session.access_token}/>} {view==='organizer-events'&&<OrganizerEvents token={session.access_token} communityId={selectedCommunityId}/>} {view==='organizer-opportunities'&&<OrganizerOpportunities token={session.access_token} communityId={selectedCommunityId}/>} {view==='organizer-tasks'&&<OrganizerTaskQueue token={session.access_token} communityId={selectedCommunityId}/>} {view==='organizer-members'&&<OrganizerMembers token={session.access_token} communityId={selectedCommunityId}/>} {view==='organizer-review'&&<OrganizerAttendanceReview token={session.access_token} eventId={events[0]?.id||''}/>} {view==='organizer-attendance'&&<OrganizerAttendanceOperations token={session.access_token} eventId={events[0]?.id||''}/>} {view==='admin-rules'&&workspace==='management'&&<AdminPointRules token={session.access_token} communityId={selectedCommunityId}/>} {view==='admin-bands'&&workspace==='management'&&<AdminContributionBands token={session.access_token} communityId={selectedCommunityId}/>} {view==='admin-leaderboards'&&workspace==='management'&&<AdminLeaderboards token={session.access_token} communityId={selectedCommunityId}/>} {view==='admin-adjustments'&&workspace==='management'&&<AdminImpactAdjustment token={session.access_token} communityId={selectedCommunityId}/>} {view==='admin-recognition'&&workspace==='management'&&<AdminRecognition token={session.access_token} communityId={selectedCommunityId}/>} {view==='admin-notifications'&&workspace==='management'&&<AdminNotificationRules token={session.access_token} communityId={selectedCommunityId}/>} {view==='admin-analytics'&&workspace==='management'&&<AdminAnalytics token={session.access_token} communityId={selectedCommunityId}/>} {view==='admin-audit'&&workspace==='management'&&<AdminAuditLogs token={session.access_token} communityId={selectedCommunityId}/>} {view==='events'&&(selected?<section className="panel"><button className="link" onClick={()=>setSelected(null)}>← All events</button><p className="eyebrow">{selected.category}</p><h2>{selected.title}</h2><p>{selected.description}</p><p>{new Date(selected.starts_at).toLocaleString()}</p><p>{selected.venue?.name||'Online event'}{selected.venue?.city?`, ${selected.venue.city}`:''}</p><h3>Tickets</h3>{typesError&&<p role="alert" className="error">{typesError}</p>}{!typesError&&!types.length&&<p role="status">Loading ticket availability…</p>}{types.map(type=><article className="ticket" key={type.id}><h4>{type.name}</h4><p>{type.description}</p><p>{type.price} {type.currency} · {type.availability} available</p><button disabled={!type.availability||Boolean(purchase)} onClick={()=>acquire(type)}>{type.availability?'Acquire ticket':'Sold out'}</button></article>)}{purchase&&<p role="status">{purchase}</p>}</section>:<section>{loading&&<p role="status">Loading events…</p>}{error&&<p role="alert" className="error">{error} <button className="link" onClick={()=>setQuery(query)}>Retry</button></p>}{!loading&&!error&&!events.length&&<EmptyState title="No events found nearby" description={query?'Try a different search or clear your search to see more events.':'There are no published events available right now. Check back soon for the next opportunity to participate.'} action={query?'Clear search':undefined} onAction={query?()=>setQuery(''):undefined}/>}<div className="grid">{events.map(event=><article className="panel card" key={event.id}><p className="eyebrow">{event.category}</p><h2>{event.title}</h2><p>{event.description}</p><time>{new Date(event.starts_at).toLocaleString()}</time><button onClick={()=>setSelected(event)}>View event</button></article>)}</div></section>)}{view==='tickets'&&<section><h2>My tickets</h2>{!tickets.length&&<p className="empty">No tickets yet. Acquire one from an event to see it here.</p>}<div className="grid">{tickets.map(ticket=><TicketQr key={ticket.public_id} ticket={ticket}/>)}</div></section>}{view==='attendance'&&<Attendance token={session.access_token} tickets={tickets}/>} {view==='tasks'&&<Tasks token={session.access_token}/>} {view==='recognition'&&<Recognition token={session.access_token}/>} {view==='profile'&&<ProfileEditor token={session.access_token}/>} {view==='communities'&&<Communities token={session.access_token}/>} {view==='notifications'&&<Notifications token={session.access_token}/>}</main></Suspense></AppShell>}
-createRoot(document.getElementById('root')!).render(<StrictMode><App/></StrictMode>);
+import { StrictMode, Suspense, lazy, useEffect, useState, useCallback } from 'react';
+import { createRoot } from 'react-dom/client';
+import { fetchWithRetry } from './fetchWithRetry';
+import { API_BASE, apiJson } from './api';
+const Notifications = lazy(() => import('./Notifications').then(m => ({ default: m.Notifications })));
+const Communities = lazy(() => import('./Communities').then(m => ({ default: m.Communities })));
+const OrganizerDashboard = lazy(() => import('./OrganizerDashboard').then(m => ({ default: m.OrganizerDashboard })));
+const OrganizerEvents = lazy(() => import('./OrganizerEvents').then(m => ({ default: m.OrganizerEvents })));
+const OrganizerTaskQueue = lazy(() => import('./OrganizerTaskQueue').then(m => ({ default: m.OrganizerTaskQueue })));
+const OrganizerOpportunities = lazy(() => import('./OrganizerOpportunities').then(m => ({ default: m.OrganizerOpportunities })));
+const OrganizerMembers = lazy(() => import('./OrganizerMembers').then(m => ({ default: m.OrganizerMembers })));
+const OrganizerAttendanceReview = lazy(() => import('./OrganizerAttendanceReview').then(m => ({ default: m.OrganizerAttendanceReview })));
+const OrganizerAttendanceOperations = lazy(() => import('./OrganizerAttendanceOperations').then(m => ({ default: m.OrganizerAttendanceOperations })));
+const AdminPointRules = lazy(() => import('./AdminPointRules').then(m => ({ default: m.AdminPointRules })));
+const AdminRecognition = lazy(() => import('./AdminRecognition').then(m => ({ default: m.AdminRecognition })));
+const AdminLeaderboards = lazy(() => import('./AdminLeaderboards').then(m => ({ default: m.AdminLeaderboards })));
+const AdminContributionBands = lazy(() => import('./AdminContributionBands').then(m => ({ default: m.AdminContributionBands })));
+const AdminImpactAdjustment = lazy(() => import('./AdminImpactAdjustment').then(m => ({ default: m.AdminImpactAdjustment })));
+const AdminAuditLogs = lazy(() => import('./AdminAuditLogs').then(m => ({ default: m.AdminAuditLogs })));
+const AdminNotificationRules = lazy(() => import('./AdminNotificationRules').then(m => ({ default: m.AdminNotificationRules })));
+const AdminAnalytics = lazy(() => import('./AdminAnalytics').then(m => ({ default: m.AdminAnalytics })));
+const Attendance = lazy(() => import('./Attendance').then(m => ({ default: m.Attendance })));
+const Tasks = lazy(() => import('./Tasks').then(m => ({ default: m.Tasks })));
+const Opportunities = lazy(() => import('./Opportunities').then(m => ({ default: m.Opportunities })));
+const Recognition = lazy(() => import('./Recognition').then(m => ({ default: m.Recognition })));
+const ProfileEditor = lazy(() => import('./ProfileEditor').then(m => ({ default: m.ProfileEditor })));
+const PaymentReturn = lazy(() => import('./PaymentReturn').then(m => ({ default: m.PaymentReturn })));
+import { cacheTicketWallet, clearCachedTicketWallet, loadCachedTicketWallet, type OfflineTicket } from './offlineTickets';
+import './designTokens.css';
+import './styles.css';
+import './workspace-selector.css';
+import { AppShell, EmptyState, type WorkspaceCommunity } from './AppShell';
+import { HomeDashboard } from './HomeDashboard';
+
+interface BeforeInstallPromptEvent extends Event { prompt: () => Promise<void>; userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }> }
+type EventItem = { id: string; title: string; description: string; category: string; starts_at: string; ends_at?: string; venue?: { name: string; city?: string } | null };
+type User = { id: string; email: string; role: string; username: string; display_name: string };
+type Session = { access_token: string; refresh_token: string; user: User };
+type TicketType = { id: string; name: string; description?: string; price: string; currency: string; availability: number; max_per_user: number };
+
+const API = API_BASE;
+
+/* ── Auth screen ─────────────────────────────────────────── */
+function Auth({ onLogin }: { onLogin: (session: Session) => void }) {
+  const [mode, setMode] = useState<'login' | 'register' | 'resend'>('login');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [username, setUsername] = useState('');
+  const [name, setName] = useState('');
+  const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const switchMode = (next: typeof mode) => { setMode(next); setError(''); setMessage(''); };
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true); setError(''); setMessage('');
+    try {
+      const endpoint = mode === 'login' ? '/auth/login' : mode === 'register' ? '/auth/register' : '/auth/verification/resend';
+      const body = mode === 'login' ? { email, password } : mode === 'register' ? { email, password, username, display_name: name } : { email };
+      const response = await fetch(`${API}${endpoint}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      if (!response.ok) {
+        const data = await response.json().catch(() => null);
+        throw new Error(
+          response.status === 401 ? 'Invalid email or password.' :
+          response.status === 409 ? 'Email or username is already registered.' :
+          response.status === 503 ? (data?.detail || 'Verification email could not be sent. Please try again.') :
+          data?.detail || 'Unable to complete request.'
+        );
+      }
+      const data = await response.json();
+      if (mode === 'login') onLogin(data);
+      else if (mode === 'register') { switchMode('login'); setMessage('Account created! Check your email to verify, then sign in.'); }
+      else setMessage('If the account needs verification, a new email was sent.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Network error. Please try again.');
+    } finally { setBusy(false); }
+  };
+
+  const titles: Record<typeof mode, string> = {
+    login: 'Welcome back',
+    register: 'Create your account',
+    resend: 'Resend verification',
+  };
+  const subtitles: Record<typeof mode, string> = {
+    login: 'Sign in to discover events and track your impact.',
+    register: 'Join your community and start earning Impact Points.',
+    resend: 'Enter your email to receive a new verification link.',
+  };
+
+  return (
+    <main className="auth">
+      <section className="panel" aria-labelledby="auth-title">
+        <div className="auth-brand">
+          <div className="auth-brand-logo" aria-hidden="true">TV</div>
+          <span className="auth-brand-name">TickVendor</span>
+        </div>
+        <h1 id="auth-title">{titles[mode]}</h1>
+        <p>{subtitles[mode]}</p>
+
+        {message && <p role="status" className="success-msg">{message}</p>}
+        {error && <p role="alert" className="error">{error}</p>}
+
+        <form onSubmit={submit} noValidate>
+          <label>
+            <span className="label-text">Email address</span>
+            <input required type="email" autoComplete="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" />
+          </label>
+          {mode !== 'resend' && (
+            <label>
+              <span className="label-text">Password</span>
+              <input required minLength={12} type="password" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} value={password} onChange={e => setPassword(e.target.value)} placeholder={mode === 'login' ? '••••••••••••' : 'At least 12 characters'} />
+            </label>
+          )}
+          {mode === 'register' && (
+            <div className="form-row">
+              <label>
+                <span className="label-text">Username</span>
+                <input required minLength={3} autoComplete="username" value={username} onChange={e => setUsername(e.target.value)} placeholder="yourhandle" />
+              </label>
+              <label>
+                <span className="label-text">Display name</span>
+                <input required autoComplete="name" value={name} onChange={e => setName(e.target.value)} placeholder="Your Name" />
+              </label>
+            </div>
+          )}
+          <div className="form-actions">
+            <button type="submit" className="primary" disabled={busy} style={{ width: '100%' }}>
+              {busy ? 'Working…' : mode === 'login' ? 'Sign in' : mode === 'register' ? 'Create account' : 'Send verification email'}
+            </button>
+          </div>
+        </form>
+
+        <div className="auth-footer">
+          {mode === 'login' && (
+            <>
+              <button className="link" onClick={() => switchMode('register')}>Don't have an account? Create one</button>
+              <button className="link" onClick={() => switchMode('resend')}>Resend verification email</button>
+            </>
+          )}
+          {mode === 'register' && (
+            <button className="link" onClick={() => switchMode('login')}>Already have an account? Sign in</button>
+          )}
+          {mode === 'resend' && (
+            <button className="link" onClick={() => switchMode('login')}>Back to sign in</button>
+          )}
+        </div>
+      </section>
+    </main>
+  );
+}
+
+/* ── Email verification screen ───────────────────────────── */
+function Verification({ token }: { token: string }) {
+  const [state, setState] = useState<'checking' | 'success' | 'error'>('checking');
+  const [seconds, setSeconds] = useState(4);
+  const goToSignIn = () => window.location.assign('/');
+
+  useEffect(() => {
+    let timer: number | undefined;
+    fetch(`${API}/auth/verify-email`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token }) })
+      .then(response => {
+        if (!response.ok) throw Error('invalid');
+        setState('success');
+        timer = window.setInterval(() => setSeconds(current => {
+          if (current <= 1) { window.clearInterval(timer); goToSignIn(); return 0; }
+          return current - 1;
+        }), 1000);
+      })
+      .catch(() => setState('error'));
+    return () => { if (timer) window.clearInterval(timer); };
+  }, [token]);
+
+  return (
+    <main className="auth">
+      <section className="panel" aria-labelledby="verify-title">
+        <div className="auth-brand">
+          <div className="auth-brand-logo" aria-hidden="true">TV</div>
+          <span className="auth-brand-name">TickVendor</span>
+        </div>
+        {state === 'checking' && <p role="status">Verifying your email address…</p>}
+        {state === 'success' && (
+          <>
+            <h1 id="verify-title">Email verified ✓</h1>
+            <p className="success-msg">Your email address has been verified. You can now sign in.</p>
+            <p role="status" aria-live="polite" className="text-muted text-sm">Redirecting to sign in in {seconds} seconds…</p>
+            <div className="form-actions" style={{ marginTop: '1rem' }}>
+              <button className="primary" onClick={goToSignIn}>Sign in now</button>
+            </div>
+          </>
+        )}
+        {state === 'error' && (
+          <>
+            <h1 id="verify-title">Verification unavailable</h1>
+            <p className="error">This link is invalid, expired, or has already been used.</p>
+            <div className="form-actions" style={{ marginTop: '1rem' }}>
+              <button className="secondary" onClick={goToSignIn}>Back to sign in</button>
+            </div>
+          </>
+        )}
+      </section>
+    </main>
+  );
+}
+
+/* ── Ticket QR card ──────────────────────────────────────── */
+function TicketQr({ ticket }: { ticket: OfflineTicket }) {
+  const [src, setSrc] = useState('');
+  const [qrError, setQrError] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    import('qrcode')
+      .then(({ default: QRCode }) => QRCode.toDataURL(ticket.qr_token, { width: 240, margin: 2, color: { dark: '#172554', light: '#ffffff' } }))
+      .then(data => { if (active) setSrc(data); })
+      .catch(() => { if (active) setQrError(true); });
+    return () => { active = false; };
+  }, [ticket.qr_token]);
+
+  const statusColor = ticket.status === 'active' ? 'chip-green' : ticket.status === 'used' ? 'chip-default' : 'chip-yellow';
+
+  return (
+    <article className="ticket-card" aria-label={`Ticket for ${ticket.event_title || ticket.public_id}`}>
+      <div className="ticket-card-header">
+        <h3>{ticket.event_title || `Ticket ${ticket.public_id}`}</h3>
+        {ticket.ticket_type_name && <p>{ticket.ticket_type_name}</p>}
+      </div>
+      <div className="ticket-card-body">
+        {src && !qrError ? (
+          <img src={src} alt={`QR code for ticket ${ticket.public_id}`} />
+        ) : qrError ? (
+          <p className="text-muted text-sm">QR code unavailable</p>
+        ) : (
+          <p role="status" className="text-muted text-sm">Generating QR code…</p>
+        )}
+        {ticket.event_starts_at && (
+          <time dateTime={ticket.event_starts_at} style={{ display: 'block', fontSize: '.85rem', color: 'var(--tv-muted)', marginTop: '.5rem' }}>
+            {new Date(ticket.event_starts_at).toLocaleString()}
+          </time>
+        )}
+        {ticket.venue_name && <p style={{ fontSize: '.85rem', color: 'var(--tv-muted)', margin: '.25rem 0 0' }}>{ticket.venue_name}</p>}
+      </div>
+      <div className="ticket-card-footer">
+        <code style={{ fontSize: '.75rem', color: 'var(--tv-muted)' }}>{ticket.public_id}</code>
+        <span className={`chip ${statusColor}`}>{ticket.status}</span>
+      </div>
+    </article>
+  );
+}
+
+/* ── Events discovery view ───────────────────────────────── */
+function EventsView({
+  events, loading, error, query, setQuery, selected, setSelected,
+  types, typesError, purchase, acquire, onRetry,
+}: {
+  events: EventItem[]; loading: boolean; error: string; query: string;
+  setQuery: (q: string) => void; selected: EventItem | null;
+  setSelected: (e: EventItem | null) => void; types: TicketType[];
+  typesError: string; purchase: string; acquire: (t: TicketType) => void;
+  onRetry: () => void;
+}) {
+  if (selected) {
+    return (
+      <div>
+        <div className="page-header">
+          <div className="page-header-text">
+            <button className="link" onClick={() => setSelected(null)} style={{ marginBottom: '.75rem', display: 'inline-flex', alignItems: 'center', gap: '.35rem' }}>
+              ← Back to events
+            </button>
+            <p className="eyebrow">{selected.category}</p>
+            <h1>{selected.title}</h1>
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gap: '1.5rem', gridTemplateColumns: 'minmax(0,1fr) minmax(0,320px)' }}>
+          <div>
+            <div className="panel" style={{ marginBottom: '1rem' }}>
+              <h2 style={{ fontSize: '1.1rem', marginBottom: '.75rem' }}>About this event</h2>
+              <p style={{ color: 'var(--tv-muted)', lineHeight: '1.7' }}>{selected.description}</p>
+            </div>
+            <div className="panel">
+              <h2 style={{ fontSize: '1.1rem', marginBottom: '.75rem' }}>Date &amp; location</h2>
+              <p>
+                <strong>Starts:</strong>{' '}
+                <time dateTime={selected.starts_at}>{new Date(selected.starts_at).toLocaleString()}</time>
+              </p>
+              {selected.ends_at && (
+                <p>
+                  <strong>Ends:</strong>{' '}
+                  <time dateTime={selected.ends_at}>{new Date(selected.ends_at).toLocaleString()}</time>
+                </p>
+              )}
+              <p>
+                <strong>Location:</strong>{' '}
+                {selected.venue?.name || 'Online event'}
+                {selected.venue?.city ? `, ${selected.venue.city}` : ''}
+              </p>
+            </div>
+          </div>
+
+          <div>
+            <div className="panel">
+              <h2 style={{ fontSize: '1.1rem', marginBottom: '1rem' }}>Get tickets</h2>
+              {typesError && <p role="alert" className="error">{typesError}</p>}
+              {!typesError && !types.length && <p role="status" className="text-muted text-sm">Loading ticket options…</p>}
+              {purchase && <p role="status" className="success-msg" style={{ marginBottom: '1rem' }}>{purchase}</p>}
+              <div className="stack">
+                {types.map(type => (
+                  <div key={type.id} style={{ padding: '1rem', border: '1.5px solid var(--tv-border)', borderRadius: 'var(--tv-radius-md)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '.5rem', marginBottom: '.5rem' }}>
+                      <strong style={{ fontSize: '.95rem' }}>{type.name}</strong>
+                      <span style={{ fontWeight: 800, color: 'var(--tv-ink)', whiteSpace: 'nowrap' }}>
+                        {Number(type.price) === 0 ? 'Free' : `${type.currency} ${Number(type.price).toLocaleString()}`}
+                      </span>
+                    </div>
+                    {type.description && <p style={{ fontSize: '.85rem', color: 'var(--tv-muted)', margin: '0 0 .75rem' }}>{type.description}</p>}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '.5rem' }}>
+                      <span className={`chip ${type.availability > 0 ? 'chip-green' : 'chip-red'}`}>
+                        {type.availability > 0 ? `${type.availability} available` : 'Sold out'}
+                      </span>
+                      <button
+                        className="accent sm"
+                        disabled={!type.availability || Boolean(purchase)}
+                        onClick={() => acquire(type)}
+                      >
+                        {type.availability ? 'Get ticket' : 'Sold out'}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="page-header">
+        <div className="page-header-text">
+          <p className="eyebrow">Discover</p>
+          <h1>Find your next event</h1>
+          <p>Explore opportunities to participate, connect, and make an impact.</p>
+        </div>
+        <div className="page-header-actions">
+          <div className="search-input">
+            <span className="search-icon" aria-hidden="true">⌕</span>
+            <input
+              type="search"
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              placeholder="Search events…"
+              aria-label="Search events"
+              style={{ width: 'min(100%, 22rem)' }}
+            />
+          </div>
+        </div>
+      </div>
+
+      {loading && <p role="status" className="text-muted">Loading events…</p>}
+      {error && (
+        <p role="alert" className="error">
+          {error}{' '}
+          <button className="link" onClick={onRetry}>Retry</button>
+        </p>
+      )}
+      {!loading && !error && !events.length && (
+        <EmptyState
+          title={query ? 'No events match your search' : 'No events available'}
+          description={query ? 'Try a different search term or clear your search to see all events.' : 'There are no published events right now. Check back soon.'}
+          action={query ? 'Clear search' : undefined}
+          onAction={query ? () => setQuery('') : undefined}
+        />
+      )}
+      <div className="grid">
+        {events.map(event => (
+          <article className="card" key={event.id} style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
+            <p className="eyebrow" style={{ marginBottom: 0 }}>{event.category}</p>
+            <h3 style={{ margin: 0 }}>{event.title}</h3>
+            <p style={{ color: 'var(--tv-muted)', fontSize: '.875rem', flex: 1, margin: 0 }}>
+              {event.description.length > 120 ? event.description.slice(0, 120) + '…' : event.description}
+            </p>
+            <time style={{ fontSize: '.8rem', color: 'var(--tv-muted-light)', display: 'block' }}>
+              {new Date(event.starts_at).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+            </time>
+            {event.venue?.name && (
+              <p style={{ fontSize: '.8rem', color: 'var(--tv-muted-light)', margin: 0 }}>
+                📍 {event.venue.name}{event.venue.city ? `, ${event.venue.city}` : ''}
+              </p>
+            )}
+            <button className="secondary sm" onClick={() => setSelected(event)} style={{ marginTop: '.25rem', alignSelf: 'flex-start' }}>
+              View event
+            </button>
+          </article>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ── Tickets view ────────────────────────────────────────── */
+function TicketsView({ tickets }: { tickets: OfflineTicket[] }) {
+  return (
+    <div>
+      <div className="page-header">
+        <div className="page-header-text">
+          <p className="eyebrow">My tickets</p>
+          <h1>Ticket wallet</h1>
+          <p>Your event tickets with QR codes for check-in.</p>
+        </div>
+      </div>
+      {!tickets.length ? (
+        <EmptyState
+          title="No tickets yet"
+          description="Acquire a ticket from an event to see it here. Your tickets are stored securely on this device."
+        />
+      ) : (
+        <div className="ticket-wallet">
+          {tickets.map(ticket => <TicketQr key={ticket.public_id} ticket={ticket} />)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Page loading fallback ───────────────────────────────── */
+function PageLoader({ label = 'Loading…' }: { label?: string }) {
+  return (
+    <div style={{ padding: '3rem 1rem', textAlign: 'center' }}>
+      <p role="status" className="text-muted">{label}</p>
+    </div>
+  );
+}
+
+/* ── Main App ────────────────────────────────────────────── */
+function App() {
+  const [session, setSession] = useState<Session | null>(() => {
+    try { return JSON.parse(sessionStorage.getItem('tickvendor.session') || 'null'); } catch { return null; }
+  });
+  const [paymentId] = useState(() => new URLSearchParams(location.search).get('payment_id'));
+  const [events, setEvents] = useState<EventItem[]>([]);
+  const [tickets, setTickets] = useState<OfflineTicket[]>([]);
+  const [query, setQuery] = useState('');
+  const [eventsError, setEventsError] = useState('');
+  const [eventsLoading, setEventsLoading] = useState(false);
+  const [view, setView] = useState<
+    'home' | 'events' | 'opportunities' | 'tickets' | 'attendance' | 'tasks' |
+    'recognition' | 'profile' | 'communities' | 'notifications' |
+    'organizer-dashboard' | 'organizer-events' | 'organizer-opportunities' |
+    'organizer-tasks' | 'organizer-members' | 'organizer-review' | 'organizer-attendance' |
+    'admin-rules' | 'admin-bands' | 'admin-leaderboards' | 'admin-adjustments' |
+    'admin-recognition' | 'admin-notifications' | 'admin-analytics' | 'admin-audit'
+  >('home');
+  const [selectedEvent, setSelectedEvent] = useState<EventItem | null>(null);
+  const [types, setTypes] = useState<TicketType[]>([]);
+  const [typesError, setTypesError] = useState('');
+  const [purchase, setPurchase] = useState('');
+  const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [workspace, setWorkspace] = useState<'participant' | 'management'>('participant');
+  const [managedCommunities, setManagedCommunities] = useState<WorkspaceCommunity[]>([]);
+  const [selectedCommunityId, setSelectedCommunityId] = useState('');
+
+  const roleItems = [
+    { id: 'organizer-dashboard', label: 'Dashboard', icon: '⌂' },
+    { id: 'organizer-events', label: 'Events', icon: '◈' },
+    { id: 'organizer-opportunities', label: 'Opportunities', icon: '◇' },
+    { id: 'organizer-tasks', label: 'Tasks', icon: '✓' },
+    { id: 'organizer-members', label: 'Members', icon: '♧' },
+    { id: 'organizer-review', label: 'Attendance review', icon: '◎' },
+    { id: 'organizer-attendance', label: 'Check-in', icon: '▣' },
+    { id: 'admin-rules', label: 'Point rules', icon: '◆' },
+    { id: 'admin-bands', label: 'Contribution bands', icon: '◫' },
+    { id: 'admin-leaderboards', label: 'Leaderboard', icon: '▥' },
+    { id: 'admin-adjustments', label: 'Adjustments', icon: '±' },
+    { id: 'admin-recognition', label: 'Recognition', icon: '★' },
+    { id: 'admin-notifications', label: 'Notifications', icon: '◌' },
+    { id: 'admin-analytics', label: 'Analytics', icon: '▤' },
+    { id: 'admin-audit', label: 'Audit log', icon: '≡' },
+  ];
+
+  // Service worker + install prompt
+  useEffect(() => {
+    const handler = (event: Event) => { event.preventDefault(); setInstallPrompt(event as BeforeInstallPromptEvent); };
+    window.addEventListener('beforeinstallprompt', handler);
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
+  // Validate session on mount
+  useEffect(() => {
+    if (!session) return;
+    fetch(`${API}/auth/me`, { headers: { Authorization: `Bearer ${session.access_token}` } })
+      .then(r => { if (!r.ok) throw Error('expired'); })
+      .catch(() => { sessionStorage.removeItem('tickvendor.session'); setSession(null); });
+  }, []);
+
+  // Load managed communities
+  useEffect(() => {
+    if (!session) return;
+    fetch(`${API}/communities/me`, { headers: { Authorization: `Bearer ${session.access_token}` } })
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then((items: any[]) => {
+        const manageable = items
+          .filter(item => item.membership?.status === 'active' && item.membership?.role === 'admin')
+          .map(item => ({ id: item.id, name: item.community.name, role: item.membership.role, status: item.membership.status }));
+        setManagedCommunities(manageable);
+        if (!manageable.some(item => item.id === selectedCommunityId)) setSelectedCommunityId(manageable[0]?.id || '');
+      })
+      .catch(() => setManagedCommunities([]));
+  }, [session]);
+
+  // Load events
+  const loadEvents = useCallback(() => {
+    if (!session) return;
+    setEventsLoading(true); setEventsError('');
+    fetchWithRetry(`${API}/events?search=${encodeURIComponent(query)}`)
+      .then(r => { if (!r.ok) throw Error('Unable to load events'); return r.json(); })
+      .then(setEvents)
+      .catch(e => setEventsError(e.message))
+      .finally(() => setEventsLoading(false));
+  }, [session, query]);
+
+  useEffect(() => { loadEvents(); }, [loadEvents]);
+
+  // Load ticket wallet
+  useEffect(() => {
+    if (!session) return;
+    fetchWithRetry(`${API}/tickets/me`, { headers: { Authorization: `Bearer ${session.access_token}` } })
+      .then(r => { if (!r.ok) throw Error('Unable to load tickets'); return r.json(); })
+      .then(async data => { setTickets(data); await cacheTicketWallet(data); })
+      .catch(async () => setTickets(await loadCachedTicketWallet()));
+  }, [session]);
+
+  // Load ticket types for selected event
+  useEffect(() => {
+    if (!selectedEvent || !session) return;
+    setTypes([]); setTypesError('');
+    fetch(`${API}/events/${selectedEvent.id}/ticket-types`, { headers: { Authorization: `Bearer ${session.access_token}` } })
+      .then(r => { if (!r.ok) throw Error('Unable to load ticket types'); return r.json(); })
+      .then(setTypes)
+      .catch(e => setTypesError(e.message));
+  }, [selectedEvent, session]);
+
+  // Auth gate
+  if (!session) {
+    const verificationToken = new URLSearchParams(location.search).get('token');
+    if (location.pathname === '/verify-email' && verificationToken) return <Verification token={verificationToken} />;
+    return <Auth onLogin={data => { sessionStorage.setItem('tickvendor.session', JSON.stringify(data)); setSession(data); }} />;
+  }
+
+  // Payment return
+  if (paymentId) {
+    return (
+      <Suspense fallback={<PageLoader label="Loading payment status…" />}>
+        <PaymentReturn token={session.access_token} paymentId={paymentId} />
+      </Suspense>
+    );
+  }
+
+  const logout = async () => { sessionStorage.removeItem('tickvendor.session'); await clearCachedTicketWallet(); setSession(null); };
+  const install = async () => { if (installPrompt) { await installPrompt.prompt(); await installPrompt.userChoice; setInstallPrompt(null); } };
+
+  const acquire = async (type: TicketType) => {
+    setPurchase('');
+    try {
+      const response = await fetch(`${API}/events/${selectedEvent?.id}/orders`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ ticket_type_id: type.id, quantity: 1, idempotency_key: `web-${type.id}-${session.user.id}` }),
+      });
+      if (!response.ok) throw Error(response.status === 409 ? 'This ticket is unavailable or already acquired.' : 'Unable to acquire ticket.');
+      const order = await response.json();
+      if (Number(type.price) === 0) {
+        setPurchase('Ticket confirmed! Open My Tickets to view your QR code.');
+        const wallet = await apiJson<OfflineTicket[]>('tickets/me', {}, session.access_token);
+        setTickets(wallet); await cacheTicketWallet(wallet);
+        return;
+      }
+      const payment = await fetch(`${API}/payments/initialize`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ order_id: order.id, idempotency_key: `web-payment-${order.id}` }),
+      }).then(r => r.ok ? r.json() : Promise.reject(Error('Unable to start payment')));
+      window.location.assign(payment.checkout_url);
+    } catch (err) {
+      setPurchase(err instanceof Error ? err.message : 'Unable to acquire ticket.');
+    }
+  };
+
+  const navigateTo = (next: typeof view) => {
+    setView(next);
+    // Reset event selection when leaving events view
+    if (next !== 'events') setSelectedEvent(null);
+  };
+
+  return (
+    <AppShell
+      user={session.user}
+      view={view}
+      setView={next => navigateTo(next as typeof view)}
+      installPrompt={installPrompt}
+      onInstall={install}
+      onSignOut={logout}
+      onProfile={() => navigateTo('profile')}
+      roleItems={roleItems}
+      workspace={workspace}
+      selectedCommunity={managedCommunities.find(item => item.id === selectedCommunityId)}
+      managedCommunities={managedCommunities}
+      onWorkspaceChange={(next, communityId) => {
+        setWorkspace(next);
+        if (next === 'participant') { navigateTo('home'); }
+        else { setSelectedCommunityId(communityId || managedCommunities[0]?.id || ''); navigateTo('organizer-dashboard'); }
+      }}
+    >
+      <Suspense fallback={<PageLoader />}>
+        <main id="main">
+          {view === 'home' && <HomeDashboard token={session.access_token} onDiscover={() => navigateTo('events')} onTasks={() => navigateTo('tasks')} onTickets={() => navigateTo('tickets')} />}
+          {view === 'events' && (
+            <EventsView
+              events={events} loading={eventsLoading} error={eventsError}
+              query={query} setQuery={setQuery}
+              selected={selectedEvent} setSelected={setSelectedEvent}
+              types={types} typesError={typesError}
+              purchase={purchase} acquire={acquire}
+              onRetry={loadEvents}
+            />
+          )}
+          {view === 'tickets' && <TicketsView tickets={tickets} />}
+          {view === 'opportunities' && <Opportunities token={session.access_token} />}
+          {view === 'attendance' && <Attendance token={session.access_token} tickets={tickets} />}
+          {view === 'tasks' && <Tasks token={session.access_token} />}
+          {view === 'recognition' && <Recognition token={session.access_token} />}
+          {view === 'profile' && <ProfileEditor token={session.access_token} />}
+          {view === 'communities' && <Communities token={session.access_token} />}
+          {view === 'notifications' && <Notifications token={session.access_token} />}
+          {view === 'organizer-dashboard' && <OrganizerDashboard token={session.access_token} />}
+          {view === 'organizer-events' && <OrganizerEvents token={session.access_token} communityId={selectedCommunityId} />}
+          {view === 'organizer-opportunities' && <OrganizerOpportunities token={session.access_token} communityId={selectedCommunityId} />}
+          {view === 'organizer-tasks' && <OrganizerTaskQueue token={session.access_token} communityId={selectedCommunityId} />}
+          {view === 'organizer-members' && <OrganizerMembers token={session.access_token} communityId={selectedCommunityId} />}
+          {view === 'organizer-review' && <OrganizerAttendanceReview token={session.access_token} eventId={events[0]?.id || ''} />}
+          {view === 'organizer-attendance' && <OrganizerAttendanceOperations token={session.access_token} eventId={events[0]?.id || ''} />}
+          {view === 'admin-rules' && workspace === 'management' && <AdminPointRules token={session.access_token} communityId={selectedCommunityId} />}
+          {view === 'admin-bands' && workspace === 'management' && <AdminContributionBands token={session.access_token} communityId={selectedCommunityId} />}
+          {view === 'admin-leaderboards' && workspace === 'management' && <AdminLeaderboards token={session.access_token} communityId={selectedCommunityId} />}
+          {view === 'admin-adjustments' && workspace === 'management' && <AdminImpactAdjustment token={session.access_token} communityId={selectedCommunityId} />}
+          {view === 'admin-recognition' && workspace === 'management' && <AdminRecognition token={session.access_token} communityId={selectedCommunityId} />}
+          {view === 'admin-notifications' && workspace === 'management' && <AdminNotificationRules token={session.access_token} communityId={selectedCommunityId} />}
+          {view === 'admin-analytics' && workspace === 'management' && <AdminAnalytics token={session.access_token} communityId={selectedCommunityId} />}
+          {view === 'admin-audit' && workspace === 'management' && <AdminAuditLogs token={session.access_token} communityId={selectedCommunityId} />}
+        </main>
+      </Suspense>
+    </AppShell>
+  );
+}
+
+createRoot(document.getElementById('root')!).render(<StrictMode><App /></StrictMode>);

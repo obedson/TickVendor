@@ -7,7 +7,9 @@ test('paid ticket uses real backend order and provider verification flow', async
   await page.getByRole('button', { name: 'Sign in' }).click();
   await page.getByRole('button', { name: 'Discover', exact: true }).click();
   await page.getByRole('button', { name: 'View event' }).click();
-  await expect(page.getByRole('heading', { name: 'Supporter admission' })).toBeVisible();
+  await expect(
+  page.getByText('Supporter admission', { exact: true })
+).toBeVisible();
 
   let initializeCalls = 0;
   await page.route('**/api/v1/payments/initialize', async route => {
@@ -16,10 +18,10 @@ test('paid ticket uses real backend order and provider verification flow', async
     const body = await response.json();
     await route.fulfill({ json: { ...body, checkout_url: `${new URL(route.request().url()).origin}/?payment_id=${body.payment_id}` } });
   });
-  await page.getByRole('button', { name: 'Acquire ticket' }).nth(1).click();
+  await page.getByRole('button', { name: 'Get ticket' }).nth(1).click();
   await expect(page).toHaveURL(/payment_id=/);
   expect(initializeCalls).toBe(1);
-  await expect(page.getByRole('heading', { name: 'Payment status' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Payment/ })).toBeVisible();
   await page.reload();
   expect(initializeCalls).toBe(1);
 });

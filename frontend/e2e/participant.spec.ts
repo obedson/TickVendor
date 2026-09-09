@@ -10,14 +10,19 @@ test('participant auth and navigation shell reaches core views', async ({ page }
   await page.route('**/api/v1/auth/me', async route => route.fulfill({ json: { id: 'participant' } }));
   await page.route('**/api/v1/events?search=', async route => route.fulfill({ json: [] }));
   await page.route('**/api/v1/tickets/me', async route => route.fulfill({ json: [] }));
+  await page.route('**/api/v1/profiles/me', async route => route.fulfill({ json: { display_name: 'Participant', impact_points: 0, rank: null, next_rank: null, badges: [], milestones: [], events_attended: 0, tasks_completed: 0 } }));
+  await page.route('**/api/v1/task-assignments/me/details', async route => route.fulfill({ json: [] }));
+  await page.route('**/api/v1/communities/me', async route => route.fulfill({ json: [] }));
   await page.goto('/');
-  await expect(page.getByRole('button', { name: 'Tasks' })).toBeVisible();
-  await page.getByRole('button', { name: 'Tasks' }).click();
-  await expect(page.getByRole('heading', { name: 'Tasks' })).toBeVisible();
-  await page.getByRole('button', { name: 'Achievements' }).click();
-  await expect(page.getByRole('heading', { name: 'Achievements' })).toBeVisible();
-  await page.getByRole('button', { name: 'Communities' }).click();
-  await expect(page.getByRole('heading', { name: 'Your communities' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Tasks', exact: true })).toBeVisible();
+await page.getByRole('button', { name: 'Tasks', exact: true }).click();
+await expect(page.getByRole('heading', { name: 'Tasks', exact: true })).toBeVisible();
+
+await page.getByRole('button', { name: 'Achievements', exact: true }).click();
+await expect(page.getByRole('heading', { name: 'Achievements' })).toBeVisible();
+
+await page.getByRole('button', { name: 'Communities', exact: true }).click();
+await expect(page.getByRole('heading', { name: 'Your communities' })).toBeVisible();
 });
 
 test('payment return uses backend status and never provider success query', async ({ page }) => {
@@ -34,8 +39,8 @@ test('payment return uses backend status and never provider success query', asyn
     await route.fulfill({ json: { status: statusCalls === 1 ? 'pending' : 'successful', order_reference: 'ORDER-1' } });
   });
   await page.goto('/?payment_id=payment-1&status=success');
-  await expect(page.getByText('Payment pending')).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Payment verified' })).toBeVisible({ timeout: 8_000 });
+  await expect(page.getByText('Payment processing')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Payment confirmed!' })).toBeVisible({ timeout: 8_000 });
   expect(statusCalls).toBe(2);
-  await expect(page.getByText('Your ticket is now available in My Tickets.')).toBeVisible();
+  await expect(page.getByText(/Your ticket has been issued and is available in My Tickets\./)).toBeVisible();
 });

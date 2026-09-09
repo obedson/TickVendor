@@ -12,6 +12,7 @@ async function authenticated(page: Parameters<typeof test>[0] extends never ? ne
   await page.route('**/api/v1/tickets/me', async route => route.fulfill({ json: [] }));
   await page.route('**/api/v1/profiles/me', async route => route.fulfill({ json: { display_name: 'Participant', impact_points: 12, rank: null, next_rank: null, badges: [], milestones: [], events_attended: 1, tasks_completed: 0 } }));
   await page.route('**/api/v1/task-assignments/me/details', async route => route.fulfill({ json: [] }));
+  await page.route('**/api/v1/communities/me', async route => route.fulfill({ json: [] }));
 }
 
 test('participant API-backed screens use the API service origin', async ({ page }) => {
@@ -19,10 +20,10 @@ test('participant API-backed screens use the API service origin', async ({ page 
   const requests: string[] = [];
   page.on('request', request => { if (request.url().includes('/api/v1/')) requests.push(request.url()); });
   await page.goto('/');
-  await page.getByRole('button', { name: 'Achievements' }).click();
-  await page.getByRole('button', { name: 'Tasks' }).click();
-  await page.getByRole('button', { name: 'Communities' }).click();
-  await page.getByRole('button', { name: 'Open notifications' }).click();
+  await page.getByRole('button', { name: 'Achievements', exact: true }).click();
+await page.getByRole('button', { name: 'Tasks', exact: true }).click();
+await page.getByRole('button', { name: 'Communities', exact: true }).click();
+await page.locator('.sidebar').getByRole('button', { name: 'Notifications', exact: true }).click();
   expect(requests.every(url => url.includes('/api/v1/'))).toBeTruthy();
 });
 
@@ -31,12 +32,12 @@ test('desktop participant Home and Discover remain distinct', async ({ page }) =
   await page.goto('/');
   await expect(page.locator('.sidebar')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Make your presence count.' })).toBeVisible();
-  await expect(page.getByText('Welcome back, Participant.')).toBeVisible();
+  await expect(page.getByText(/Welcome back, Participant/)).toBeVisible();
   await page.getByRole('button', { name: 'Discover', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Find your next event' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Make your presence count.' })).not.toBeVisible();
-  await expect(page.getByRole('textbox', { name: 'Search events' })).toHaveCount(1);
-  await expect(page.getByRole('heading', { name: 'No events found nearby' })).toBeVisible();
+  await expect(page.getByRole('searchbox', { name: 'Search events' })).toHaveCount(1);
+  await expect(page.getByRole('heading', { name: 'No events available' })).toBeVisible();
   await page.getByRole('button', { name: 'Home' }).click();
   await expect(page.getByRole('heading', { name: 'Make your presence count.' })).toBeVisible();
   await page.locator('.account-menu summary').click();
@@ -58,9 +59,16 @@ test('mobile participant shell and More navigation', async ({ page }) => {
 
 test('role-restricted organizer navigation remains reachable', async ({ page }) => {
   await authenticated(page, 'organizer');
+  // Override the communities/me route to return a manageable community
+  await page.route('**/api/v1/communities/me', async route => route.fulfill({
+    json: [{ id: 'comm-1', community: { name: 'Test Community' }, membership: { role: 'admin', status: 'active' } }],
+  }));
   await page.goto('/');
-  await expect(page.getByRole('button', { name: 'Organizer dashboard' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Manage events' })).toBeVisible();
+  // Switch to management workspace to reveal organizer nav
+  await page.getByRole('button', { name: 'Select workspace' }).first().click();
+  await page.getByRole('option', { name: 'Test Community' }).click();
+  await expect(page.getByRole('button', { name: 'Dashboard' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Events' })).toBeVisible();
 });
 
 test('verification success handoff and invalid-link non-redirect behavior', async ({ page }) => {

@@ -63,9 +63,17 @@ def list_tasks(community_id: UUID, db: Annotated[Session, Depends(get_db)],
 
 @router.get("/task-assignments/me", response_model=list[TaskAssignmentResponse])
 def my_assignments(db: Annotated[Session, Depends(get_db)], user: Annotated[User, Depends(get_current_user)]):
-    return [{"id": item.id, "task_id": item.task_id, "assignee_id": item.assignee_id,
-             "status": item.status.value, "due_at": db.get(Task, item.task_id).due_at}
-            for item in db.scalars(select(TaskAssignment).where(TaskAssignment.assignee_id == user.id))]
+    rows = db.execute(
+        select(TaskAssignment, Task)
+        .join(Task, Task.id == TaskAssignment.task_id)
+        .where(TaskAssignment.assignee_id == user.id)
+        .order_by(TaskAssignment.created_at)
+    )
+    return [
+        {"id": assignment.id, "task_id": task.id, "assignee_id": assignment.assignee_id,
+         "status": assignment.status.value, "due_at": task.due_at}
+        for assignment, task in rows
+    ]
 
 
 @router.get("/task-assignments/me/details")
