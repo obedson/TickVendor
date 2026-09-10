@@ -105,21 +105,27 @@ function WorkspaceSelector({
   workspace,
   selectedCommunity,
   managedCommunities,
+  isSuperAdmin,
   onWorkspaceChange,
   mobile = false,
 }: {
-  workspace: 'participant' | 'management';
+  workspace: 'participant' | 'management' | 'platform';
   selectedCommunity?: WorkspaceCommunity;
   managedCommunities: WorkspaceCommunity[];
-  onWorkspaceChange: (workspace: 'participant' | 'management', communityId?: string) => void;
+  isSuperAdmin: boolean;
+  onWorkspaceChange: (workspace: 'participant' | 'management' | 'platform', communityId?: string) => void;
   mobile?: boolean;
 }) {
-  const value = workspace === 'management' && selectedCommunity ? selectedCommunity.id : 'participant';
+  const value = workspace === 'management' && selectedCommunity ? selectedCommunity.id : workspace;
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const optionRefs = useRef<Array<HTMLButtonElement | null>>([]);
-  const options = [{ id: 'participant', name: 'My Space' }, ...managedCommunities.map(item => ({ id: item.id, name: item.name }))];
+  const options = [
+    { id: 'participant', name: 'My Space' },
+    ...managedCommunities.map(item => ({ id: item.id, name: item.name })),
+    ...(isSuperAdmin ? [{ id: 'platform', name: 'Platform Admin' }] : []),
+  ];
   const selectedName = options.find(item => item.id === value)?.name || 'My Space';
 
   useEffect(() => {
@@ -132,8 +138,8 @@ function WorkspaceSelector({
   setOpen(false);
   buttonRef.current?.focus();
 
-  if (id === 'participant') {
-    onWorkspaceChange('participant');
+  if (id === 'participant' || id === 'platform') {
+    onWorkspaceChange(id);
   } else {
     onWorkspaceChange('management', id);
   }
@@ -206,6 +212,20 @@ function WorkspaceSelector({
               {value === item.id && <span aria-hidden="true">✓</span>}
             </button>
           ))}
+          {isSuperAdmin && (
+            <button
+              ref={el => { optionRefs.current[managedCommunities.length + 1] = el; }}
+              className={`space-option${value === 'platform' ? ' selected' : ''}`}
+              type="button"
+              role="option"
+              aria-selected={value === 'platform'}
+              onClick={() => choose('platform')}
+              onKeyDown={event => handleOptionKeyDown(event, managedCommunities.length + 1, 'platform')}
+            >
+              <span>Platform Admin</span>
+              {value === 'platform' && <span aria-hidden="true">✓</span>}
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -225,6 +245,7 @@ export function AppShell({
   workspace,
   selectedCommunity,
   managedCommunities,
+  isSuperAdmin,
   onWorkspaceChange,
 }: {
   children: ReactNode;
@@ -236,10 +257,11 @@ export function AppShell({
   onSignOut: () => void;
   onProfile: () => void;
   roleItems: NavItem[];
-  workspace: 'participant' | 'management';
+  workspace: 'participant' | 'management' | 'platform';
   selectedCommunity?: WorkspaceCommunity;
   managedCommunities: WorkspaceCommunity[];
-  onWorkspaceChange: (workspace: 'participant' | 'management', communityId?: string) => void;
+  isSuperAdmin: boolean;
+  onWorkspaceChange: (workspace: 'participant' | 'management' | 'platform', communityId?: string) => void;
 }) {
   const [moreOpen, setMoreOpen] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState<string[]>(['Impact', 'Settings']);
@@ -253,12 +275,13 @@ export function AppShell({
   const isActive = (id: string) => view === (VIEW_ALIAS[id] ?? id);
 
   const management = workspace === 'management' && Boolean(selectedCommunity);
-  const workspaceLabel = management ? selectedCommunity?.name : 'My Space';
+  const platform = workspace === 'platform';
+  const workspaceLabel = platform ? 'Platform Admin' : management ? selectedCommunity?.name : 'My Space';
   const availableItems = new Map(roleItems.map(item => [item.id, item]));
 
   // Mobile nav: show first 4 participant items + More, or first 3 management + More
-  const mobileNavItems = management ? roleItems.slice(0, 4) : participantNav.slice(0, 4);
-  const moreItems = management ? roleItems.slice(4) : [...participantNav.slice(4), ...secondaryNav];
+  const mobileNavItems = platform ? roleItems.filter(item => item.id === 'platform-admin') : management ? roleItems.slice(0, 4) : participantNav.slice(0, 4);
+  const moreItems = platform ? [] : management ? roleItems.slice(4) : [...participantNav.slice(4), ...secondaryNav];
 
   return (
     <div className="app-shell">
@@ -294,6 +317,7 @@ export function AppShell({
         workspace={workspace}
         selectedCommunity={selectedCommunity}
         managedCommunities={managedCommunities}
+        isSuperAdmin={isSuperAdmin}
         onWorkspaceChange={onWorkspaceChange}
         mobile
       />
@@ -306,10 +330,11 @@ export function AppShell({
             workspace={workspace}
             selectedCommunity={selectedCommunity}
             managedCommunities={managedCommunities}
+            isSuperAdmin={isSuperAdmin}
             onWorkspaceChange={onWorkspaceChange}
           />
           <nav>
-            {!management && (
+            {!management && !platform && (
               <>
                 {participantNav.map(item => (
                   <button
@@ -335,6 +360,15 @@ export function AppShell({
                   </button>
                 ))}
               </>
+            )}
+            {platform && (
+              <div className="management-nav-group">
+                <p className="sidebar-title">Platform</p>
+                <button className={isActive('platform-admin') ? 'active' : ''} onClick={() => go('platform-admin')} aria-current={isActive('platform-admin') ? 'page' : undefined}>
+                  <span aria-hidden="true">⚙</span>
+                  <span>Platform Admin</span>
+                </button>
+              </div>
             )}
             {management && managementGroups.map(group => {
               const items = group.ids.map(id => availableItems.get(id)).filter((item): item is NavItem => Boolean(item));

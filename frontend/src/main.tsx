@@ -467,7 +467,7 @@ function App() {
   const [typesError, setTypesError] = useState('');
   const [purchase, setPurchase] = useState('');
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
-  const [workspace, setWorkspace] = useState<'participant' | 'management'>('participant');
+  const [workspace, setWorkspace] = useState<'participant' | 'management' | 'platform'>('participant');
   const [managedCommunities, setManagedCommunities] = useState<WorkspaceCommunity[]>([]);
   const [selectedCommunityId, setSelectedCommunityId] = useState('');
 
@@ -630,11 +630,13 @@ function App() {
       onProfile={() => navigateTo('profile')}
       roleItems={roleItems}
       workspace={workspace}
+      isSuperAdmin={isSuperAdmin}
       selectedCommunity={managedCommunities.find(item => item.id === selectedCommunityId)}
       managedCommunities={managedCommunities}
       onWorkspaceChange={(next, communityId) => {
         setWorkspace(next);
         if (next === 'participant') { navigateTo('home'); }
+        else if (next === 'platform' && isSuperAdmin) { navigateTo('platform-admin'); }
         else { setSelectedCommunityId(communityId || managedCommunities[0]?.id || ''); navigateTo('organizer-dashboard'); }
       }}
     >
