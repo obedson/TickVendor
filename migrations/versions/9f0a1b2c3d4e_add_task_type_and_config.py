@@ -1,7 +1,7 @@
 """add task_type and task_config columns
 
-Revision ID: a1b2c3d4e5f6
-Revises: f7a8b9c0d123
+Revision ID: 9f0a1b2c3d4e
+Revises: f1a2b3c4d5e6
 Create Date: 2026-09-10
 """
 from collections.abc import Sequence
@@ -9,8 +9,8 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "a1b2c3d4e5f6"
-down_revision: str | Sequence[str] | None = "f7a8b9c0d123"
+revision: str = "9f0a1b2c3d4e"
+down_revision: str | Sequence[str] | None = "f1a2b3c4d5e6"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
