@@ -4,6 +4,12 @@
 
 Branch: `duo/feature/spec-reconciliation-remediation`
 
+#### FIRST PLATFORM ADMIN BOOTSTRAP — IMPLEMENTED, LOCALLY VERIFIED
+- Added `scripts/provision_first_super_admin.py` for the one-time operator bootstrap. It only promotes an existing active, email-verified user when no `super_admin` exists, requires explicit `--confirm`, is not an HTTP endpoint, and records `platform.super_admin_bootstrapped` in the append-only audit log.
+- The development/demo seed remains separate and must not be used against staging or production. Default event categories are seeded only when the development/business seed is explicitly run; deployed startup does not mutate business configuration.
+- Fixed the Platform Admin user overview to derive email verification from `email_verified_at` rather than the nonexistent `is_email_verified` attribute.
+- Focused verification: bootstrap, category authorization, and platform authorization tests pass; Ruff, compilation, and `git diff --check` pass.
+
 ### Pass 2 — Task UI, Members Browser, Category API, Static Review Fixes
 
 #### PRIORITY 3 — Category API Design (IMPLEMENTED, verification outstanding)

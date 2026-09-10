@@ -377,7 +377,7 @@ def list_platform_users(
             "username": p.username if p else None,
             "display_name": p.display_name if p else None,
             "is_active": u.is_active,
-            "is_email_verified": u.is_email_verified,
+            "is_email_verified": u.email_verified_at is not None,
         }
         for u, p in rows
     ]

@@ -15,9 +15,17 @@ TickVendor is a FastAPI/SQLAlchemy backend under `src/`, a Vite/React frontend u
 
 Run the API with `./venv/Scripts/python.exe -m uvicorn src.main:app --reload`. Run the frontend with `cd frontend && npm run dev`.
 
-## Database and seeds
+## Database, seeds, and first platform administrator
 
 SQLite is for development/test only. Staging and production require a server database URL. Apply migrations before startup. The application seed module (`src/seed.py`) provides idempotent business configuration; the isolated browser fixture is `frontend/e2e/seed_e2e.py` and is never production data.
+
+The development/demo seed creates demo accounts, including a Super Administrator, but must never be run against staging or production. To provision the first real platform Super Administrator, first register and email-verify the operator account through the normal authentication flow, then run this one-time command from a trusted deployment shell with `DATABASE_URL` set to the intended database:
+
+    ./venv/Scripts/python.exe scripts/provision_first_super_admin.py --email operator@example.com --confirm
+
+The command refuses to run if a Super Administrator already exists, if the account is inactive or unverified, or if confirmation is omitted. It promotes only that existing account and writes an append-only `platform.super_admin_bootstrapped` audit entry. It does not expose a public promotion endpoint and does not create credentials.
+
+Default event categories are development/business seed data, not an application-startup side effect. After signing in to the provisioned Platform Admin account, use Platform Admin → Event Categories to create and activate the categories required by the deployment. Category mutations are backend-authorized for `super_admin` only.
 
 ## API and authentication
 
