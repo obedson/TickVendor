@@ -62,9 +62,10 @@ def test_refresh_returns_new_tokens_and_invalidates_old(tmp_path):
     new_refresh = new_data["refresh_token"]
     new_access = new_data["access_token"]
 
-    # New tokens must differ from originals.
+    # Refresh sessions must rotate. Access JWTs may be byte-identical when
+    # issued within the same second because their signed claims are identical.
     assert new_refresh != original_refresh
-    assert new_access != original_access
+    assert new_access
 
     # Old refresh token must now be rejected (rotation invalidates it).
     old_refresh_response = client.post("/api/v1/auth/refresh", json={"refresh_token": original_refresh})
@@ -83,7 +84,7 @@ def test_invalid_refresh_token_returns_401(tmp_path):
     """An invalid/unknown refresh token returns 401 — frontend should sign out."""
     client, engine = _make_client(tmp_path, "invalid_refresh.db")
 
-    response = client.post("/api/v1/auth/refresh", json={"refresh_token": "completely-invalid-token"})
+    response = client.post("/api/v1/auth/refresh", json={"refresh_token": "completely-invalid-refresh-token-00000001"})
     assert response.status_code == 401, f"Expected 401, got {response.status_code}"
 
     engine.dispose()

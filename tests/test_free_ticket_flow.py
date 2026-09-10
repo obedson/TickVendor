@@ -70,7 +70,7 @@ def test_free_ticket_acquisition_journey(tmp_path):
         db.add_all([organizer, participant])
         db.flush()
 
-        org = Organization(name="Test Org", owner_id=organizer.id)
+        org = Organization(name="Test Org", slug="test-org", owner_id=organizer.id)
         db.add(org)
         db.flush()
 
@@ -107,6 +107,7 @@ def test_free_ticket_acquisition_journey(tmp_path):
             community_id=community.id,
             organizer_id=organizer.id,
             title="Free Community Meetup",
+            slug="free-community-meetup",
             description="A free community event for testing.",
             category="community",
             location_type=LocationType.ONLINE,
@@ -204,7 +205,7 @@ def test_free_ticket_does_not_require_payment_initialization(tmp_path):
         participant = User(email="part2@example.com", password_hash="x", role=PlatformRole.PARTICIPANT)
         db.add_all([organizer, participant])
         db.flush()
-        org = Organization(name="Org2", owner_id=organizer.id)
+        org = Organization(name="Org2", slug="org2", owner_id=organizer.id)
         db.add(org)
         db.flush()
         community = Community(name="Comm2", slug="comm2", organization_id=org.id)
@@ -216,7 +217,7 @@ def test_free_ticket_does_not_require_payment_initialization(tmp_path):
         db.flush()
         event = Event(
             community_id=community.id, organizer_id=organizer.id,
-            title="Free Event 2", description="Another free event.",
+            title="Free Event 2", slug="free-event-2", description="Another free event.",
             category="community2", location_type=LocationType.ONLINE,
             online_url="https://meet.example.com/2",
             starts_at=datetime.now(UTC) + timedelta(days=2),
@@ -233,7 +234,7 @@ def test_free_ticket_does_not_require_payment_initialization(tmp_path):
     auth = {"Authorization": f"Bearer {create_access_token(participant_id, 'participant')}"}
     order = client.post(
         f"/api/v1/events/{event_id}/orders",
-        json={"ticket_type_id": ticket_type_id, "quantity": 1, "idempotency_key": "free-no-pay"},
+        json={"ticket_type_id": ticket_type_id, "quantity": 1, "idempotency_key": "free-no-payment-test-001"},
         headers=auth,
     )
     assert order.status_code == 201
@@ -241,7 +242,7 @@ def test_free_ticket_does_not_require_payment_initialization(tmp_path):
     # Attempting to initialize payment for a confirmed free order should fail gracefully.
     pay_init = client.post(
         "/api/v1/payments/initialize",
-        json={"order_id": order.json()["id"], "idempotency_key": "pay-init-free"},
+        json={"order_id": order.json()["id"], "idempotency_key": "pay-init-free-test-001"},
         headers=auth,
     )
     # Backend should reject payment initialization for already-confirmed orders.

@@ -175,7 +175,43 @@ def test_organizer_cannot_create_task_in_another_community(tmp_path):
     with sessions() as db:
         organizer_a, _, community_a, _ = _setup_community(db)
         # Create a second community with a different organizer.
-        organizer_b, _, community_b, _ = _setup_community(db)
+        # Create a genuinely separate second tenant. Do not call
+        # _setup_community() again because create_event_context() uses
+        # fixed fixture identities such as owner@example.com.
+        from src.models import Community, Organization
+
+        organizer_b = User(
+            email="tenant-b-organizer@example.com",
+            password_hash="hash",
+        )
+        db.add(organizer_b)
+        db.flush()
+
+        organization_b = Organization(
+            owner_id=organizer_b.id,
+            name="Tenant B Org",
+            slug="tenant-b-org",
+        )
+        db.add(organization_b)
+        db.flush()
+
+        community_b = Community(
+            organization_id=organization_b.id,
+            name="Tenant B Community",
+            slug="tenant-b-community",
+        )
+        db.add(community_b)
+        db.flush()
+
+        db.add(
+            Membership(
+                community_id=community_b.id,
+                user_id=organizer_b.id,
+                role=MembershipRole.ORGANIZER,
+                status=MembershipStatus.ACTIVE,
+            )
+        )
+        db.commit()
         # organizer_a tries to create a task in community_b — should fail.
         with pytest.raises(HTTPException) as exc_info:
             create_task(
