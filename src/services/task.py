@@ -65,12 +65,24 @@ def transition_assignment(db: Session, assignment: TaskAssignment, user: User,
     return assignment
 
 
+def _validate_evidence(task: Task, evidence_text, evidence_url, evidence_attachments) -> None:
+    """Enforce required_evidence_types configured on the task."""
+    required = set(task.required_evidence_types or ["text"])
+    if "text" in required and not evidence_text:
+        raise HTTPException(status_code=422, detail="This task requires a text description of your evidence.")
+    if "url" in required and not evidence_url:
+        raise HTTPException(status_code=422, detail="This task requires a URL as evidence.")
+    if "attachment" in required and not evidence_attachments:
+        raise HTTPException(status_code=422, detail="This task requires at least one attachment as evidence.")
+
+
 def submit_task(db: Session, assignment: TaskAssignment, user: User, evidence_text=None, evidence_url=None, evidence_attachments=None):
     if assignment.assignee_id != user.id:
         raise HTTPException(status_code=403, detail="Task is not assigned to this user")
     if assignment.status not in {TaskAssignmentStatus.ASSIGNED, TaskAssignmentStatus.ACCEPTED, TaskAssignmentStatus.IN_PROGRESS, TaskAssignmentStatus.REJECTED}:
         raise HTTPException(status_code=409, detail="Task cannot be submitted in its current state")
     task = db.get(Task, assignment.task_id)
+    _validate_evidence(task, evidence_text, evidence_url, evidence_attachments)
     now = datetime.now(UTC)
     if task.due_at and now > as_utc(task.due_at) and assignment.status != TaskAssignmentStatus.REJECTED:
         assignment.status = TaskAssignmentStatus.OVERDUE

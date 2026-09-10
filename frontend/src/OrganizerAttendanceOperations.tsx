@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { apiFetch } from './api';
+import { apiJson, ApiError, getLiveToken } from './api';
 
 type Validation = { result: string; ticket?: { public_id: string; attendee_id: string; status: string } | null };
 
@@ -14,17 +14,15 @@ export function OrganizerAttendanceOperations({ token, eventId }: { token: strin
     if (!eventId) { setError('No event selected. Select an event from the Events section first.'); return; }
     setBusy(true); setError(''); setResult(null);
     try {
-      const response = await apiFetch(`events/${eventId}/tickets/validate`, {
+      const data = await apiJson<Validation>(`events/${eventId}/tickets/validate`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ qr_token: qr }),
-      });
-      const data = await response.json();
-      if (!response.ok) throw Error(data.detail || 'Unable to validate ticket');
+      }, getLiveToken() ?? token);
       setResult(data);
       setQr('');
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Unable to validate ticket');
+      setError(cause instanceof ApiError ? cause.message : 'Unable to validate ticket');
     } finally { setBusy(false); }
   };
 

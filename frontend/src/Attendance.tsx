@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { apiFetch, apiUrl } from './api';
+import { apiJson, ApiError, getLiveToken } from './api';
 import { EmptyState } from './AppShell';
 import type { OfflineTicket } from './offlineTickets';
 
@@ -16,13 +16,12 @@ export function Attendance({ token, tickets }: AttendanceProps) {
   const [error, setError] = useState('');
   const [geoStatus, setGeoStatus] = useState<'idle' | 'requesting' | 'granted' | 'denied'>('idle');
 
+  const liveToken = () => getLiveToken() ?? token;
+
   const loadCandidates = async () => {
     if (!ticket?.event_id) return;
     try {
-      const response = await apiFetch(`events/${ticket.event_id}/attendance/peer-candidates`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (response.ok) setCandidates(await response.json());
+      setCandidates(await apiJson<Candidate[]>(`events/${ticket.event_id}/attendance/peer-candidates`, {}, liveToken()));
     } catch {
       setCandidates([]);
     }
@@ -43,18 +42,16 @@ export function Attendance({ token, tickets }: AttendanceProps) {
     setCheckInStatus('');
 
     const submit = (latitude?: number, longitude?: number, accuracy?: number) => {
-      fetch(apiUrl(`events/${ticket.event_id}/attendance/check-in`), {
+      apiJson<CheckInResult>(`events/${ticket.event_id}/attendance/check-in`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ticket_id: ticket.id!, latitude, longitude, accuracy_meters: accuracy }),
-      })
-        .then(async response => {
-          const data: CheckInResult = await response.json();
-          if (!response.ok) throw Error((data as any).detail || 'Check-in failed');
+      }, liveToken())
+        .then(data => {
           setCheckInStatus(`Check-in recorded. Status: ${data.status}`);
           loadCandidates();
         })
-        .catch(e => setError(e.message))
+        .catch((e: Error) => setError(e instanceof ApiError ? e.message : e.message))
         .finally(() => setBusy(false));
     };
 
@@ -82,16 +79,14 @@ export function Attendance({ token, tickets }: AttendanceProps) {
     setBusy(true);
     setError('');
     try {
-      const response = await apiFetch(`events/${ticket.event_id}/attendance/peer-confirmations`, {
+      await apiJson<unknown>(`events/${ticket.event_id}/attendance/peer-confirmations`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ subject_id, confirmed: true }),
-      });
-      const data = await response.json();
-      if (!response.ok) throw Error(data.detail || 'Confirmation failed');
+      }, liveToken());
       setConfirmedIds(prev => new Set([...prev, subject_id]));
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Confirmation failed');
+      setError(e instanceof ApiError ? e.message : 'Confirmation failed');
     } finally {
       setBusy(false);
     }

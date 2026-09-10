@@ -57,6 +57,7 @@ from src.models.task import (
     TaskAssignmentStatus,
     TaskPriority,
     TaskSubmission,
+    TaskType,
 )
 from src.models.ticket import (
     Order,
@@ -131,6 +132,7 @@ __all__ = [
     "TaskAssignmentStatus",
     "TaskPriority",
     "TaskSubmission",
+    "TaskType",
     "Ticket",
     "TicketStatus",
     "TicketType",

@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session, selectinload
 from src.api.auth import get_current_user
 from src.config import settings
 from src.database import get_db
-from src.models import Event, EventStatus, User
+from src.models import Event, EventCategory, EventStatus, User
 from src.schemas.event import EventCreate, EventResponse, EventUpdate
 from src.services.analytics import event_summary
 from src.services.event import (
@@ -26,6 +26,29 @@ from src.storage import LocalObjectStorage, S3ObjectStorage, event_cover_key
 from src.uploads import safe_upload_name, validate_image_upload
 
 router = APIRouter(prefix="/events", tags=["events"])
+
+
+@router.get("/categories")
+def list_event_categories(
+    db: Annotated[Session, Depends(get_db)],
+    active_only: bool = True,
+):
+    """Public endpoint — list event categories.
+
+    Returns active categories by default. Pass active_only=false to include
+    inactive categories (intended for authenticated super_admin use via
+    PlatformAdmin; the /admin/categories route also serves that purpose with
+    full mutation support).
+    """
+    stmt = select(EventCategory)
+    if active_only:
+        stmt = stmt.where(EventCategory.is_active.is_(True))
+    stmt = stmt.order_by(EventCategory.name)
+    categories = db.scalars(stmt).all()
+    return [
+        {"id": str(c.id), "slug": c.slug, "name": c.name, "is_active": c.is_active}
+        for c in categories
+    ]
 
 
 @router.get("/{event_id}/analytics")

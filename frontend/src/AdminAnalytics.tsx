@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { apiFetch } from './api';
+import { apiJson, ApiError, getLiveToken } from './api';
 
 type Summary = {
   community_id: string;
@@ -28,18 +28,16 @@ export function AdminAnalytics({ token, communityId }: { token: string; communit
   const [community, setCommunity] = useState(communityId ?? '');
   const [data, setData] = useState<Summary | null>(null);
   const [error, setError] = useState('');
-  const headers = { Authorization: `Bearer ${token}` };
+  const liveToken = () => getLiveToken() ?? token;
 
   useEffect(() => {
     (async () => {
       try {
-        const id = community || (await (await apiFetch('communities/me', { headers })).json())[0]?.id;
+        const id = community || (await apiJson<any[]>('communities/me', {}, liveToken()))[0]?.id;
         if (!id) throw Error('No community is available for analytics.');
         setCommunity(id);
-        const response = await apiFetch(`communities/${id}/analytics`, { headers });
-        if (!response.ok) throw Error(response.status === 403 ? 'Administrator access required.' : 'Unable to load community analytics.');
-        setData(await response.json());
-      } catch (cause) { setError(cause instanceof Error ? cause.message : 'Unable to load community analytics.'); }
+        setData(await apiJson<Summary>(`communities/${id}/analytics`, {}, liveToken()));
+      } catch (cause) { setError(cause instanceof ApiError && cause.status === 403 ? 'Administrator access required.' : cause instanceof Error ? cause.message : 'Unable to load community analytics.'); }
     })();
   }, [token, communityId]);
 

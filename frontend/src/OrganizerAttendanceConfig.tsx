@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { apiFetch } from './api';
+import { apiJson, ApiError, getLiveToken } from './api';
 
 type Config = {
   qr_attendance_enabled: boolean;
@@ -37,16 +37,14 @@ export function OrganizerAttendanceConfig({ token, communityId, eventId }: { tok
     e.preventDefault();
     setBusy(true); setError(''); setMessage('');
     try {
-      const response = await apiFetch(`communities/${communityId}/events/${eventId}/attendance-config`, {
+      await apiJson<Config>(`communities/${communityId}/events/${eventId}/attendance-config`, {
         method: 'PATCH',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(config),
-      });
-      const data = await response.json();
-      if (!response.ok) throw Error(data.detail || 'Unable to save attendance configuration');
+      }, getLiveToken() ?? token);
       setMessage('Attendance configuration saved.');
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Unable to save attendance configuration');
+      setError(cause instanceof ApiError ? cause.message : 'Unable to save attendance configuration');
     } finally { setBusy(false); }
   };
 

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { EmptyState } from './AppShell';
-import { apiFetch } from './api';
+import { apiJson, ApiError, getLiveToken } from './api';
 
 type Review = {
   attendance_id: string;
@@ -17,31 +17,30 @@ export function OrganizerAttendanceReview({ token, eventId }: { token: string; e
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(true);
-  const headers = { Authorization: `Bearer ${token}` };
+  const liveToken = () => getLiveToken() ?? token;
 
   const load = async () => {
     if (!eventId) { setLoading(false); return; }
-    setLoading(true);
-    const response = await apiFetch(`events/${eventId}/attendance/review`, { headers });
-    if (!response.ok) {
-      setError(response.status === 403 ? 'Attendance review permission required.' : 'Unable to load review queue.');
-    } else {
-      setItems(await response.json());
-    }
-    setLoading(false);
+    setLoading(true); setError('');
+    try {
+      setItems(await apiJson<Review[]>(`events/${eventId}/attendance/review`, {}, liveToken()));
+    } catch (cause) {
+      setError(cause instanceof ApiError && cause.status === 403 ? 'Attendance review permission required.' : 'Unable to load review queue.');
+    } finally { setLoading(false); }
   };
 
   useEffect(() => { load(); }, [token, eventId]);
 
   const resolve = async (item: Review, outcome: string) => {
-    const response = await apiFetch(`events/${eventId}/attendance/${item.attendance_id}/review`, {
-      method: 'POST',
-      headers: { ...headers, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ outcome, reason: `Organizer ${outcome} review` }),
-    });
-    if (!response.ok) { setError('Unable to resolve review.'); return; }
-    setMessage(`Attendance ${outcome}.`);
-    await load();
+    try {
+      await apiJson<unknown>(`events/${eventId}/attendance/${item.attendance_id}/review`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ outcome, reason: `Organizer ${outcome} review` }),
+      }, liveToken());
+      setMessage(`Attendance ${outcome}.`);
+      await load();
+    } catch { setError('Unable to resolve review.'); }
   };
 
   return (

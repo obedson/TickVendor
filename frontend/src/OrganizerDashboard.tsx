@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { apiFetch } from './api';
+import { apiJson, ApiError, getLiveToken } from './api';
 
 type Summary = {
   upcoming_events: number;
@@ -21,13 +21,9 @@ export function OrganizerDashboard({ token }: { token: string }) {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    apiFetch('communities/organizer/dashboard', { headers: { Authorization: `Bearer ${token}` } })
-      .then(async r => {
-        if (!r.ok) throw Error(r.status === 403 ? 'Organizer access required.' : 'Unable to load dashboard.');
-        return r.json();
-      })
+    apiJson<Summary>('communities/organizer/dashboard', {}, getLiveToken() ?? token)
       .then(setData)
-      .catch(e => setError(e.message));
+      .catch((cause: Error) => setError(cause instanceof ApiError && cause.status === 403 ? 'Organizer access required.' : cause.message));
   }, [token]);
 
   if (error) {
