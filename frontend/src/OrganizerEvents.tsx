@@ -72,19 +72,29 @@ export function OrganizerEvents({ token, communityId }: { token: string; communi
     finally { setLoading(false); }
   };
 
-  useEffect(() => {
-    load();
-    apiJson<Community[]>('communities/me', {}, liveToken())
-      .then(setCommunities)
-      .catch(() => setCommunities([]));
-    // Load active categories from the API (public endpoint, no auth needed).
-    apiJson<EventCategory[]>('admin/categories')
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
+  const [categoriesError, setCategoriesError] = useState('');
+
+  const loadCategories = () => {
+    setCategoriesLoading(true);
+    setCategoriesError('');
+    // Use the public /events/categories endpoint (non-admin route per spec conventions).
+    apiJson<EventCategory[]>('events/categories', {}, liveToken())
       .then(cats => {
         setCategories(cats);
         // Set default category to first active one if form is blank.
         setForm(prev => prev.category ? prev : { ...prev, category: cats[0]?.slug ?? '' });
       })
-      .catch(() => setCategories([]));
+      .catch((e: Error) => setCategoriesError(e.message))
+      .finally(() => setCategoriesLoading(false));
+  };
+
+  useEffect(() => {
+    load();
+    apiJson<Community[]>('communities/me', {}, liveToken())
+      .then(setCommunities)
+      .catch(() => setCommunities([]));
+    loadCategories();
   }, [token]);
 
   const create = async (e: React.FormEvent) => {
@@ -249,24 +259,29 @@ setForm({
             </label>
             <label>
               <span className="label-text">Event category</span>
-              {categories.length > 0 ? (
+              {categoriesLoading ? (
+                <p role="status" className="text-muted text-sm" style={{ margin: '.25rem 0' }}>Loading categories…</p>
+              ) : categoriesError ? (
+                <p role="alert" className="error" style={{ margin: '.25rem 0' }}>
+                  {categoriesError}{' '}
+                  <button type="button" className="link" onClick={loadCategories}>Retry</button>
+                </p>
+              ) : categories.length === 0 ? (
+                <p role="alert" className="error" style={{ margin: '.25rem 0' }}>
+                  No active event categories are configured. A Platform Administrator must create at least one category before events can be created.
+                </p>
+              ) : (
                 <select
                   required
                   value={form.category}
                   onChange={e => setForm({ ...form, category: e.target.value })}
+                  disabled={categories.length === 0}
                 >
                   <option value="" disabled>Select a category…</option>
                   {categories.map(cat => (
                     <option key={cat.slug} value={cat.slug}>{cat.name}</option>
                   ))}
                 </select>
-              ) : (
-                <input
-                  required
-                  value={form.category}
-                  onChange={e => setForm({ ...form, category: e.target.value })}
-                  placeholder="e.g. community"
-                />
               )}
             </label>
             <div className="form-row">
@@ -337,7 +352,7 @@ setForm({
   </>
 )}
             <div className="form-actions">
-              <button type="submit" className="accent" disabled={saving}>
+              <button type="submit" className="accent" disabled={saving || (!editing && (categoriesLoading || categories.length === 0))}>
                 {saving ? 'Saving…' : editing ? 'Save changes' : 'Create event'}
               </button>
               <button type="button" className="secondary" onClick={cancelForm}>Cancel</button>
@@ -422,8 +437,7 @@ setForm({
                           <span className="label-text">Visibility</span>
                           <select value={ticketForm.visibility} onChange={e => setTicketForm({ ...ticketForm, visibility: e.target.value })}>
                             <option value="public">Public</option>
-                            <option value="members_only">Members only</option>
-                            <option value="hidden">Hidden</option>
+                            <option value="hidden">Hidden (not listed publicly)</option>
                             <option value="invite_only">Invite only</option>
                           </select>
                         </label>

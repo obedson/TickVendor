@@ -24,6 +24,8 @@ function CategoryManager({ token }: { token: string }) {
 
   const load = async () => {
     try {
+      // Use the authenticated /admin/categories endpoint with active_only=false
+      // so super_admin sees all categories including inactive ones.
       setCategories(await apiJson<Category[]>('admin/categories?active_only=false', {}, liveToken()));
     } catch (cause) {
       setError(cause instanceof ApiError ? cause.message : 'Unable to load categories.');
@@ -206,9 +208,9 @@ function PlatformUsers({ token }: { token: string }) {
 
   useEffect(() => {
     setLoading(true);
-    // Use the search endpoint to list users (platform admin can search all).
-    apiJson<{ users?: PlatformUser[] }>('search?q=&limit=50', {}, liveToken())
-      .then(data => setUsers(data.users ?? []))
+    // Use the dedicated platform admin endpoint (super_admin only).
+    apiJson<PlatformUser[]>('admin/platform/users?limit=50', {}, liveToken())
+      .then(data => setUsers(data))
       .catch((cause: Error) => setError(cause.message))
       .finally(() => setLoading(false));
   }, [token]);
@@ -251,8 +253,9 @@ function PlatformCommunities({ token }: { token: string }) {
 
   useEffect(() => {
     setLoading(true);
-    apiJson<{ communities?: PlatformCommunity[] }>('search?q=&limit=50', {}, liveToken())
-      .then(data => setCommunities(data.communities ?? []))
+    // Use the dedicated platform admin endpoint (super_admin only).
+    apiJson<PlatformCommunity[]>('admin/platform/communities?limit=50', {}, liveToken())
+      .then(data => setCommunities(data))
       .catch((cause: Error) => setError(cause.message))
       .finally(() => setLoading(false));
   }, [token]);
