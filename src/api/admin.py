@@ -44,6 +44,21 @@ router = APIRouter(prefix="/admin/communities/{community_id}", tags=["admin"])
 category_router = APIRouter(prefix="/admin/categories", tags=["admin"])
 
 
+@category_router.get("")
+def list_categories(
+    db: Annotated[Session, Depends(get_db)],
+    active_only: bool = True,
+):
+    """List event categories. Public endpoint — no auth required.
+    Pass active_only=false to include inactive categories (Super Admin use)."""
+    stmt = select(EventCategory)
+    if active_only:
+        stmt = stmt.where(EventCategory.is_active.is_(True))
+    stmt = stmt.order_by(EventCategory.name)
+    categories = db.scalars(stmt).all()
+    return [{"id": str(c.id), "slug": c.slug, "name": c.name, "is_active": c.is_active} for c in categories]
+
+
 @category_router.post("", status_code=status.HTTP_201_CREATED)
 def create_category(
     payload: EventCategoryCreateInput,
