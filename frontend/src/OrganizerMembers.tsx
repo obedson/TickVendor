@@ -2,10 +2,18 @@ import { useEffect, useState } from 'react';
 import { EmptyState } from './AppShell';
 import { apiJson, ApiError, getLiveToken } from './api';
 
-type Member = { id: string; user_id: string; username?: string; display_name?: string; role: string; status: string; joined_at?: string };
+type Member = {
+  id: string;
+  user_id: string;
+  username?: string;
+  display_name?: string;
+  role: string;
+  status: string;
+  joined_at?: string;
+};
 
 const ROLE_COLORS: Record<string, string> = { admin: 'chip-blue', organizer: 'chip-teal', member: 'chip-green' };
-const STATUS_COLORS: Record<string, string> = { active: 'chip-green', inactive: 'chip-default', pending: 'chip-yellow' };
+const STATUS_COLORS: Record<string, string> = { active: 'chip-green', inactive: 'chip-default', invited: 'chip-yellow', pending: 'chip-yellow' };
 
 export function OrganizerMembers({ token, communityId }: { token: string; communityId?: string }) {
   const [members, setMembers] = useState<Member[]>([]);
@@ -13,6 +21,12 @@ export function OrganizerMembers({ token, communityId }: { token: string; commun
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [showInvite, setShowInvite] = useState(false);
+  const [inviteIdentifier, setInviteIdentifier] = useState('');
+  const [inviteRole, setInviteRole] = useState('member');
+  const [inviting, setInviting] = useState(false);
+  const [roleChangeTarget, setRoleChangeTarget] = useState<Member | null>(null);
+  const [newRole, setNewRole] = useState('');
   const liveToken = () => getLiveToken() ?? token;
 
   const getCommunityId = async (): Promise<string | undefined> => {
@@ -45,7 +59,48 @@ export function OrganizerMembers({ token, communityId }: { token: string; commun
       }, liveToken());
       setMessage(`${member.display_name || member.username || 'Member'} ${status === 'active' ? 'activated' : 'deactivated'}.`);
       await load();
-    } catch { setError('Unable to update membership.'); }
+    } catch (cause) {
+      setError(cause instanceof ApiError ? cause.message : 'Unable to update membership.');
+    }
+  };
+
+  const changeRole = async () => {
+    if (!roleChangeTarget || !newRole) return;
+    try {
+      const id = await getCommunityId();
+      await apiJson<unknown>(`communities/${id}/members/${roleChangeTarget.id}/role`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: newRole }),
+      }, liveToken());
+      setMessage(`${roleChangeTarget.display_name || roleChangeTarget.username || 'Member'}'s role changed to ${newRole}.`);
+      setRoleChangeTarget(null);
+      setNewRole('');
+      await load();
+    } catch (cause) {
+      setError(cause instanceof ApiError ? cause.message : 'Unable to change role.');
+    }
+  };
+
+  const inviteMember = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inviteIdentifier.trim()) return;
+    setInviting(true); setError('');
+    try {
+      const id = await getCommunityId();
+      await apiJson<unknown>(`communities/${id}/members/invite`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ identifier: inviteIdentifier.trim(), role: inviteRole }),
+      }, liveToken());
+      setMessage(`Invitation sent to ${inviteIdentifier}.`);
+      setInviteIdentifier('');
+      setInviteRole('member');
+      setShowInvite(false);
+      await load();
+    } catch (cause) {
+      setError(cause instanceof ApiError ? cause.message : 'Unable to send invitation.');
+    } finally { setInviting(false); }
   };
 
   const filtered = members.filter(m => {
@@ -71,18 +126,60 @@ export function OrganizerMembers({ token, communityId }: { token: string; commun
               onChange={e => setSearch(e.target.value)}
               placeholder="Search members…"
               aria-label="Search members"
-              style={{ width: '18rem' }}
+              style={{ width: '16rem' }}
             />
           </div>
+          <button className="accent sm" onClick={() => setShowInvite(!showInvite)}>
+            {showInvite ? 'Cancel' : '+ Invite member'}
+          </button>
         </div>
       </div>
+
+      {/* Invite form */}
+      {showInvite && (
+        <div className="panel" style={{ marginBottom: '1.5rem' }}>
+          <h2 style={{ fontSize: '1rem', marginBottom: '1rem' }}>Invite a member</h2>
+          <form onSubmit={inviteMember} style={{ display: 'grid', gap: '.75rem' }}>
+            <label>
+              <span className="label-text">Email address or username *</span>
+              <input
+                required
+                value={inviteIdentifier}
+                onChange={e => setInviteIdentifier(e.target.value)}
+                placeholder="user@example.com or @username"
+                autoComplete="off"
+              />
+            </label>
+            <label>
+              <span className="label-text">Role</span>
+              <select value={inviteRole} onChange={e => setInviteRole(e.target.value)}>
+                <option value="member">Member</option>
+                <option value="organizer">Organizer</option>
+              </select>
+            </label>
+            <div className="form-actions">
+              <button type="submit" className="accent sm" disabled={inviting}>
+                {inviting ? 'Sending…' : 'Send invitation'}
+              </button>
+              <button type="button" className="secondary sm" onClick={() => { setShowInvite(false); setInviteIdentifier(''); }}>
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {error && <p role="alert" className="error" style={{ marginBottom: '1rem' }}>{error}</p>}
       {message && <p role="status" className="success-msg" style={{ marginBottom: '1rem' }}>{message}</p>}
       {loading && <p role="status" className="text-muted">Loading members…</p>}
 
       {!loading && !error && !members.length && (
-        <EmptyState title="No members" description="This community has no members yet." />
+        <EmptyState
+          title="No members"
+          description="This community has no members yet. Invite someone to get started."
+          action="Invite member"
+          onAction={() => setShowInvite(true)}
+        />
       )}
 
       {!loading && filtered.length === 0 && members.length > 0 && (
@@ -121,11 +218,20 @@ export function OrganizerMembers({ token, communityId }: { token: string; commun
                     {member.joined_at ? new Date(member.joined_at).toLocaleDateString() : '—'}
                   </td>
                   <td>
-                    {member.status === 'active' ? (
-                      <button className="secondary sm" onClick={() => updateStatus(member, 'inactive')}>Deactivate</button>
-                    ) : (
-                      <button className="accent sm" onClick={() => updateStatus(member, 'active')}>Activate</button>
-                    )}
+                    <div style={{ display: 'flex', gap: '.4rem', flexWrap: 'wrap' }}>
+                      <button
+                        className="secondary sm"
+                        onClick={() => { setRoleChangeTarget(member); setNewRole(member.role); }}
+                        title="Change role"
+                      >
+                        Change role
+                      </button>
+                      {member.status === 'active' ? (
+                        <button className="secondary sm" onClick={() => updateStatus(member, 'inactive')}>Deactivate</button>
+                      ) : member.status === 'inactive' ? (
+                        <button className="accent sm" onClick={() => updateStatus(member, 'active')}>Activate</button>
+                      ) : null}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -133,6 +239,34 @@ export function OrganizerMembers({ token, communityId }: { token: string; commun
           </table>
         )}
       </div>
+
+      {/* Role change confirmation modal */}
+      {roleChangeTarget && (
+        <div
+          style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.5)', zIndex: 300, display: 'grid', placeItems: 'center', padding: '1rem' }}
+          onClick={() => setRoleChangeTarget(null)}
+        >
+          <div className="panel" style={{ width: 'min(100%, 28rem)' }} onClick={e => e.stopPropagation()}>
+            <h2 style={{ fontSize: '1.1rem', marginBottom: '1rem' }}>Change role</h2>
+            <p style={{ color: 'var(--tv-muted)', marginBottom: '1rem' }}>
+              Change role for <strong>{roleChangeTarget.display_name || roleChangeTarget.username || 'this member'}</strong>
+            </p>
+            <label>
+              <span className="label-text">New role</span>
+              <select value={newRole} onChange={e => setNewRole(e.target.value)}>
+                <option value="member">Member</option>
+                <option value="organizer">Organizer</option>
+              </select>
+            </label>
+            <div className="form-actions" style={{ marginTop: '1rem' }}>
+              <button className="accent" onClick={changeRole} disabled={newRole === roleChangeTarget.role}>
+                Confirm role change
+              </button>
+              <button className="secondary" onClick={() => setRoleChangeTarget(null)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

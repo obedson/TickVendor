@@ -50,6 +50,12 @@ class MemberAdd(BaseModel):
     role: MembershipRole = MembershipRole.MEMBER
 
 
+class MemberInviteByIdentifier(BaseModel):
+    """Invite a member by email or username (organizer-friendly)."""
+    identifier: str = Field(min_length=1, max_length=255, description="Email address or username")
+    role: MembershipRole = MembershipRole.MEMBER
+
+
 class MemberRole(BaseModel):
     role: MembershipRole
 
@@ -147,6 +153,60 @@ def add_member(community_id: UUID, payload: MemberAdd, db: Annotated[Session, De
     membership.role = payload.role; membership.status = MembershipStatus.INVITED
     db.add(membership)
     audit(db, actor_id=user.id, community_id=community_id, action="membership.invited", target_type="membership", target_id=membership.id, metadata={"user_id": str(payload.user_id)}, commit=False)
+    db.commit()
+    return _member(db, membership, user)
+
+
+@router.post("/{community_id}/members/invite", status_code=status.HTTP_201_CREATED)
+def invite_member_by_identifier(
+    community_id: UUID,
+    payload: MemberInviteByIdentifier,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
+):
+    """Invite a member by email address or username.
+
+    Looks up the user by email (exact match) or username (exact match, case-insensitive).
+    Respects profile privacy: does not expose whether an email exists to unauthorized callers
+    (returns 404 for both not-found and privacy-redacted cases).
+    """
+    require_community_role(db, community_id, user, MembershipRole.ADMIN)
+    identifier = payload.identifier.strip()
+    # Try email first, then username.
+    target_user: User | None = None
+    if "@" in identifier:
+        target_user = db.scalar(select(User).where(User.email == identifier.lower()))
+    if target_user is None:
+        # Username lookup via Profile.
+        profile = db.scalar(
+            select(Profile).where(Profile.username == identifier.lower())
+        )
+        if profile:
+            target_user = db.get(User, profile.user_id)
+    if target_user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    if target_user.id == user.id:
+        raise HTTPException(status_code=403, detail="Cannot invite yourself")
+    if payload.role == MembershipRole.ADMIN and user.role != PlatformRole.SUPER_ADMIN:
+        raise HTTPException(status_code=403, detail="Cannot assign admin role")
+    membership = db.scalar(
+        select(Membership).where(
+            Membership.community_id == community_id, Membership.user_id == target_user.id
+        )
+    )
+    if membership is not None and membership.status != MembershipStatus.LEFT:
+        raise HTTPException(status_code=409, detail="User is already a member or has a pending invitation")
+    if membership is None:
+        membership = Membership(community_id=community_id, user_id=target_user.id)
+    membership.role = payload.role
+    membership.status = MembershipStatus.INVITED
+    db.add(membership)
+    audit(
+        db, actor_id=user.id, community_id=community_id,
+        action="membership.invited", target_type="membership", target_id=membership.id,
+        metadata={"user_id": str(target_user.id), "identifier": identifier},
+        commit=False,
+    )
     db.commit()
     return _member(db, membership, user)
 
