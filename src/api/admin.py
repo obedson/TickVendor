@@ -5,6 +5,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -42,6 +43,7 @@ from src.services.notification import audit
 
 router = APIRouter(prefix="/admin/communities/{community_id}", tags=["admin"])
 category_router = APIRouter(prefix="/admin/categories", tags=["admin"])
+platform_router = APIRouter(prefix="/admin/platform", tags=["admin"])
 
 
 @category_router.get("")
@@ -347,3 +349,59 @@ def update_achievement_rule(
         metadata={"is_active": rule.is_active},
     )
     return {"id": str(rule.id), "slug": rule.slug, "is_active": rule.is_active}
+
+
+# ── Platform-wide admin endpoints (super_admin only) ─────────────────────────
+
+@platform_router.get("/users")
+def list_platform_users(
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[User, Depends(require_platform_roles(PlatformRole.SUPER_ADMIN))],
+    limit: int = 50,
+    offset: int = 0,
+):
+    """List all platform users. Super Admin only."""
+    from src.models import Profile
+    rows = db.execute(
+        select(User, Profile)
+        .outerjoin(Profile, Profile.user_id == User.id)
+        .order_by(User.created_at.desc())
+        .limit(limit)
+        .offset(offset)
+    ).all()
+    return [
+        {
+            "id": str(u.id),
+            "email": u.email,
+            "role": u.role.value if hasattr(u.role, "value") else u.role,
+            "username": p.username if p else None,
+            "display_name": p.display_name if p else None,
+            "is_active": u.is_active,
+            "is_email_verified": u.is_email_verified,
+        }
+        for u, p in rows
+    ]
+
+
+@platform_router.get("/communities")
+def list_platform_communities(
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[User, Depends(require_platform_roles(PlatformRole.SUPER_ADMIN))],
+    limit: int = 50,
+    offset: int = 0,
+):
+    """List all platform communities. Super Admin only."""
+    from src.models import Community
+    communities = db.scalars(
+        select(Community).order_by(Community.created_at.desc()).limit(limit).offset(offset)
+    ).all()
+    return [
+        {
+            "id": str(c.id),
+            "name": c.name,
+            "slug": c.slug,
+            "is_active": c.is_active,
+            "is_public": c.is_public,
+        }
+        for c in communities
+    ]
