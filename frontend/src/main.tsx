@@ -1,7 +1,7 @@
 import { StrictMode, Suspense, lazy, useEffect, useState, useCallback } from 'react';
 import { createRoot } from 'react-dom/client';
 import { fetchWithRetry } from './fetchWithRetry';
-import { API_BASE, apiJson } from './api';
+import { API_BASE, apiJson, apiFetchAuth, addAuthListener, persistSession, clearSession, getLiveToken, type SessionData } from './api';
 const Notifications = lazy(() => import('./Notifications').then(m => ({ default: m.Notifications })));
 const Communities = lazy(() => import('./Communities').then(m => ({ default: m.Communities })));
 const OrganizerDashboard = lazy(() => import('./OrganizerDashboard').then(m => ({ default: m.OrganizerDashboard })));
@@ -19,6 +19,7 @@ const AdminImpactAdjustment = lazy(() => import('./AdminImpactAdjustment').then(
 const AdminAuditLogs = lazy(() => import('./AdminAuditLogs').then(m => ({ default: m.AdminAuditLogs })));
 const AdminNotificationRules = lazy(() => import('./AdminNotificationRules').then(m => ({ default: m.AdminNotificationRules })));
 const AdminAnalytics = lazy(() => import('./AdminAnalytics').then(m => ({ default: m.AdminAnalytics })));
+const PlatformAdmin = lazy(() => import('./PlatformAdmin').then(m => ({ default: m.PlatformAdmin })));
 const Attendance = lazy(() => import('./Attendance').then(m => ({ default: m.Attendance })));
 const Tasks = lazy(() => import('./Tasks').then(m => ({ default: m.Tasks })));
 const Opportunities = lazy(() => import('./Opportunities').then(m => ({ default: m.Opportunities })));
@@ -35,7 +36,7 @@ import { HomeDashboard } from './HomeDashboard';
 interface BeforeInstallPromptEvent extends Event { prompt: () => Promise<void>; userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }> }
 type EventItem = { id: string; title: string; description: string; category: string; starts_at: string; ends_at?: string; venue?: { name: string; city?: string } | null };
 type User = { id: string; email: string; role: string; username: string; display_name: string };
-type Session = { access_token: string; refresh_token: string; user: User };
+type Session = SessionData;
 type TicketType = { id: string; name: string; description?: string; price: string; currency: string; availability: number; max_per_user: number };
 
 const API = API_BASE;
@@ -440,6 +441,12 @@ function App() {
   const [session, setSession] = useState<Session | null>(() => {
     try { return JSON.parse(sessionStorage.getItem('tickvendor.session') || 'null'); } catch { return null; }
   });
+
+  // Subscribe to auth state changes (token refresh, sign-out) so React state
+  // stays in sync with the canonical session in sessionStorage.
+  useEffect(() => {
+    return addAuthListener(updated => setSession(updated));
+  }, []);
   const [paymentId] = useState(() => new URLSearchParams(location.search).get('payment_id'));
   const [events, setEvents] = useState<EventItem[]>([]);
   const [tickets, setTickets] = useState<OfflineTicket[]>([]);
@@ -452,7 +459,8 @@ function App() {
     'organizer-dashboard' | 'organizer-events' | 'organizer-opportunities' |
     'organizer-tasks' | 'organizer-members' | 'organizer-review' | 'organizer-attendance' |
     'admin-rules' | 'admin-bands' | 'admin-leaderboards' | 'admin-adjustments' |
-    'admin-recognition' | 'admin-notifications' | 'admin-analytics' | 'admin-audit'
+    'admin-recognition' | 'admin-notifications' | 'admin-analytics' | 'admin-audit' |
+    'platform-admin'
   >('home');
   const [selectedEvent, setSelectedEvent] = useState<EventItem | null>(null);
   const [types, setTypes] = useState<TicketType[]>([]);
@@ -463,6 +471,8 @@ function App() {
   const [managedCommunities, setManagedCommunities] = useState<WorkspaceCommunity[]>([]);
   const [selectedCommunityId, setSelectedCommunityId] = useState('');
 
+  const isSuperAdmin = session?.user?.role === 'super_admin';
+
   const roleItems = [
     { id: 'organizer-dashboard', label: 'Dashboard', icon: '⌂' },
     { id: 'organizer-events', label: 'Events', icon: '◈' },
@@ -472,13 +482,15 @@ function App() {
     { id: 'organizer-review', label: 'Attendance review', icon: '◎' },
     { id: 'organizer-attendance', label: 'Check-in', icon: '▣' },
     { id: 'admin-rules', label: 'Point rules', icon: '◆' },
-    { id: 'admin-bands', label: 'Contribution bands', icon: '◫' },
+    { id: 'admin-bands', label: 'Contribution Tiers', icon: '◫' },
     { id: 'admin-leaderboards', label: 'Leaderboard', icon: '▥' },
     { id: 'admin-adjustments', label: 'Adjustments', icon: '±' },
     { id: 'admin-recognition', label: 'Recognition', icon: '★' },
     { id: 'admin-notifications', label: 'Notifications', icon: '◌' },
     { id: 'admin-analytics', label: 'Analytics', icon: '▤' },
     { id: 'admin-audit', label: 'Audit log', icon: '≡' },
+    // Super Admin only — platform-wide administration.
+    ...(isSuperAdmin ? [{ id: 'platform-admin', label: 'Platform Admin', icon: '⚙' }] : []),
   ];
 
   // Service worker + install prompt
@@ -489,66 +501,66 @@ function App() {
     return () => window.removeEventListener('beforeinstallprompt', handler);
   }, []);
 
-  // Validate session on mount
+  // Validate session on mount — use live token so a prior refresh is honoured.
   useEffect(() => {
     if (!session) return;
-    fetch(`${API}/auth/me`, { headers: { Authorization: `Bearer ${session.access_token}` } })
+    const token = getLiveToken() ?? session.access_token;
+    fetch(`${API}/auth/me`, { headers: { Authorization: `Bearer ${token}` } })
       .then(r => { if (!r.ok) throw Error('expired'); })
-      .catch(() => { sessionStorage.removeItem('tickvendor.session'); setSession(null); });
+      .catch(() => clearSession());
   }, []);
 
-  // Load managed communities
+  // Load managed communities — include admin AND organizer roles per spec.
+  // Uses apiJson so a 401 triggers refresh before failing.
   useEffect(() => {
     if (!session) return;
-    fetch(`${API}/communities/me`, { headers: { Authorization: `Bearer ${session.access_token}` } })
-      .then(r => r.ok ? r.json() : Promise.reject())
-      .then((items: any[]) => {
+    apiJson<any[]>('communities/me', {}, getLiveToken() ?? session.access_token)
+      .then(items => {
         const manageable = items
-          .filter(item => item.membership?.status === 'active' && item.membership?.role === 'admin')
-          .map(item => ({ id: item.id, name: item.community.name, role: item.membership.role, status: item.membership.status }));
+          .filter(item => item.membership?.status === 'active' &&
+            (item.membership?.role === 'admin' || item.membership?.role === 'organizer'))
+          .map(item => ({ id: item.id, name: item.community?.name ?? item.name, role: item.membership.role, status: item.membership.status }));
         setManagedCommunities(manageable);
         if (!manageable.some(item => item.id === selectedCommunityId)) setSelectedCommunityId(manageable[0]?.id || '');
       })
       .catch(() => setManagedCommunities([]));
-  }, [session]);
+  }, [session?.access_token]);
 
-  // Load events
+  // Load events — public endpoint, no auth required, but use fetchWithRetry for resilience.
   const loadEvents = useCallback(() => {
     if (!session) return;
     setEventsLoading(true); setEventsError('');
     fetchWithRetry(`${API}/events?search=${encodeURIComponent(query)}`)
       .then(r => { if (!r.ok) throw Error('Unable to load events'); return r.json(); })
       .then(setEvents)
-      .catch(e => setEventsError(e.message))
+      .catch((e: Error) => setEventsError(e.message))
       .finally(() => setEventsLoading(false));
-  }, [session, query]);
+  }, [session?.access_token, query]);
 
   useEffect(() => { loadEvents(); }, [loadEvents]);
 
-  // Load ticket wallet
+  // Load ticket wallet — uses apiJson for refresh-on-401.
   useEffect(() => {
     if (!session) return;
-    fetchWithRetry(`${API}/tickets/me`, { headers: { Authorization: `Bearer ${session.access_token}` } })
-      .then(r => { if (!r.ok) throw Error('Unable to load tickets'); return r.json(); })
+    apiJson<OfflineTicket[]>('tickets/me', {}, getLiveToken() ?? session.access_token)
       .then(async data => { setTickets(data); await cacheTicketWallet(data); })
       .catch(async () => setTickets(await loadCachedTicketWallet()));
-  }, [session]);
+  }, [session?.access_token]);
 
-  // Load ticket types for selected event
+  // Load ticket types for selected event — uses apiJson for refresh-on-401.
   useEffect(() => {
     if (!selectedEvent || !session) return;
     setTypes([]); setTypesError('');
-    fetch(`${API}/events/${selectedEvent.id}/ticket-types`, { headers: { Authorization: `Bearer ${session.access_token}` } })
-      .then(r => { if (!r.ok) throw Error('Unable to load ticket types'); return r.json(); })
+    apiJson<TicketType[]>(`events/${selectedEvent.id}/ticket-types`, {}, getLiveToken() ?? session.access_token)
       .then(setTypes)
-      .catch(e => setTypesError(e.message));
-  }, [selectedEvent, session]);
+      .catch((e: Error) => setTypesError(e.message));
+  }, [selectedEvent?.id, session?.access_token]);
 
   // Auth gate
   if (!session) {
     const verificationToken = new URLSearchParams(location.search).get('token');
     if (location.pathname === '/verify-email' && verificationToken) return <Verification token={verificationToken} />;
-    return <Auth onLogin={data => { sessionStorage.setItem('tickvendor.session', JSON.stringify(data)); setSession(data); }} />;
+    return <Auth onLogin={data => { persistSession(data); setSession(data); }} />;
   }
 
   // Payment return
@@ -560,30 +572,41 @@ function App() {
     );
   }
 
-  const logout = async () => { sessionStorage.removeItem('tickvendor.session'); await clearCachedTicketWallet(); setSession(null); };
+  const logout = async () => { clearSession(); await clearCachedTicketWallet(); };
   const install = async () => { if (installPrompt) { await installPrompt.prompt(); await installPrompt.userChoice; setInstallPrompt(null); } };
 
   const acquire = async (type: TicketType) => {
+    if (!session) return;
     setPurchase('');
     try {
-      const response = await fetch(`${API}/events/${selectedEvent?.id}/orders`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-        body: JSON.stringify({ ticket_type_id: type.id, quantity: 1, idempotency_key: `web-${type.id}-${session.user.id}` }),
-      });
-      if (!response.ok) throw Error(response.status === 409 ? 'This ticket is unavailable or already acquired.' : 'Unable to acquire ticket.');
-      const order = await response.json();
+      // Always use the live token (may have been refreshed since component mounted).
+      const liveToken = getLiveToken() ?? session.access_token;
+      const order = await apiJson<{ id: string }>(
+        `events/${selectedEvent?.id}/orders`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ticket_type_id: type.id, quantity: 1, idempotency_key: `web-${type.id}-${session.user.id}` }),
+        },
+        liveToken,
+      );
       if (Number(type.price) === 0) {
+        // Free ticket: no Paystack checkout. Refresh wallet immediately.
         setPurchase('Ticket confirmed! Open My Tickets to view your QR code.');
-        const wallet = await apiJson<OfflineTicket[]>('tickets/me', {}, session.access_token);
+        const wallet = await apiJson<OfflineTicket[]>('tickets/me', {}, getLiveToken() ?? liveToken);
         setTickets(wallet); await cacheTicketWallet(wallet);
         return;
       }
-      const payment = await fetch(`${API}/payments/initialize`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-        body: JSON.stringify({ order_id: order.id, idempotency_key: `web-payment-${order.id}` }),
-      }).then(r => r.ok ? r.json() : Promise.reject(Error('Unable to start payment')));
+      // Paid ticket: initialize Paystack checkout.
+      const payment = await apiJson<{ checkout_url: string }>(
+        'payments/initialize',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ order_id: order.id, idempotency_key: `web-payment-${order.id}` }),
+        },
+        getLiveToken() ?? liveToken,
+      );
       window.location.assign(payment.checkout_url);
     } catch (err) {
       setPurchase(err instanceof Error ? err.message : 'Unable to acquire ticket.');
@@ -651,6 +674,7 @@ function App() {
           {view === 'admin-notifications' && workspace === 'management' && <AdminNotificationRules token={session.access_token} communityId={selectedCommunityId} />}
           {view === 'admin-analytics' && workspace === 'management' && <AdminAnalytics token={session.access_token} communityId={selectedCommunityId} />}
           {view === 'admin-audit' && workspace === 'management' && <AdminAuditLogs token={session.access_token} communityId={selectedCommunityId} />}
+          {view === 'platform-admin' && isSuperAdmin && <PlatformAdmin token={session.access_token} userRole={session.user.role} />}
         </main>
       </Suspense>
     </AppShell>
