@@ -74,21 +74,44 @@ function refreshSession(): Promise<string | undefined> {
   return _refreshPromise;
 }
 
+// ── Body re-readability guard ─────────────────────────────────────────────────
+// FormData and ReadableStream bodies can only be consumed once. Retrying a
+// request with such a body would silently send an empty body. Detect these
+// cases and skip the retry rather than sending a corrupt request.
+function isBodyReReadable(body: BodyInit | null | undefined): boolean {
+  if (body == null) return true;
+  if (typeof body === 'string') return true;
+  if (body instanceof URLSearchParams) return true;
+  if (body instanceof ArrayBuffer) return true;
+  if (body instanceof Blob) return true;
+  // FormData and ReadableStream are NOT safely re-readable.
+  return false;
+}
+
 // ── Core API fetch with automatic 401 → refresh → single retry ───────────────
 export async function apiJson<T>(path: string, init: RequestInit = {}, token?: string): Promise<T> {
   // Always use the freshest token from storage, falling back to the prop.
   const liveToken = getLiveToken() ?? token;
+  // Skip refresh-on-401 retry for non-re-readable bodies (FormData/streams)
+  // to avoid double-consumption. Callers using FormData should handle 401 themselves.
+  const canRetry = isBodyReReadable(init.body);
+  // Never attempt a refresh for the auth endpoints themselves.
+  const isAuthPath = /^auth\/(login|refresh)/.test(path.replace(/^\//, ''));
   let response: Response;
   try { response = await apiFetch(path, init, liveToken); } catch {
     throw new ApiError(0, 'Unable to reach TickVendor. Check your connection and try again.', 'network');
   }
-  if (response.status === 401 && liveToken) {
+  if (response.status === 401 && liveToken && canRetry && !isAuthPath) {
     // Attempt a single refresh; concurrent callers share the same promise.
     const refreshed = await refreshSession().catch(() => undefined);
     if (refreshed) {
       // Retry the original request exactly once with the new token.
       try { response = await apiFetch(path, init, refreshed); } catch {
         throw new ApiError(0, 'Unable to reach TickVendor. Check your connection and try again.', 'network');
+      }
+      // If the retry also returns 401, the session is truly expired — sign out.
+      if (response.status === 401) {
+        clearSession();
       }
     }
   }
@@ -104,17 +127,22 @@ export async function apiJson<T>(path: string, init: RequestInit = {}, token?: s
 
 // ── Authenticated apiFetch wrapper with refresh-on-401 ───────────────────────
 // Use this for non-JSON responses (file uploads, etc.) that still need auth.
+// NOTE: Does NOT retry FormData/stream bodies to avoid double-consumption.
 export async function apiFetchAuth(path: string, init: RequestInit = {}, token?: string): Promise<Response> {
   const liveToken = getLiveToken() ?? token;
+  const canRetry = isBodyReReadable(init.body);
   let response: Response;
   try { response = await apiFetch(path, init, liveToken); } catch {
     throw new ApiError(0, 'Unable to reach TickVendor. Check your connection and try again.', 'network');
   }
-  if (response.status === 401 && liveToken) {
+  if (response.status === 401 && liveToken && canRetry) {
     const refreshed = await refreshSession().catch(() => undefined);
     if (refreshed) {
       try { response = await apiFetch(path, init, refreshed); } catch {
         throw new ApiError(0, 'Unable to reach TickVendor. Check your connection and try again.', 'network');
+      }
+      if (response.status === 401) {
+        clearSession();
       }
     }
   }
