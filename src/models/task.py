@@ -29,6 +29,16 @@ class TaskPriority(str, enum.Enum):
     URGENT = "urgent"
 
 
+class TaskType(str, enum.Enum):
+    """Supported task kinds. Each kind drives per-type config and evidence requirements."""
+    GENERAL = "general"
+    VIDEO = "video"           # Watch a video / YouTube link
+    SOCIAL_FOLLOW = "social_follow"  # Follow/subscribe on a social platform
+    SURVEY = "survey"         # Complete a survey
+    REFERRAL = "referral"     # Invite/refer new members
+    PHYSICAL = "physical"     # Physical/manual work (e.g. arranging chairs)
+
+
 class TaskAssignmentStatus(str, enum.Enum):
     ASSIGNED = "assigned"
     ACCEPTED = "accepted"
@@ -67,6 +77,15 @@ class Task(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     verification_required: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     attachments: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    # Task kind and per-type configuration (e.g. target URL, platform handle, survey link).
+    task_type: Mapped[str] = mapped_column(
+        String(32), default=TaskType.GENERAL.value, nullable=False
+    )
+    task_config: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    # Which evidence types are required for submission (e.g. ["text"], ["url"], ["text","url"]).
+    required_evidence_types: Mapped[list[str]] = mapped_column(
+        JSON, default=lambda: ["text"], nullable=False
+    )
 
 
 class TaskAssignment(UUIDPrimaryKeyMixin, TimestampMixin, Base):

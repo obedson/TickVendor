@@ -58,7 +58,18 @@ def list_tasks(community_id: UUID, db: Annotated[Session, Depends(get_db)],
     query = select(Task).where(Task.community_id == community_id, Task.is_active.is_(True))
     if status_filter:
         query = query.where(Task.id.in_(select(TaskAssignment.task_id).where(TaskAssignment.status == status_filter)))
-    return [{**{field: getattr(task, field) for field in ("id", "community_id", "created_by_id", "title", "description", "event_id", "due_at", "priority", "impact_point_reward", "verification_required")}, "status": "active"} for task in db.scalars(query.order_by(Task.due_at))]
+    return [
+        {
+            **{field: getattr(task, field) for field in (
+                "id", "community_id", "created_by_id", "title", "description",
+                "event_id", "due_at", "priority", "impact_point_reward",
+                "verification_required", "attachments", "task_type", "task_config",
+                "required_evidence_types",
+            )},
+            "status": "active",
+        }
+        for task in db.scalars(query.order_by(Task.due_at))
+    ]
 
 
 @router.get("/task-assignments/me", response_model=list[TaskAssignmentResponse])
@@ -83,7 +94,9 @@ def my_assignment_details(db: Annotated[Session, Depends(get_db)], user: Annotat
     return [{"id": str(assignment.id), "task_id": str(task.id), "title": task.title,
              "description": task.description, "due_at": task.due_at,
              "status": assignment.status.value, "verification_required": task.verification_required,
-             "impact_point_reward": task.impact_point_reward, "attachments": task.attachments}
+             "impact_point_reward": task.impact_point_reward, "attachments": task.attachments,
+             "task_type": task.task_type, "task_config": task.task_config,
+             "required_evidence_types": task.required_evidence_types}
             for assignment, task in rows]
 
 
