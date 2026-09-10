@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { OrganizerAttendanceConfig } from './OrganizerAttendanceConfig';
-import { apiJson, ApiError, apiFetch } from './api';
+import { apiJson, ApiError, apiFetchAuth, getLiveToken } from './api';
 import { EmptyState } from './AppShell';
 
 type Event = {
@@ -20,13 +20,14 @@ type Event = {
     region?: string | null;
   } | null;
 };
-type Community = { id: string; community: { name: string } };
+type Community = { id: string; community?: { name: string }; name?: string };
 type TicketType = { id: string; name: string; price: string; currency: string; quantity: number; visibility: string; availability: number };
+type EventCategory = { id: string; slug: string; name: string; is_active: boolean };
 
 const emptyForm = {
   title: '',
   description: '',
-  category: 'community',
+  category: '',
   starts_at: '',
   ends_at: '',
   online_url: '',
@@ -43,34 +44,47 @@ const STATUS_COLORS: Record<string, string> = {
   completed: 'chip-blue',
 };
 
+const emptyTicketForm = { name: '', description: '', price: '0', currency: 'NGN', quantity: '100', max_per_user: '1', visibility: 'public' };
+
 export function OrganizerEvents({ token, communityId }: { token: string; communityId?: string }) {
   const [events, setEvents] = useState<Event[]>([]);
   const [communities, setCommunities] = useState<Community[]>([]);
+  const [categories, setCategories] = useState<EventCategory[]>([]);
   const [form, setForm] = useState(emptyForm);
   const [editing, setEditing] = useState<Event | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [types, setTypes] = useState<TicketType[]>([]);
+  const [ticketForm, setTicketForm] = useState(emptyTicketForm);
+  const [showTicketForm, setShowTicketForm] = useState(false);
+  const [savingTicket, setSavingTicket] = useState(false);
   const [configEvent, setConfigEvent] = useState<Event | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
 
-  const headers = { Authorization: `Bearer ${token}` };
+  const liveToken = () => getLiveToken() ?? token;
 
   const load = async () => {
     setLoading(true); setError('');
-    try { setEvents(await apiJson<Event[]>('communities/organizer/events', {}, token)); }
+    try { setEvents(await apiJson<Event[]>('communities/organizer/events', {}, liveToken())); }
     catch (cause) { setError(cause instanceof ApiError ? cause.message : 'Unable to load events'); }
     finally { setLoading(false); }
   };
 
   useEffect(() => {
     load();
-    apiFetch('communities/me', { headers })
-      .then(r => r.ok ? r.json() : [])
+    apiJson<Community[]>('communities/me', {}, liveToken())
       .then(setCommunities)
       .catch(() => setCommunities([]));
+    // Load active categories from the API (public endpoint, no auth needed).
+    apiJson<EventCategory[]>('admin/categories')
+      .then(cats => {
+        setCategories(cats);
+        // Set default category to first active one if form is blank.
+        setForm(prev => prev.category ? prev : { ...prev, category: cats[0]?.slug ?? '' });
+      })
+      .catch(() => setCategories([]));
   }, [token]);
 
   const create = async (e: React.FormEvent) => {
@@ -79,38 +93,36 @@ export function OrganizerEvents({ token, communityId }: { token: string; communi
     if (!community) { setError('Join an active community before creating an event.'); return; }
     setSaving(true); setError(''); setMessage('');
     try {
-      const response = await apiFetch('events', {
+      const data = await apiJson<Event>('events', {
         method: 'POST',
-        headers: { ...headers, 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-  title: form.title,
-  description: form.description,
-  category: form.category,
-  community_id: community.id,
-  starts_at: new Date(form.starts_at).toISOString(),
-  ends_at: new Date(form.ends_at).toISOString(),
-  location_type: form.online_url ? 'online' : 'physical',
-  ...(form.online_url
-    ? { online_url: form.online_url }
-    : {
-        venue: {
-          name: form.venue_name,
-          address: form.venue_address,
-          ...(form.venue_city ? { city: form.venue_city } : {}),
-          ...(form.venue_region ? { region: form.venue_region } : {}),
-          country_code: 'NG',
-        },
-      }),
-}),
-      });
-      const data = await response.json();
-      if (!response.ok) throw Error(data.detail?.[0]?.msg || data.detail || 'Unable to create event');
+          title: form.title,
+          description: form.description,
+          category: form.category,
+          community_id: community.id,
+          starts_at: new Date(form.starts_at).toISOString(),
+          ends_at: new Date(form.ends_at).toISOString(),
+          location_type: form.online_url ? 'online' : 'physical',
+          ...(form.online_url
+            ? { online_url: form.online_url }
+            : {
+                venue: {
+                  name: form.venue_name,
+                  address: form.venue_address,
+                  ...(form.venue_city ? { city: form.venue_city } : {}),
+                  ...(form.venue_region ? { region: form.venue_region } : {}),
+                  country_code: 'NG',
+                },
+              }),
+        }),
+      }, liveToken());
       setMessage(`Event "${data.title}" created.`);
       setForm(emptyForm);
       setShowForm(false);
       await load();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Unable to create event');
+      setError(cause instanceof ApiError ? cause.message : cause instanceof Error ? cause.message : 'Unable to create event');
     } finally { setSaving(false); }
   };
 
@@ -119,39 +131,67 @@ export function OrganizerEvents({ token, communityId }: { token: string; communi
     if (!editing) return;
     setSaving(true); setError('');
     try {
-      const response = await apiFetch(`events/${editing.id}`, {
+      const data = await apiJson<Event>(`events/${editing.id}`, {
         method: 'PATCH',
-        headers: { ...headers, 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: form.title,
           description: form.description,
           starts_at: new Date(form.starts_at).toISOString(),
           ends_at: new Date(form.ends_at).toISOString(),
         }),
-      });
-      const data = await response.json();
-      if (!response.ok) throw Error(data.detail || 'Unable to update event');
+      }, liveToken());
       setMessage(`Event "${data.title}" updated.`);
       setEditing(null);
       setShowForm(false);
       await load();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Unable to update event');
+      setError(cause instanceof ApiError ? cause.message : cause instanceof Error ? cause.message : 'Unable to update event');
     } finally { setSaving(false); }
   };
 
   const publish = async (event: Event) => {
     setError('');
-    const response = await apiFetch(`events/${event.id}/publish`, { method: 'POST', headers });
-    if (!response.ok) { const data = await response.json(); setError(data.detail || 'Unable to publish event'); return; }
-    setMessage(`"${event.title}" is now published.`);
-    await load();
+    try {
+      await apiJson<unknown>(`events/${event.id}/publish`, { method: 'POST' }, liveToken());
+      setMessage(`"${event.title}" is now published.`);
+      await load();
+    } catch (cause) {
+      setError(cause instanceof ApiError ? cause.message : 'Unable to publish event');
+    }
   };
 
   const loadTypes = async (event: Event) => {
-    const response = await apiFetch(`events/${event.id}/ticket-types`, { headers });
-    if (!response.ok) { setError('Unable to load ticket types'); return; }
-    setTypes(await response.json());
+    try {
+      setTypes(await apiJson<TicketType[]>(`events/${event.id}/ticket-types`, {}, liveToken()));
+    } catch { setError('Unable to load ticket types'); }
+  };
+
+  const createTicketType = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!configEvent) return;
+    setSavingTicket(true); setError('');
+    try {
+      await apiJson<TicketType>(`events/${configEvent.id}/ticket-types`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: ticketForm.name,
+          description: ticketForm.description || undefined,
+          price: Number(ticketForm.price),
+          currency: ticketForm.currency,
+          quantity: Number(ticketForm.quantity),
+          max_per_user: Number(ticketForm.max_per_user),
+          visibility: ticketForm.visibility,
+        }),
+      }, liveToken());
+      setMessage('Ticket type created.');
+      setTicketForm(emptyTicketForm);
+      setShowTicketForm(false);
+      await loadTypes(configEvent);
+    } catch (cause) {
+      setError(cause instanceof ApiError ? cause.message : 'Unable to create ticket type');
+    } finally { setSavingTicket(false); }
   };
 
   const beginEdit = (event: Event) => {
@@ -206,6 +246,28 @@ setForm({
             <label>
               <span className="label-text">Description</span>
               <textarea required minLength={10} value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} rows={4} placeholder="Describe the event, what participants can expect…" />
+            </label>
+            <label>
+              <span className="label-text">Event category</span>
+              {categories.length > 0 ? (
+                <select
+                  required
+                  value={form.category}
+                  onChange={e => setForm({ ...form, category: e.target.value })}
+                >
+                  <option value="" disabled>Select a category…</option>
+                  {categories.map(cat => (
+                    <option key={cat.slug} value={cat.slug}>{cat.name}</option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  required
+                  value={form.category}
+                  onChange={e => setForm({ ...form, category: e.target.value })}
+                  placeholder="e.g. community"
+                />
+              )}
             </label>
             <div className="form-row">
               <label>
@@ -322,10 +384,55 @@ setForm({
 
             {/* Inline config panel */}
             {configEvent?.id === event.id && (
-              <div style={{ borderTop: '1px solid var(--tv-border)', paddingTop: '1rem', display: 'grid', gap: '1rem' }}>
+              <div style={{ borderTop: '1px solid var(--tv-border)', paddingTop: '1rem', display: 'grid', gap: '1.25rem' }}>
                 <OrganizerAttendanceConfig token={token} communityId={event.community_id} eventId={event.id} />
                 <div>
-                  <h4 style={{ marginBottom: '.75rem' }}>Ticket types</h4>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '.75rem' }}>
+                    <h4 style={{ margin: 0 }}>Ticket types</h4>
+                    <button className="accent sm" onClick={() => setShowTicketForm(!showTicketForm)}>
+                      {showTicketForm ? 'Cancel' : '+ Add ticket type'}
+                    </button>
+                  </div>
+                  {showTicketForm && (
+                    <form onSubmit={createTicketType} style={{ background: 'var(--tv-surface-sunken)', padding: '1rem', borderRadius: 'var(--tv-radius-md)', marginBottom: '1rem', display: 'grid', gap: '.75rem' }}>
+                      <div className="form-row">
+                        <label>
+                          <span className="label-text">Name</span>
+                          <input required value={ticketForm.name} onChange={e => setTicketForm({ ...ticketForm, name: e.target.value })} placeholder="e.g. General Admission" />
+                        </label>
+                        <label>
+                          <span className="label-text">Price (0 = Free)</span>
+                          <input required type="number" min="0" step="0.01" value={ticketForm.price} onChange={e => setTicketForm({ ...ticketForm, price: e.target.value })} />
+                        </label>
+                      </div>
+                      <label>
+                        <span className="label-text">Description (optional)</span>
+                        <input value={ticketForm.description} onChange={e => setTicketForm({ ...ticketForm, description: e.target.value })} placeholder="What's included…" />
+                      </label>
+                      <div className="form-row">
+                        <label>
+                          <span className="label-text">Quantity</span>
+                          <input required type="number" min="1" value={ticketForm.quantity} onChange={e => setTicketForm({ ...ticketForm, quantity: e.target.value })} />
+                        </label>
+                        <label>
+                          <span className="label-text">Max per user</span>
+                          <input required type="number" min="1" value={ticketForm.max_per_user} onChange={e => setTicketForm({ ...ticketForm, max_per_user: e.target.value })} />
+                        </label>
+                        <label>
+                          <span className="label-text">Visibility</span>
+                          <select value={ticketForm.visibility} onChange={e => setTicketForm({ ...ticketForm, visibility: e.target.value })}>
+                            <option value="public">Public</option>
+                            <option value="members_only">Members only</option>
+                            <option value="hidden">Hidden</option>
+                            <option value="invite_only">Invite only</option>
+                          </select>
+                        </label>
+                      </div>
+                      <div className="form-actions">
+                        <button type="submit" className="accent sm" disabled={savingTicket}>{savingTicket ? 'Saving…' : 'Create ticket type'}</button>
+                      </div>
+                    </form>
+                  )}
                   {!types.length ? (
                     <p className="empty">No ticket types configured for this event.</p>
                   ) : (
@@ -334,7 +441,7 @@ setForm({
                         <div key={type.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '.65rem .85rem', background: 'var(--tv-surface-sunken)', borderRadius: 'var(--tv-radius-md)', fontSize: '.875rem', gap: '.5rem', flexWrap: 'wrap' }}>
                           <strong>{type.name}</strong>
                           <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center' }}>
-                            <span>{Number(type.price) === 0 ? 'Free' : `${type.currency} ${type.price}`}</span>
+                            <span>{Number(type.price) === 0 ? 'Free' : `${type.currency} ${Number(type.price).toLocaleString()}`}</span>
                             <span className={`chip ${type.availability > 0 ? 'chip-green' : 'chip-red'}`}>{type.availability} left</span>
                             <span className="chip chip-default">{type.visibility}</span>
                           </div>
