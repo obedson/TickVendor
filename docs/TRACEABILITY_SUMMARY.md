@@ -4,6 +4,27 @@ Source: `docs/TICKVENDOR_SPEC.md` at the current repository head.
 
 The complete generated requirement matrix is maintained at `docs/TRACEABILITY_MATRIX.md`. It contains one row for each normative top-level specification bullet under sections 1–82, stable section/row identifiers, A/B/C classification, implementation evidence, verification method, and remaining dependency. This document is the concise assessment index; the detailed matrix is the authoritative row-level record.
 
+## Pass 2 delta (spec-reconciliation-remediation, 2026-09-10)
+
+This second remediation pass addresses the following items that were previously "not yet implemented":
+
+### Newly implemented (implemented but verification outstanding)
+- **Task evidence UI** (§19): `evidence_url` and `evidence_attachments` now exposed in participant submission form with URL validation, required-evidence enforcement per `required_evidence_types`, and correct payload matching backend schema.
+- **Flexible task authoring** (§19): `task_type` enum (general/video/social_follow/survey/referral/physical) added to Task model with Alembic migration `a1b2c3d4e5f6`. Per-type config (video URL, platform handle, survey link, referral target, physical instructions). Organizer authoring UI exposes all config. Participant rendering adapts per task kind.
+- **Organizer task admin workflow** (§19): Full list/create/assign/verify/reject with reason in OrganizerTaskQueue.tsx.
+- **Members browser invite/add** (§5.84): `POST /communities/{id}/members/invite` by email/username. Role management with confirmation modal. Status display (invited/pending). Joined date.
+- **Category API route** (conventions): Public category discovery at `GET /events/categories` (non-admin route). Mutations remain super_admin-only under `/admin/categories`.
+- **Platform admin user/community listing**: Dedicated `GET /admin/platform/users` and `GET /admin/platform/communities` endpoints (super_admin only).
+
+### Static defects fixed
+- `src/api/admin.py`: Missing `select` import (would cause NameError at runtime on `list_categories`).
+- `frontend/src/api.ts`: FormData/stream body double-consumption guard; auth endpoint exclusion from refresh loop; post-retry clearSession on 401.
+- `frontend/src/OrganizerEvents.tsx`: Removed invalid `members_only` ticket visibility; category endpoint corrected; loading/error/empty states for category selector.
+- `frontend/src/PlatformAdmin.tsx`: Fixed search endpoint usage (was using `search?q=` which requires min_length=2 and would fail).
+
+### Assessment note
+No requirements are reclassified from B to A in this pass (execution environment blocks npm and Python deps). No items are deferred. The items above move from "not yet implemented" to "implemented but verification outstanding".
+
 ## Current assessment (post spec-reconciliation-remediation, 2026-09-10)
 
 The current repository-backed assessment counts 771 normative bullet requirements.

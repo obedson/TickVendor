@@ -1,5 +1,51 @@
 # TickVendor Build Status
 
+## Spec Reconciliation Remediation Pass 2 — 2026-09-10
+
+Branch: `duo/feature/spec-reconciliation-remediation`
+
+### Pass 2 — Task UI, Members Browser, Category API, Static Review Fixes
+
+#### PRIORITY 3 — Category API Design (IMPLEMENTED, verification outstanding)
+- Decision: Public category discovery exposed at `GET /api/v1/events/categories` (non-admin route matching project conventions for public reads like events/communities). Mutations (POST/PATCH) remain under `/admin/categories` super_admin-only.
+- `OrganizerEvents.tsx` updated to use `/events/categories` instead of `/admin/categories`.
+- `PlatformAdmin.tsx` CategoryManager still uses `/admin/categories?active_only=false` (authenticated super_admin route) to see all categories including inactive.
+- Category selector UX: loading state, error with retry button, clear "no active categories" message that disables submit (no free-text fallback).
+- Bug fixed: `select` was missing from imports in `src/api/admin.py` (would have caused NameError at runtime on `list_categories`).
+- New platform admin endpoints: `GET /admin/platform/users` and `GET /admin/platform/communities` (super_admin only) — replaces broken `search?q=` usage in PlatformAdmin.tsx (search requires min_length=2).
+- Verification: NOT VERIFIED (Python deps / npm blocked).
+
+#### PRIORITY 4 — Static Review Defects Fixed (IMPLEMENTED, verification outstanding)
+- `api.ts`: Added `isBodyReReadable()` guard — FormData and ReadableStream bodies are NOT retried after 401 (prevents double-consumption / empty body on retry). Auth endpoints (auth/login, auth/refresh) are excluded from refresh-on-401 to prevent recursive loops. After a successful refresh, if the retry also returns 401, `clearSession()` is called exactly once.
+- `OrganizerEvents.tsx`: Removed `members_only` ticket visibility option (not in backend `TicketVisibility` enum; backend only has public/hidden/invite_only). Category payload sends slug (correct — backend `validate_category` normalizes to slug).
+- `PlatformAdmin.tsx`: Fixed user/community listing to use dedicated platform admin endpoints instead of search endpoint.
+- Management nav structure verified: OVERVIEW (Dashboard), PROGRAMS (Events, Opportunities, Tasks), PEOPLE (Members, Attendance Review, Check-in), IMPACT (Leaderboard, Recognition, Adjustments), SETTINGS (Point rules, Contribution Tiers, Notifications, Analytics, Audit log), PLATFORM (Platform Admin — super_admin only). Matches spec requirement exactly.
+- Verification: NOT VERIFIED (npm blocked).
+
+#### PRIORITY 1 — Task UI (IMPLEMENTED, verification outstanding)
+- `Tasks.tsx`: Evidence submission modal now exposes `evidence_text`, `evidence_url`, and `evidence_attachments` (up to 10 URLs) with usable controls. Client-side validation enforces `required_evidence_types` per task config (required fields marked *, block submit). URL format validation with onBlur feedback. Task cards show task-type-specific quick info (video link, social follow link, survey link, referral instructions, physical location).
+- `OrganizerTaskQueue.tsx` (full rewrite): Three-view layout — Verification Queue / All Tasks / Create Task. Verification queue shows all evidence types including attachments; reject action prompts for rejection reason. All tasks list with assign-to-member modal. Create task form supports all 6 task types with per-type config fields.
+- Backend: `TaskType` enum (general/video/social_follow/survey/referral/physical) added to `src/models/task.py`. `task_type`, `task_config` (JSON), `required_evidence_types` columns added with Alembic migration `a1b2c3d4e5f6`. `TaskCreateInput` validates config keys per task type. `submit_task()` enforces `required_evidence_types` (raises 422 if required evidence missing). Task list API includes new fields in response.
+- Referral tasks: use manual/organizer verification (no platform referral tracking exists; anti-abuse note shown in UI; organizer verifies referred users are new/verified accounts).
+- Verification: NOT VERIFIED (Python deps / npm blocked).
+
+#### PRIORITY 2 — Members Browser (IMPLEMENTED, verification outstanding)
+- Backend: `POST /communities/{id}/members/invite` endpoint added — accepts `identifier` (email or username), looks up user, creates INVITED membership. Privacy-safe (returns 404 for both not-found and privacy-redacted). Self-invite and admin-role escalation guards. Audit record fires.
+- `OrganizerMembers.tsx`: Invite form (email/username + role selector). Role management: "Change role" button opens confirmation modal with role selector (disabled when new role equals current). Status display: invited/pending shown with yellow chip. Empty state has "Invite member" action.
+- Verification: NOT VERIFIED (npm blocked).
+
+#### Tests Added (Pass 2) — NOT VERIFIED
+- `tests/test_task_type_and_evidence.py`: 9 focused backend tests covering task type creation, evidence validation (text/url required), tenant isolation (cross-community task creation denied), member denied on verification queue, ordinary admin denied on category mutations, public /events/categories endpoint.
+- `frontend/src/__tests__/api.test.ts`: 7 vitest unit tests for api.ts covering refresh-on-401, single retry, no second retry, concurrent dedup (single refresh promise), failed-refresh sign-out, FormData body guard, auth endpoint exclusion.
+
+#### Checks Executed (Pass 2)
+- `python3 -m py_compile src/api/admin.py src/api/events.py src/api/tasks.py src/api/community_management.py src/models/task.py src/models/__init__.py src/schemas/task.py src/services/task.py src/main.py` → Exit 0 (all OK)
+- `python3 -m py_compile tests/test_task_type_and_evidence.py tests/test_event_categories_admin.py tests/test_free_ticket_flow.py` → Exit 0 (all OK)
+- `git diff --check` → Exit 0 (no whitespace issues)
+- Brace balance check on all modified .tsx/.ts files → all balanced
+
+---
+
 ## Spec Reconciliation Remediation — 2026-09-10
 
 Branch: `duo/feature/spec-reconciliation-remediation`
