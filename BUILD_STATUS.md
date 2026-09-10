@@ -1,5 +1,68 @@
 # TickVendor Build Status
 
+## Spec Reconciliation Remediation — 2026-09-10
+
+Branch: `duo/feature/spec-reconciliation-remediation`
+
+### Priority 1 — Central Auth/Session Fix (IMPLEMENTED, verification outstanding)
+- Root cause: `api.ts` `refreshSession()` read from `sessionStorage` but did not update live React state; concurrent refresh races were not prevented; all protected calls used stale token props/closures.
+- Fix: Canonical `SessionData` type; `addAuthListener`/`persistSession`/`clearSession`/`getLiveToken` exported from `api.ts`; single in-flight `_refreshPromise` prevents concurrent refresh races; `apiJson` always reads `getLiveToken()` before using the prop token; retry-once after 401; invalid refresh triggers `clearSession()` (clean sign-out); React root subscribes via `addAuthListener`; `apiFetchAuth` wrapper for non-JSON authenticated calls.
+- All 19 frontend components updated to use `apiJson`/`getLiveToken()` instead of raw `apiFetch` with stale token props.
+- Verification: NOT VERIFIED locally (npm registry blocked in this environment; no node_modules). Requires frontend build + browser test in staging.
+
+### Priority 2 — Event Categories (IMPLEMENTED, verification outstanding)
+- Root cause: No GET endpoint for categories; `OrganizerEvents.tsx` hardcoded `category: 'community'`; form had no selector.
+- Fix: Added `GET /api/v1/admin/categories` public endpoint (no auth required, `active_only=true` by default); `OrganizerEvents.tsx` loads categories from API on mount; renders `<select>` with human-readable names; falls back to text input if API unavailable; default set to first active category.
+- Backend test added: `tests/test_event_categories_admin.py::test_list_categories_public_endpoint`.
+- Verification: Backend test NOT VERIFIED (Python deps not installed in this environment). Frontend NOT VERIFIED (npm blocked).
+
+### Priority 3 — Free Event Tickets (IMPLEMENTED, verification outstanding)
+- Root cause: `acquire()` in `main.tsx` used stale `session.access_token` prop; free ticket path used `apiJson` but with stale token.
+- Fix: `acquire()` now uses `getLiveToken() ?? session.access_token`; free ticket path (price=0) calls `apiJson` for order creation and wallet refresh with live token; no Paystack checkout for free orders.
+- Backend tests added: `tests/test_free_ticket_flow.py` — covers free ticket acquisition, active status, QR token presence, duplicate protection, and payment initialization rejection for confirmed free orders.
+- Verification: NOT VERIFIED (Python deps not installed).
+
+### Community/Organization Admin (IMPLEMENTED, verification outstanding)
+- Fix: `managedCommunities` filter now includes `role === 'organizer'` in addition to `role === 'admin'`; uses `apiJson` with live token.
+- Tenant isolation: preserved — backend enforces community-scoped authorization on all management endpoints.
+
+### Super Admin / Platform Admin (IMPLEMENTED, verification outstanding)
+- New: `frontend/src/PlatformAdmin.tsx` — restricted to `super_admin` role; provides Event Category CRUD (create/edit/activate/deactivate), Platform Users overview, Platform Communities overview.
+- Integrated into management workspace nav as "Platform" group (only visible to super_admin).
+- Backend: `GET /api/v1/admin/categories` (public), `POST /api/v1/admin/categories` (super_admin), `PATCH /api/v1/admin/categories/{id}` (super_admin) — all existing.
+- Verification: NOT VERIFIED (npm blocked).
+
+### Contribution Tiers Wording (IMPLEMENTED)
+- Frontend-only: "Contribution Bands" → "Contribution Tiers" in all UI labels, messages, headings, and nav items.
+- Backend/API/database identifiers unchanged (`contribution-bands`, `ContributionBand`).
+- Description: "Define contribution ranges and the Impact Points members earn for each tier."
+- Create button: "Create contribution tier"; Save button: "Save contribution tier"; List heading: "Configured tiers".
+- Empty state: "Contribution ranges must not overlap active tiers."
+
+### Audit UX (IMPLEMENTED, verification outstanding)
+- `AdminAuditLogs.tsx`: human-readable `friendlyAction()` mapping for 40+ action codes; concise technical code shown below; expandable "Show details" / "Hide details" for raw metadata; `<details>` element for raw JSON.
+- Verification: NOT VERIFIED (npm blocked).
+
+### Management UX (PRESERVED)
+- Nav structure: OVERVIEW (Dashboard), PROGRAMS (Events, Opportunities, Tasks), PEOPLE (Members, Attendance Review, Check-in), IMPACT (Leaderboard, Recognition, Adjustments), SETTINGS (Point rules, Contribution Tiers, Notifications, Analytics, Audit log), PLATFORM (Platform Admin — super_admin only).
+- Compact workspace behavior preserved; My Space = participant nav only; Managed Community = management nav only.
+
+### API Consistency (IMPLEMENTED, verification outstanding)
+- All 19 frontend components audited and updated to use `apiJson`/`getLiveToken()`.
+- Eliminated stale `Authorization: Bearer ${token}` header construction from props/closures.
+- `apiFetch` still exported for internal use by `apiJson`/`apiFetchAuth`.
+
+### Tests Added
+- `tests/test_event_categories_admin.py::test_list_categories_public_endpoint` — GET categories public endpoint.
+- `tests/test_free_ticket_flow.py` — free ticket acquisition journey (2 tests).
+- `tests/test_auth_refresh_behavior.py` — refresh token rotation, invalid token 401, expired access token flow (3 tests).
+
+### Verification Status
+- Backend tests: NOT VERIFIED — Python dependencies (pytest, fastapi, sqlalchemy, etc.) not installed in this execution environment. Command attempted: `python3 -m pytest tests/ -x -q` → `No module named pytest`.
+- Frontend build: NOT VERIFIED — npm registry blocked (403 Forbidden). Command attempted: `npm run build` → `tsc: command not found` (no node_modules).
+- All code changes are syntactically correct based on static inspection and follow existing patterns.
+- Previous test suite (47 backend tests, 14 Playwright tests) was green at the prior commit; these changes are additive and do not modify existing test logic.
+
 ## Recovery Audit — 2026-08-31
 
 - Recovery checkpoint: Git initialized; pre-repair state committed as `f8206db`.

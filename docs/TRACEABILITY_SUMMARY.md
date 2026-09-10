@@ -4,17 +4,28 @@ Source: `docs/TICKVENDOR_SPEC.md` at the current repository head.
 
 The complete generated requirement matrix is maintained at `docs/TRACEABILITY_MATRIX.md`. It contains one row for each normative top-level specification bullet under sections 1–82, stable section/row identifiers, A/B/C classification, implementation evidence, verification method, and remaining dependency. This document is the concise assessment index; the detailed matrix is the authoritative row-level record.
 
-## Current assessment
+## Current assessment (post spec-reconciliation-remediation, 2026-09-10)
 
-The current repository-backed assessment counts 771 normative bullet requirements. This slice adds
-verified evidence for the organization-scoped volunteer/community activity opportunity path without
-changing the overall assessment counts.
+The current repository-backed assessment counts 771 normative bullet requirements.
 
-- A — implemented + verified: 639
-- B — implemented, verification outstanding: 132
+This remediation pass addresses the following previously-B items:
+- Central auth/session: stale token, refresh-on-401, concurrent refresh dedup, retry logic, live React state sync — **implemented, verification outstanding** (B/L2: requires frontend build + browser test).
+- Event category GET endpoint: public `GET /admin/categories` — **implemented, verification outstanding** (B/L1: requires backend test run).
+- Event creation category selector: human-readable `<select>` loaded from API — **implemented, verification outstanding** (B/L2: requires browser test).
+- Free ticket flow: `acquire()` uses live token, no Paystack for ₦0 — **implemented, verification outstanding** (B/L1: requires backend test run).
+- Community/Org admin: organizer role included in managed communities — **implemented, verification outstanding** (B/L2).
+- Super Admin Platform workspace: `PlatformAdmin.tsx` with category CRUD — **implemented, verification outstanding** (B/L2).
+- Contribution Tiers wording: frontend-only rename — **implemented** (no external verification needed; static change).
+- Audit UX: human-readable action names, expandable raw metadata — **implemented, verification outstanding** (B/L2).
+- API consistency: all 19 components use `apiJson`/`getLiveToken()` — **implemented, verification outstanding** (B/L2).
+
+No requirements have been reclassified from B to A in this pass because the execution environment blocks both npm (frontend build) and Python deps (backend tests). The Contribution Tiers wording change is a static frontend-only change with no external dependency.
+
+- A — implemented + verified: 639 (unchanged; no new local verification possible)
+- B — implemented, verification outstanding: 132 (unchanged count; several B items now have stronger implementation evidence)
 - C — not implemented: 0
 - Implementation completion: 771 / 771 = 100.00%
-- Verification completion: 639 / 771 = 82.88%
+- Verification completion: 639 / 771 = 82.88% (unchanged pending environment fix)
 - Not implemented: 0 / 771 × 100 = 0.00%
 - B verification dependency split: L1 = 73, L2 = 48, E1 = 2, E2 = 9 (sum = 132).
 
