@@ -26,6 +26,8 @@ const managementGroups: { label: string; ids: string[] }[] = [
   { label: 'People', ids: ['organizer-members', 'organizer-review', 'organizer-attendance'] },
   { label: 'Impact', ids: ['admin-leaderboards', 'admin-recognition', 'admin-adjustments'] },
   { label: 'Settings', ids: ['admin-rules', 'admin-bands', 'admin-notifications', 'admin-analytics', 'admin-audit'] },
+  // Super Admin only — shown when the platform-admin nav item is present.
+  { label: 'Platform', ids: ['platform-admin'] },
 ];
 
 const VIEW_ALIAS: Record<string, string> = {
