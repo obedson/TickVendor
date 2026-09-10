@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { apiJson, apiFetch, ApiError } from './api';
+import { apiJson, ApiError, getLiveToken } from './api';
 import { enqueueAction, flushActions } from './offlineQueue';
 import { EmptyState } from './AppShell';
 
@@ -21,13 +21,15 @@ export function Notifications({ token }: { token: string }) {
   const [showPrefs, setShowPrefs] = useState(false);
   const [filter, setFilter] = useState<'all' | 'unread'>('unread');
 
+  const liveToken = () => getLiveToken() ?? token;
+
   useEffect(() => {
     const flush = () => flushActions();
     flush();
     window.addEventListener('online', flush);
     Promise.all([
-      apiJson<Notification[]>('notifications', {}, token),
-      apiJson<Preferences>('notifications/preferences', {}, token),
+      apiJson<Notification[]>('notifications', {}, liveToken()),
+      apiJson<Preferences>('notifications/preferences', {}, liveToken()),
     ])
       .then(([n, p]) => { setItems(n); setPrefs(p); })
       .catch(e => setError(e instanceof ApiError ? e.message : 'Unable to load notifications'))
@@ -37,7 +39,7 @@ export function Notifications({ token }: { token: string }) {
 
   const markRead = async (item: Notification) => {
     try {
-      await apiFetch(`notifications/${item.id}/read`, { method: 'POST' }, token);
+      await apiJson<unknown>(`notifications/${item.id}/read`, { method: 'POST' }, liveToken());
       setItems(current => current.map(n => n.id === item.id ? { ...n, read_at: new Date().toISOString() } : n));
     } catch {
       await enqueueAction({ kind: 'notification-read', resourceId: item.id });
@@ -53,7 +55,7 @@ export function Notifications({ token }: { token: string }) {
 
   const savePreferences = async (next: Preferences) => {
     try {
-      await apiFetch('notifications/preferences', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(next) }, token);
+      await apiJson<Preferences>('notifications/preferences', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(next) }, liveToken());
       setPrefs(next);
       setStatusMsg('Preferences saved.');
     } catch {

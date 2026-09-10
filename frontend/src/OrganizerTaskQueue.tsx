@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { EmptyState } from './AppShell';
-import { apiFetch } from './api';
+import { apiJson, ApiError, getLiveToken } from './api';
 
 type Submission = {
   assignment_id: string;
@@ -19,38 +19,38 @@ export function OrganizerTaskQueue({ token, communityId }: { token: string; comm
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<string | null>(null);
-  const headers = { Authorization: `Bearer ${token}` };
+  const liveToken = () => getLiveToken() ?? token;
 
   const load = async () => {
-    setLoading(true);
+    setLoading(true); setError('');
     try {
       let id = communityId;
       if (!id) {
-        const memberships = await apiFetch('communities/me', { headers });
-        if (!memberships.ok) throw Error('Unable to load communities');
-        id = (await memberships.json())[0]?.id;
+        const memberships = await apiJson<any[]>('communities/me', {}, liveToken());
+        id = memberships[0]?.id;
       }
       if (!id) throw Error('No active community selected');
-      const response = await apiFetch(`communities/${id}/task-verification-queue`, { headers });
-      if (!response.ok) throw Error(response.status === 403 ? 'Organizer access required' : 'Unable to load task queue');
-      setItems(await response.json());
+      setItems(await apiJson<Submission[]>(`communities/${id}/task-verification-queue`, {}, liveToken()));
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Unable to load task queue');
+      setError(cause instanceof ApiError && cause.status === 403 ? 'Organizer access required' : cause instanceof Error ? cause.message : 'Unable to load task queue');
     } finally { setLoading(false); }
   };
 
   useEffect(() => { load(); }, [token, communityId]);
 
   const verify = async (assignmentId: string, approve: boolean) => {
-    const response = await apiFetch(`task-assignments/${assignmentId}/verify`, {
-      method: 'POST',
-      headers: { ...headers, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ approve }),
-    });
-    if (!response.ok) { const data = await response.json(); setError(data.detail || 'Unable to update submission'); return; }
-    setMessage(approve ? 'Task verified and points awarded.' : 'Task submission rejected.');
-    setExpanded(null);
-    await load();
+    try {
+      await apiJson<unknown>(`task-assignments/${assignmentId}/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ approve }),
+      }, liveToken());
+      setMessage(approve ? 'Task verified and points awarded.' : 'Task submission rejected.');
+      setExpanded(null);
+      await load();
+    } catch (cause) {
+      setError(cause instanceof ApiError ? cause.message : 'Unable to update submission');
+    }
   };
 
   return (

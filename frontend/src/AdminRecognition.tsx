@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { apiFetch } from './api';
+import { apiJson, ApiError, getLiveToken } from './api';
 
 type Community = { id: string; community: { name: string } };
 type SavedItem = { id: string; slug: string; name: string; is_active?: boolean };
@@ -26,11 +26,11 @@ export function AdminRecognition({ token, communityId }: Props) {
   const [milestone, setMilestone] = useState({ name: '', slug: '', requirements: '', rewardPoints: '0' });
   const [rank, setRank] = useState({ name: '', slug: '', minimumPoints: '', sortOrder: '', requirements: '' });
 
+  const liveToken = () => getLiveToken() ?? token;
+
   const loadCommunity = async () => {
     if (community) return community;
-    const response = await apiFetch('communities/me', { headers });
-    if (!response.ok) throw Error('Unable to load communities.');
-    const items = await response.json() as Community[];
+    const items = await apiJson<Community[]>('communities/me', {}, liveToken());
     const id = items[0]?.id;
     if (!id) throw Error('No community is available for administration.');
     setCommunity(id);
@@ -39,7 +39,7 @@ export function AdminRecognition({ token, communityId }: Props) {
 
   useEffect(() => {
     if (!community) {
-      loadCommunity().catch(cause => setError(cause instanceof Error ? cause.message : 'Unable to load communities.'));
+      loadCommunity().catch(cause => setError(cause instanceof ApiError ? cause.message : 'Unable to load communities.'));
     }
   }, [token]);
 
@@ -47,15 +47,14 @@ export function AdminRecognition({ token, communityId }: Props) {
     if (!community) return;
     setLoading(true);
     Promise.all((['achievement-rules', 'badges', 'milestones', 'ranks'] as const).map(async resource => {
-      const response = await apiFetch(api(community, resource), { headers });
-      if (!response.ok) throw Error('Unable to load recognition configuration.');
-      return [resource, await response.json() as SavedItem[]] as const;
+      const values = await apiJson<SavedItem[]>(api(community, resource), {}, liveToken());
+      return [resource, values] as const;
     })).then(items => items.forEach(([resource, values]) => {
       if (resource === 'achievement-rules') setRules(values);
       if (resource === 'badges') setBadges(values);
       if (resource === 'milestones') setMilestones(values);
       if (resource === 'ranks') setRanks(values);
-    })).catch(cause => setError(cause instanceof Error ? cause.message : 'Unable to load recognition configuration.')).finally(() => setLoading(false));
+    })).catch(cause => setError(cause instanceof ApiError ? cause.message : 'Unable to load recognition configuration.')).finally(() => setLoading(false));
   }, [community, token]);
 
   const create = async (resource: string, body: object, label: string) => {
@@ -65,17 +64,13 @@ export function AdminRecognition({ token, communityId }: Props) {
     setBusy(true);
     try {
       const id = await loadCommunity();
-      const response = await apiFetch(api(id, resource), {
+      await apiJson<SavedItem>(api(id, resource), {
         method: 'POST',
-        headers: { ...headers, 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
-      });
-      const data = await response.json();
-      if (!response.ok) throw Error(data.detail || `Unable to create ${label}.`);
+      }, liveToken());
       setMessage(`${label} saved.`);
-      const refreshed = await apiFetch(api(id, resource), { headers });
-      if (!refreshed.ok) throw Error('Saved, but unable to reload recognition configuration.');
-      const values = await refreshed.json() as SavedItem[];
+      const values = await apiJson<SavedItem[]>(api(id, resource), {}, liveToken());
       if (resource === 'achievement-rules') setRules(values);
       if (resource === 'badges') setBadges(values);
       if (resource === 'milestones') setMilestones(values);
@@ -88,17 +83,17 @@ export function AdminRecognition({ token, communityId }: Props) {
   const toggle = async (resource: string, item: SavedItem, active: boolean) => {
     if (!community || !item.id) return;
     setError('');
-    const response = await apiFetch(`${api(community, resource)}/${item.id}`, {
-      method: 'PATCH',
-      headers: { ...headers, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ is_active: active }),
-    });
-    const data = await response.json();
-    if (!response.ok) { setError(data.detail || 'Unable to update recognition configuration.'); return; }
-    const update = (items: SavedItem[]) => items.map(existing => existing.id === item.id ? { ...existing, is_active: data.is_active } : existing);
-    if (resource === 'achievement-rules') setRules(update);
-    if (resource === 'ranks') setRanks(update);
-    setMessage('Recognition configuration updated.');
+    try {
+      const data = await apiJson<SavedItem>(`${api(community, resource)}/${item.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_active: active }),
+      }, liveToken());
+      const update = (items: SavedItem[]) => items.map(existing => existing.id === item.id ? { ...existing, is_active: data.is_active } : existing);
+      if (resource === 'achievement-rules') setRules(update);
+      if (resource === 'ranks') setRanks(update);
+      setMessage('Recognition configuration updated.');
+    } catch (cause) { setError(cause instanceof ApiError ? cause.message : 'Unable to update recognition configuration.'); }
   };
 
   const parse = (value: string, label: string) => {

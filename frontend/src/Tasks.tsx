@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { apiJson, apiFetch, ApiError } from './api';
+import { apiJson, ApiError, getLiveToken } from './api';
 import { EmptyState } from './AppShell';
 
 type Task = {
@@ -40,16 +40,18 @@ export function Tasks({ token, communityId }: { token: string; communityId?: str
   const [noCommunity, setNoCommunity] = useState(false);
   const [filter, setFilter] = useState<'all' | 'active' | 'completed'>('active');
 
+  const liveToken = () => getLiveToken() ?? token;
+
   const load = async () => {
     setLoading(true);
     setNoCommunity(false);
     try {
-      const communities = communityId ? [{ id: communityId }] : await apiJson<{ id: string }[]>('communities/me', {}, token);
+      const communities = communityId ? [{ id: communityId }] : await apiJson<{ id: string }[]>('communities/me', {}, liveToken());
       const id = communities[0]?.id;
       if (!id) { setNoCommunity(true); setTasks([]); setAssignments([]); return; }
       const [a, t] = await Promise.all([
-        apiJson<Assignment[]>('task-assignments/me', {}, token),
-        apiJson<Task[]>(`communities/${id}/tasks`, {}, token),
+        apiJson<Assignment[]>('task-assignments/me', {}, liveToken()),
+        apiJson<Task[]>(`communities/${id}/tasks`, {}, liveToken()),
       ]);
       setAssignments(a);
       setTasks(t);
@@ -70,11 +72,11 @@ export function Tasks({ token, communityId }: { token: string; communityId?: str
     setBusy(true);
     setError('');
     try {
-      await apiFetch(`task-assignments/${assignment.id}/submissions`, {
+      await apiJson<unknown>(`task-assignments/${assignment.id}/submissions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ evidence_text: evidence }),
-      }, token);
+      }, liveToken());
       setStatusMsg(selected.verification_required ? 'Submitted for verification.' : 'Task completed!');
       setSelected(null);
       setEvidence('');
