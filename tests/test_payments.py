@@ -11,7 +11,17 @@ from sqlalchemy.orm import Session
 
 import src.models  # noqa: F401
 from src.database import Base
-from src.models import Order, OrderStatus, Payment, PaymentStatus, Ticket, TicketStatus, TicketType
+from src.models import (
+    AuditLog,
+    Notification,
+    Order,
+    OrderStatus,
+    Payment,
+    PaymentStatus,
+    Ticket,
+    TicketStatus,
+    TicketType,
+)
 from src.payments.live_providers import PaystackProvider, StripeProvider
 from src.payments.providers import PaymentInitialization, PaymentVerification, TestPaymentProvider
 from src.services.payment import apply_successful_payment, initialize_payment, reconcile_payment
@@ -40,6 +50,11 @@ def test_successful_payment_activates_tickets_once(tmp_path):
         assert payment.status == PaymentStatus.SUCCESSFUL
         assert order.status == OrderStatus.CONFIRMED
         assert ticket.status == TicketStatus.ACTIVE
+        assert db.query(Ticket).filter_by(order_id=order.id).count() == 1
+        assert db.query(AuditLog).filter_by(action="payment.verified").count() == 1
+        assert db.query(Notification).filter_by(
+            deduplication_key=f"paid-ticket-confirmed:{order.id}"
+        ).count() == 1
     engine.dispose()
 
 
@@ -96,6 +111,56 @@ class RecordingProvider(TestPaymentProvider):
 
     def verify(self, provider_reference):
         return self.verification
+
+
+class FailingInitializationProvider(RecordingProvider):
+    def initialize(self, reference, amount, currency, email):
+        raise RuntimeError("simulated provider outage")
+
+
+def test_initialization_failure_releases_pending_ticket_reservation(tmp_path):
+    from fastapi import HTTPException
+
+    engine = create_engine(f"sqlite:///{tmp_path / 'init-failure.db'}")
+    Base.metadata.create_all(engine)
+    with Session(engine, expire_on_commit=False) as db:
+        user, _community, event = create_event_context(db)
+        order = Order(
+            reference="INIT-FAIL",
+            idempotency_key="init-failure-order-key",
+            user_id=user.id,
+            event_id=event.id,
+            total_amount=Decimal(100),
+            currency="NGN",
+        )
+        ticket_type = TicketType(
+            event_id=event.id, name="Paid", price=Decimal(100), quantity=1
+        )
+        db.add_all([order, ticket_type])
+        db.flush()
+        ticket = Ticket(
+            public_id="PUBLICINITFAIL",
+            qr_token="f" * 48,
+            event_id=event.id,
+            ticket_type_id=ticket_type.id,
+            attendee_id=user.id,
+            order_id=order.id,
+            status=TicketStatus.PENDING_PAYMENT,
+        )
+        db.add(ticket)
+        db.commit()
+
+        with pytest.raises(HTTPException) as failed:
+            initialize_payment(
+                db, order, user.email, "init-failure-payment-key", FailingInitializationProvider()
+            )
+
+        assert failed.value.status_code == 502
+        assert order.status == OrderStatus.CANCELLED
+        assert ticket.status == TicketStatus.CANCELLED
+        assert db.query(Payment).count() == 0
+        assert db.query(AuditLog).filter_by(action="order.cancelled").count() == 1
+    engine.dispose()
 
 
 def test_payment_initialization_replay_reuses_checkout_and_conflict_is_rejected(tmp_path):

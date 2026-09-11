@@ -23,6 +23,7 @@ from src.models import (
     PeerConfirmation,
     Profile,
     Ticket,
+    TicketStatus,
     User,
 )
 from src.schemas.attendance import (
@@ -173,7 +174,11 @@ def attendance_roster(
     """Return ticket holders and attendance-only participants for organizer operations."""
     event = event_or_404(db, event_id)
     _require_review_access(db, event, user)
-    participant_ids = select(Ticket.attendee_id).where(Ticket.event_id == event_id).union(
+    admission_statuses = [TicketStatus.PAID, TicketStatus.ACTIVE, TicketStatus.USED]
+    participant_ids = select(Ticket.attendee_id).where(
+        Ticket.event_id == event_id,
+        Ticket.status.in_(admission_statuses),
+    ).union(
         select(Attendance.user_id).where(Attendance.event_id == event_id)
     )
     participants = db.execute(
@@ -186,7 +191,9 @@ def attendance_roster(
     ).all()
     user_ids = [participant.id for participant, _profile in participants]
     tickets = list(db.scalars(select(Ticket).where(
-        Ticket.event_id == event_id, Ticket.attendee_id.in_(user_ids)
+        Ticket.event_id == event_id,
+        Ticket.attendee_id.in_(user_ids),
+        Ticket.status.in_(admission_statuses),
     ))) if user_ids else []
     attendances = list(db.scalars(select(Attendance).where(
         Attendance.event_id == event_id, Attendance.user_id.in_(user_ids)

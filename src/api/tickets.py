@@ -19,7 +19,12 @@ from src.schemas.ticket import (
     TicketValidationResponse,
     TicketWalletResponse,
 )
-from src.services.ticket import create_order, create_ticket_type, validate_ticket
+from src.services.ticket import (
+    create_order,
+    create_ticket_type,
+    expire_pending_orders,
+    validate_ticket,
+)
 
 router = APIRouter(tags=["ticketing"])
 
@@ -44,14 +49,19 @@ def order_tickets(
 def ticket_wallet(
     db: Annotated[Session, Depends(get_db)], current_user: Annotated[User, Depends(get_current_user)],
 ):
+    expire_pending_orders(db, user_id=current_user.id)
     rows = db.execute(select(Ticket, Event, TicketType).join(Event, Event.id == Ticket.event_id)
                       .join(TicketType, TicketType.id == Ticket.ticket_type_id)
-                      .where(Ticket.attendee_id == current_user.id)
+                      .where(
+                          Ticket.attendee_id == current_user.id,
+                          Ticket.status.notin_([TicketStatus.RESERVED, TicketStatus.PENDING_PAYMENT]),
+                      )
                       .order_by(Ticket.created_at.desc()))
     result = []
     for ticket, event, ticket_type in rows:
-        group = "cancelled" if ticket.status in {TicketStatus.CANCELLED, TicketStatus.REFUNDED} else \
-            "used" if ticket.status in {TicketStatus.USED, TicketStatus.EXPIRED} else "upcoming"
+        group = "cancelled" if ticket.status in {
+            TicketStatus.CANCELLED, TicketStatus.REFUNDED, TicketStatus.EXPIRED,
+        } else "used" if ticket.status == TicketStatus.USED else "upcoming"
         result.append(TicketWalletResponse.model_validate({
             **{key: getattr(ticket, key) for key in ("id", "public_id", "qr_token", "event_id", "ticket_type_id", "attendee_id", "order_id", "status", "used_at")},
             "event_title": event.title, "event_starts_at": event.starts_at,

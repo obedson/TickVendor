@@ -16,6 +16,7 @@ from src.payments.providers import PaymentProvider, TestPaymentProvider
 from src.schemas.payment import (
     PaymentInitializeRequest,
     PaymentInitializeResponse,
+    PaymentReferenceVerifyRequest,
     PaymentVerifyRequest,
 )
 from src.services.payment import apply_successful_payment, initialize_payment, reconcile_payment
@@ -69,6 +70,33 @@ def initialize(
         provider_reference=initialized.provider_reference,
         checkout_url=initialized.checkout_url,
     )
+
+
+@router.post("/verify-reference")
+def verify_reference(
+    payload: PaymentReferenceVerifyRequest,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
+    provider: Annotated[PaymentProvider, Depends(get_payment_provider)],
+):
+    payment = db.query(Payment).filter_by(
+        provider=provider.name,
+        provider_reference=payload.provider_reference,
+    ).one_or_none()
+    if payment is None:
+        raise HTTPException(status_code=404, detail="Payment not found")
+    order = db.get(Order, payment.order_id)
+    if order is None or order.user_id != user.id:
+        raise HTTPException(status_code=404, detail="Payment not found")
+    apply_successful_payment(db, payment, provider)
+    return {
+        "payment_id": str(payment.id),
+        "order_id": str(order.id),
+        "order_reference": order.reference,
+        "status": payment.status.value,
+        "order_status": order.status.value,
+        "provider_reference": payment.provider_reference,
+    }
 
 
 @router.get("/{payment_id}")

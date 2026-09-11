@@ -1,18 +1,33 @@
 import { useEffect, useState } from 'react';
 import { apiJson, ApiError } from './api';
 
-type PaymentReturnProps = { token: string; paymentId: string };
+type PaymentReturnProps = {
+  token: string;
+  paymentId: string | null;
+  providerReference: string | null;
+};
 type PaymentState = 'checking' | 'pending' | 'successful' | 'failed' | 'unknown' | 'error';
 
-export function PaymentReturn({ token, paymentId }: PaymentReturnProps) {
+export function PaymentReturn({ token, paymentId, providerReference }: PaymentReturnProps) {
   const [state, setState] = useState<PaymentState>('checking');
   const [details, setDetails] = useState<any>(null);
+  const [resolvedPaymentId, setResolvedPaymentId] = useState(paymentId);
   const [attempt, setAttempt] = useState(0);
 
   const check = () => {
-    apiJson<any>(`payments/${encodeURIComponent(paymentId)}`, {}, token)
+    const request = providerReference && !resolvedPaymentId
+      ? apiJson<any>('payments/verify-reference', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ provider_reference: providerReference }),
+        }, token)
+      : resolvedPaymentId
+        ? apiJson<any>(`payments/${encodeURIComponent(resolvedPaymentId)}`, {}, token)
+        : Promise.reject(new ApiError(404, 'Payment not found', 'unexpected'));
+    request
       .then(data => {
         setDetails(data);
+        if (data.payment_id) setResolvedPaymentId(data.payment_id);
         setState(
           data.status === 'success' || data.status === 'successful' ? 'successful' :
           data.status === 'failed' ? 'failed' : 'pending'
@@ -21,7 +36,7 @@ export function PaymentReturn({ token, paymentId }: PaymentReturnProps) {
       .catch(e => setState(e instanceof ApiError && e.status === 404 ? 'unknown' : 'error'));
   };
 
-  useEffect(() => { check(); }, [paymentId, token, attempt]);
+  useEffect(() => { check(); }, [resolvedPaymentId, providerReference, token, attempt]);
 
   useEffect(() => {
     if (state !== 'pending' || attempt >= 8) return;
@@ -58,9 +73,9 @@ export function PaymentReturn({ token, paymentId }: PaymentReturnProps) {
           </p>
         )}
 
-        {details?.reference && (
+        {(details?.provider_reference || details?.order_reference) && (
           <p style={{ fontSize: '.875rem', color: 'var(--tv-muted)', marginBottom: '1rem' }}>
-            Reference: <code>{details.reference}</code>
+            Reference: <code>{details.provider_reference || details.order_reference}</code>
           </p>
         )}
 

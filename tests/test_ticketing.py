@@ -9,6 +9,8 @@ from sqlalchemy import create_engine, event
 from sqlalchemy.orm import Session
 
 import src.models  # noqa: F401
+from src.api.ticket_catalog import list_event_ticket_types
+from src.api.tickets import ticket_wallet
 from src.database import Base
 from src.models import (
     Attendance,
@@ -32,7 +34,12 @@ from src.models import (
 from src.schemas.attendance import AttendanceCheckIn
 from src.schemas.ticket import OrderCreate, TicketTypeCreate
 from src.services.attendance import check_in
-from src.services.ticket import create_order, create_ticket_type, validate_ticket
+from src.services.ticket import (
+    create_order,
+    create_ticket_type,
+    expire_pending_orders,
+    validate_ticket,
+)
 
 
 def setup(db: Session):
@@ -110,4 +117,70 @@ def test_non_public_ticket_type_cannot_be_ordered(tmp_path):
             create_order(db, event_model.id, OrderCreate(ticket_type_id=ticket_type.id, quantity=1,
                                                          idempotency_key="visibility-key-12345"), buyer)
         assert denied.value.status_code == 403
+    engine.dispose()
+
+
+def test_paid_reservation_reuses_order_expires_and_releases_inventory(tmp_path):
+    engine = create_engine(f"sqlite:///{tmp_path / 'paid-reservation.db'}")
+    Base.metadata.create_all(engine)
+    with Session(engine, expire_on_commit=False) as db:
+        organizer, buyer, _outsider, event_model = setup(db)
+        ticket_type = create_ticket_type(
+            db,
+            event_model.id,
+            TicketTypeCreate(name="Paid", price=Decimal(100), quantity=1, max_per_user=1),
+            organizer,
+        )
+        order = create_order(
+            db,
+            event_model.id,
+            OrderCreate(
+                ticket_type_id=ticket_type.id,
+                quantity=1,
+                idempotency_key="paid-reservation-key-1",
+            ),
+            buyer,
+        )
+        resumed = create_order(
+            db,
+            event_model.id,
+            OrderCreate(
+                ticket_type_id=ticket_type.id,
+                quantity=1,
+                idempotency_key="paid-reservation-key-2",
+            ),
+            buyer,
+        )
+        assert resumed.id == order.id
+        assert db.query(Ticket).filter_by(ticket_type_id=ticket_type.id).count() == 1
+        ticket = db.query(Ticket).filter_by(order_id=order.id).one()
+        assert ticket.status == TicketStatus.PENDING_PAYMENT
+        assert ticket_wallet(db, buyer) == []
+        assert list_event_ticket_types(event_model.id, db, buyer)[0]["availability"] == 0
+
+        result, _ = validate_ticket(db, event_model.id, ticket.qr_token, organizer)
+        assert result == "invalid_status"
+
+        order.expires_at = datetime.now(UTC) - timedelta(seconds=1)
+        db.commit()
+        assert expire_pending_orders(db, event_id=event_model.id) == 1
+        assert order.status.value == "expired"
+        assert ticket.status == TicketStatus.EXPIRED
+        assert list_event_ticket_types(event_model.id, db, buyer)[0]["availability"] == 1
+
+        replacement = create_order(
+            db,
+            event_model.id,
+            OrderCreate(
+                ticket_type_id=ticket_type.id,
+                quantity=1,
+                idempotency_key="paid-reservation-key-3",
+            ),
+            buyer,
+        )
+        assert replacement.id != order.id
+        assert db.query(Ticket).filter_by(
+            ticket_type_id=ticket_type.id,
+            status=TicketStatus.PENDING_PAYMENT,
+        ).count() == 1
     engine.dispose()

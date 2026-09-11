@@ -18,3 +18,7 @@ class PaymentInitializeResponse(BaseModel):
 
 class PaymentVerifyRequest(BaseModel):
     payment_id: UUID
+
+
+class PaymentReferenceVerifyRequest(BaseModel):
+    provider_reference: str = Field(min_length=1, max_length=128)

@@ -4,6 +4,7 @@ import time
 
 from src.database import SessionLocal
 from src.services.notification_worker import process_scheduled_notifications
+from src.services.ticket import expire_pending_orders
 
 
 class ConfiguredSender:
@@ -19,6 +20,7 @@ class ConfiguredSender:
 
 def run_once() -> int:
     with SessionLocal() as db:
+        expire_pending_orders(db)
         return process_scheduled_notifications(
             db, ConfiguredSender(), batch_size=int(os.getenv("NOTIFICATION_WORKER_BATCH_SIZE", "100"))
         )

@@ -1,7 +1,7 @@
 import { StrictMode, Suspense, lazy, useEffect, useState, useCallback } from 'react';
 import { createRoot } from 'react-dom/client';
 import { fetchWithRetry } from './fetchWithRetry';
-import { API_BASE, apiJson, apiFetchAuth, addAuthListener, persistSession, clearSession, getLiveToken, type SessionData } from './api';
+import { API_BASE, ApiError, apiJson, apiFetchAuth, addAuthListener, persistSession, clearSession, getLiveToken, type SessionData } from './api';
 const Notifications = lazy(() => import('./Notifications').then(m => ({ default: m.Notifications })));
 const Communities = lazy(() => import('./Communities').then(m => ({ default: m.Communities })));
 const OrganizerDashboard = lazy(() => import('./OrganizerDashboard').then(m => ({ default: m.OrganizerDashboard })));
@@ -253,12 +253,13 @@ function TicketQr({ ticket }: { ticket: OfflineTicket }) {
 /* ── Events discovery view ───────────────────────────────── */
 function EventsView({
   events, loading, error, query, setQuery, selected, setSelected,
-  types, typesError, purchase, acquire, onRetry,
+  types, typesError, purchase, purchaseError, purchasingTypeId, acquire, onRetry,
 }: {
   events: EventItem[]; loading: boolean; error: string; query: string;
   setQuery: (q: string) => void; selected: EventItem | null;
   setSelected: (e: EventItem | null) => void; types: TicketType[];
-  typesError: string; purchase: string; acquire: (t: TicketType) => void;
+  typesError: string; purchase: string; purchaseError: string; purchasingTypeId: string;
+  acquire: (t: TicketType) => void;
   onRetry: () => void;
 }) {
   if (selected) {
@@ -306,6 +307,7 @@ function EventsView({
               {typesError && <p role="alert" className="error">{typesError}</p>}
               {!typesError && !types.length && <p role="status" className="text-muted text-sm">Loading ticket options…</p>}
               {purchase && <p role="status" className="success-msg" style={{ marginBottom: '1rem' }}>{purchase}</p>}
+              {purchaseError && <p role="alert" className="error" style={{ marginBottom: '1rem' }}>{purchaseError}</p>}
               <div className="stack">
                 {types.map(type => (
                   <div key={type.id} style={{ padding: '1rem', border: '1.5px solid var(--tv-border)', borderRadius: 'var(--tv-radius-md)' }}>
@@ -322,10 +324,10 @@ function EventsView({
                       </span>
                       <button
                         className="accent sm"
-                        disabled={!type.availability || Boolean(purchase)}
+                        disabled={!type.availability || Boolean(purchasingTypeId) || Boolean(purchase)}
                         onClick={() => acquire(type)}
                       >
-                        {type.availability ? 'Get ticket' : 'Sold out'}
+                        {purchasingTypeId === type.id ? 'Starting checkout…' : type.availability ? 'Get ticket' : 'Sold out'}
                       </button>
                     </div>
                   </div>
@@ -447,7 +449,13 @@ function App() {
   useEffect(() => {
     return addAuthListener(updated => setSession(updated));
   }, []);
-  const [paymentId] = useState(() => new URLSearchParams(location.search).get('payment_id'));
+  const [paymentReturn] = useState(() => {
+    const params = new URLSearchParams(location.search);
+    return {
+      paymentId: params.get('payment_id'),
+      providerReference: params.get('reference') || params.get('trxref'),
+    };
+  });
   const [events, setEvents] = useState<EventItem[]>([]);
   const [tickets, setTickets] = useState<OfflineTicket[]>([]);
   const [query, setQuery] = useState('');
@@ -466,6 +474,8 @@ function App() {
   const [types, setTypes] = useState<TicketType[]>([]);
   const [typesError, setTypesError] = useState('');
   const [purchase, setPurchase] = useState('');
+  const [purchaseError, setPurchaseError] = useState('');
+  const [purchasingTypeId, setPurchasingTypeId] = useState('');
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [workspace, setWorkspace] = useState<'participant' | 'management' | 'platform'>('participant');
   const [managedCommunities, setManagedCommunities] = useState<WorkspaceCommunity[]>([]);
@@ -564,10 +574,14 @@ function App() {
   }
 
   // Payment return
-  if (paymentId) {
+  if (paymentReturn.paymentId || paymentReturn.providerReference) {
     return (
       <Suspense fallback={<PageLoader label="Loading payment status…" />}>
-        <PaymentReturn token={session.access_token} paymentId={paymentId} />
+        <PaymentReturn
+          token={session.access_token}
+          paymentId={paymentReturn.paymentId}
+          providerReference={paymentReturn.providerReference}
+        />
       </Suspense>
     );
   }
@@ -578,6 +592,8 @@ function App() {
   const acquire = async (type: TicketType) => {
     if (!session) return;
     setPurchase('');
+    setPurchaseError('');
+    setPurchasingTypeId(type.id);
     try {
       // Always use the live token (may have been refreshed since component mounted).
       const liveToken = getLiveToken() ?? session.access_token;
@@ -586,7 +602,7 @@ function App() {
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ticket_type_id: type.id, quantity: 1, idempotency_key: `web-${type.id}-${session.user.id}` }),
+          body: JSON.stringify({ ticket_type_id: type.id, quantity: 1, idempotency_key: `web-order-${crypto.randomUUID()}` }),
         },
         liveToken,
       );
@@ -609,7 +625,17 @@ function App() {
       );
       window.location.assign(payment.checkout_url);
     } catch (err) {
-      setPurchase(err instanceof Error ? err.message : 'Unable to acquire ticket.');
+      const message = err instanceof ApiError
+        ? err.message
+        : 'Ticket checkout could not be started. Please try again.';
+      setPurchaseError(message);
+      if (selectedEvent) {
+        apiJson<TicketType[]>(`events/${selectedEvent.id}/ticket-types`, {}, getLiveToken() ?? session.access_token)
+          .then(setTypes)
+          .catch(() => {});
+      }
+    } finally {
+      setPurchasingTypeId('');
     }
   };
 
@@ -649,7 +675,8 @@ function App() {
               query={query} setQuery={setQuery}
               selected={selectedEvent} setSelected={setSelectedEvent}
               types={types} typesError={typesError}
-              purchase={purchase} acquire={acquire}
+              purchase={purchase} purchaseError={purchaseError}
+              purchasingTypeId={purchasingTypeId} acquire={acquire}
               onRetry={loadEvents}
             />
           )}

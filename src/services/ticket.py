@@ -32,6 +32,90 @@ from src.schemas.ticket import OrderCreate, TicketTypeCreate
 from src.services.event import as_utc
 from src.services.notification import audit, notify
 
+CAPACITY_HOLDING_TICKET_STATUSES = {
+    TicketStatus.RESERVED,
+    TicketStatus.PENDING_PAYMENT,
+    TicketStatus.PAID,
+    TicketStatus.ACTIVE,
+    TicketStatus.USED,
+}
+
+
+def expire_pending_orders(
+    db: Session,
+    *,
+    now: datetime | None = None,
+    event_id: UUID | None = None,
+    user_id: UUID | None = None,
+) -> int:
+    """Release expired paid-ticket reservations safely and idempotently."""
+    now = now or datetime.now(UTC)
+    query = select(Order).where(
+        Order.status == OrderStatus.PENDING,
+        Order.expires_at.is_not(None),
+        Order.expires_at <= now,
+    )
+    if event_id is not None:
+        query = query.where(Order.event_id == event_id)
+    if user_id is not None:
+        query = query.where(Order.user_id == user_id)
+    orders = list(db.scalars(query.with_for_update()))
+    if not orders:
+        return 0
+    for order in orders:
+        order.status = OrderStatus.EXPIRED
+        for ticket in db.scalars(select(Ticket).where(Ticket.order_id == order.id).with_for_update()):
+            if ticket.status in {TicketStatus.RESERVED, TicketStatus.PENDING_PAYMENT}:
+                ticket.status = TicketStatus.EXPIRED
+        for payment in db.scalars(select(Payment).where(
+            Payment.order_id == order.id,
+            Payment.status == PaymentStatus.PENDING,
+        ).with_for_update()):
+            payment.status = PaymentStatus.CANCELLED
+            payment.failure_reason = "Ticket reservation expired before payment confirmation"
+        event = db.get(Event, order.event_id)
+        audit(
+            db,
+            actor_id=None,
+            community_id=event.community_id if event else None,
+            action="order.expired",
+            target_type="order",
+            target_id=order.id,
+            metadata={"reason": "payment_reservation_timeout"},
+            commit=False,
+        )
+    db.commit()
+    emit("ticket_reservations_expired", count=len(orders))
+    return len(orders)
+
+
+def release_pending_order(
+    db: Session,
+    order: Order,
+    *,
+    reason: str,
+    actor_id: UUID | None = None,
+) -> None:
+    """Cancel a pending reservation when checkout cannot be initialized."""
+    if order.status != OrderStatus.PENDING:
+        return
+    order.status = OrderStatus.CANCELLED
+    for ticket in db.scalars(select(Ticket).where(Ticket.order_id == order.id).with_for_update()):
+        if ticket.status in {TicketStatus.RESERVED, TicketStatus.PENDING_PAYMENT}:
+            ticket.status = TicketStatus.CANCELLED
+    event = db.get(Event, order.event_id)
+    audit(
+        db,
+        actor_id=actor_id,
+        community_id=event.community_id if event else None,
+        action="order.cancelled",
+        target_type="order",
+        target_id=order.id,
+        metadata={"reason": reason},
+        commit=False,
+    )
+    db.commit()
+
 
 def manage_event(db: Session, event_id: UUID, user: User) -> Event:
     event = db.get(Event, event_id)
@@ -54,13 +138,20 @@ def create_ticket_type(db: Session, event_id: UUID, payload: TicketTypeCreate, u
 
 
 def create_order(db: Session, event_id: UUID, payload: OrderCreate, user: User) -> Order:
+    expire_pending_orders(db, event_id=event_id)
     existing = db.scalar(select(Order).where(Order.idempotency_key == payload.idempotency_key))
     if existing:
         if existing.user_id != user.id or existing.event_id != event_id:
             raise HTTPException(status_code=409, detail="Idempotency key conflict")
+        existing_tickets = list(db.scalars(select(Ticket).where(Ticket.order_id == existing.id)))
+        if (len(existing_tickets) != payload.quantity
+                or any(ticket.ticket_type_id != payload.ticket_type_id for ticket in existing_tickets)):
+            raise HTTPException(status_code=409, detail="Idempotency key conflict")
         return existing
     event = db.get(Event, event_id)
-    ticket_type = db.get(TicketType, payload.ticket_type_id)
+    ticket_type = db.scalar(select(TicketType).where(
+        TicketType.id == payload.ticket_type_id
+    ).with_for_update())
     now = datetime.now(UTC)
     if event is None or event.status != EventStatus.PUBLISHED:
         raise HTTPException(status_code=404, detail="Published event not found")
@@ -72,7 +163,24 @@ def create_order(db: Session, event_id: UUID, payload: OrderCreate, user: User) 
         raise HTTPException(status_code=409, detail="Ticket sales have not started")
     if ticket_type.sales_end and as_utc(ticket_type.sales_end) < now:
         raise HTTPException(status_code=409, detail="Ticket sales have ended")
-    issued = db.scalar(select(func.count()).select_from(Ticket).where(Ticket.ticket_type_id == ticket_type.id)) or 0
+    active_reservation = db.scalar(
+        select(Order)
+        .join(Ticket, Ticket.order_id == Order.id)
+        .where(
+            Order.user_id == user.id,
+            Order.event_id == event_id,
+            Order.status == OrderStatus.PENDING,
+            Ticket.ticket_type_id == ticket_type.id,
+            Ticket.status == TicketStatus.PENDING_PAYMENT,
+        )
+        .order_by(Order.created_at.desc())
+    )
+    if active_reservation is not None:
+        return active_reservation
+    issued = db.scalar(select(func.count()).select_from(Ticket).where(
+        Ticket.ticket_type_id == ticket_type.id,
+        Ticket.status.in_(CAPACITY_HOLDING_TICKET_STATUSES),
+    )) or 0
     if issued + payload.quantity > ticket_type.quantity:
         raise HTTPException(status_code=409, detail="Insufficient ticket inventory")
     owned = db.scalar(select(func.count()).select_from(Ticket).where(
