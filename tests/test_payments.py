@@ -5,11 +5,14 @@ import hmac
 import json
 from decimal import Decimal
 
+import httpx
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 import src.models  # noqa: F401
+from src.api.ticket_catalog import list_event_ticket_types
+from src.api.tickets import ticket_wallet
 from src.database import Base
 from src.models import (
     AuditLog,
@@ -23,7 +26,12 @@ from src.models import (
     TicketType,
 )
 from src.payments.live_providers import PaystackProvider, StripeProvider
-from src.payments.providers import PaymentInitialization, PaymentVerification, TestPaymentProvider
+from src.payments.providers import (
+    PaymentInitialization,
+    PaymentProviderError,
+    PaymentVerification,
+    TestPaymentProvider,
+)
 from src.services.payment import apply_successful_payment, initialize_payment, reconcile_payment
 from tests.test_database import create_event_context
 
@@ -55,6 +63,7 @@ def test_successful_payment_activates_tickets_once(tmp_path):
         assert db.query(Notification).filter_by(
             deduplication_key=f"paid-ticket-confirmed:{order.id}"
         ).count() == 1
+        assert list_event_ticket_types(event.id, db, user)[0]["availability"] == 0
     engine.dispose()
 
 
@@ -83,7 +92,52 @@ def test_paystack_initialization_and_authoritative_verification(monkeypatch):
     assert initialized == PaymentInitialization("ORDER-1", "https://paystack.test/checkout")
     assert verified == PaymentVerification("ORDER-1", Decimal("125.5"), "NGN", "success")
     assert calls[0][2]["json"]["amount"] == 12550
+    assert calls[0][1][0] == "https://api.paystack.co/transaction/initialize"
+    assert calls[0][2]["headers"]["Authorization"] == "Bearer sk_test"
+    assert calls[0][2]["json"]["reference"] == "ORDER-1"
+    assert calls[0][2]["json"]["currency"] == "NGN"
+    assert calls[0][2]["json"]["email"] == "member@example.com"
     assert calls[0][2]["json"]["callback_url"] == "https://staging.example.test/payment/return"
+    assert calls[0][2]["timeout"] == 15
+
+
+def test_paystack_initialization_classifies_http_timeout_and_invalid_response(monkeypatch):
+    provider = PaystackProvider("sk_test", callback_url="https://staging.example.test")
+    request = httpx.Request("POST", "https://api.paystack.co/transaction/initialize")
+
+    def rejected(*_args, **_kwargs):
+        return httpx.Response(
+            401, json={"status": False, "message": "Invalid key"}, request=request
+        )
+
+    monkeypatch.setattr("src.payments.live_providers.httpx.post", rejected)
+    with pytest.raises(PaymentProviderError) as http_error:
+        provider.initialize("ORDER-1", Decimal(100), "NGN", "member@example.com")
+    assert http_error.value.kind == "provider_rejection"
+    assert http_error.value.http_status == 401
+    assert http_error.value.safe_message == "Invalid key"
+
+    def timed_out(*_args, **_kwargs):
+        raise httpx.ReadTimeout("timeout", request=request)
+
+    monkeypatch.setattr("src.payments.live_providers.httpx.post", timed_out)
+    with pytest.raises(PaymentProviderError) as timeout_error:
+        provider.initialize("ORDER-2", Decimal(100), "NGN", "member@example.com")
+    assert timeout_error.value.kind == "timeout"
+
+    class InvalidResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"status": True, "data": {}}
+
+    monkeypatch.setattr(
+        "src.payments.live_providers.httpx.post", lambda *_args, **_kwargs: InvalidResponse()
+    )
+    with pytest.raises(PaymentProviderError) as invalid_error:
+        provider.initialize("ORDER-3", Decimal(100), "NGN", "member@example.com")
+    assert invalid_error.value.kind == "invalid_response"
 
 
 def test_paystack_webhook_signature_and_event_contract():
@@ -115,12 +169,15 @@ class RecordingProvider(TestPaymentProvider):
 
 class FailingInitializationProvider(RecordingProvider):
     def initialize(self, reference, amount, currency, email):
-        raise RuntimeError("simulated provider outage")
+        raise PaymentProviderError(
+            "provider_rejection", "Invalid integration configuration", http_status=401
+        )
 
 
-def test_initialization_failure_releases_pending_ticket_reservation(tmp_path):
+def test_initialization_failure_releases_pending_ticket_reservation(tmp_path, caplog):
     from fastapi import HTTPException
 
+    caplog.set_level("INFO", logger="tickvendor.monitoring")
     engine = create_engine(f"sqlite:///{tmp_path / 'init-failure.db'}")
     Base.metadata.create_all(engine)
     with Session(engine, expire_on_commit=False) as db:
@@ -158,8 +215,13 @@ def test_initialization_failure_releases_pending_ticket_reservation(tmp_path):
         assert failed.value.status_code == 502
         assert order.status == OrderStatus.CANCELLED
         assert ticket.status == TicketStatus.CANCELLED
+        assert ticket_wallet(db, user) == []
         assert db.query(Payment).count() == 0
         assert db.query(AuditLog).filter_by(action="order.cancelled").count() == 1
+        logged = " ".join(record.getMessage() for record in caplog.records)
+        assert "provider_rejection" in logged
+        assert "provider_http_status" in logged
+        assert "INIT-FAIL" in logged
     engine.dispose()
 
 

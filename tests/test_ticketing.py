@@ -31,10 +31,13 @@ from src.models import (
     User,
     VerificationMethod,
 )
+from src.payments.providers import PaymentProviderError
 from src.schemas.attendance import AttendanceCheckIn
 from src.schemas.ticket import OrderCreate, TicketTypeCreate
 from src.services.attendance import check_in
+from src.services.payment import initialize_payment
 from src.services.ticket import (
+    cancel_ticket,
     create_order,
     create_ticket_type,
     expire_pending_orders,
@@ -120,6 +123,36 @@ def test_non_public_ticket_type_cannot_be_ordered(tmp_path):
     engine.dispose()
 
 
+def test_cancelled_issued_ticket_remains_in_cancelled_wallet_history(tmp_path):
+    engine = create_engine(f"sqlite:///{tmp_path / 'cancelled-issued.db'}")
+    Base.metadata.create_all(engine)
+    with Session(engine, expire_on_commit=False) as db:
+        organizer, buyer, _outsider, event_model = setup(db)
+        ticket_type = create_ticket_type(
+            db,
+            event_model.id,
+            TicketTypeCreate(name="Free", price=Decimal(0), quantity=1),
+            organizer,
+        )
+        order = create_order(
+            db,
+            event_model.id,
+            OrderCreate(
+                ticket_type_id=ticket_type.id,
+                quantity=1,
+                idempotency_key="cancelled-issued-order-key",
+            ),
+            buyer,
+        )
+        ticket = db.query(Ticket).filter_by(order_id=order.id).one()
+        cancel_ticket(db, ticket, buyer)
+        wallet = ticket_wallet(db, buyer)
+        assert len(wallet) == 1
+        assert wallet[0].status == TicketStatus.CANCELLED
+        assert wallet[0].group == "cancelled"
+    engine.dispose()
+
+
 def test_paid_reservation_reuses_order_expires_and_releases_inventory(tmp_path):
     engine = create_engine(f"sqlite:///{tmp_path / 'paid-reservation.db'}")
     Base.metadata.create_all(engine)
@@ -166,6 +199,7 @@ def test_paid_reservation_reuses_order_expires_and_releases_inventory(tmp_path):
         assert expire_pending_orders(db, event_id=event_model.id) == 1
         assert order.status.value == "expired"
         assert ticket.status == TicketStatus.EXPIRED
+        assert ticket_wallet(db, buyer) == []
         assert list_event_ticket_types(event_model.id, db, buyer)[0]["availability"] == 1
 
         replacement = create_order(
@@ -183,4 +217,47 @@ def test_paid_reservation_reuses_order_expires_and_releases_inventory(tmp_path):
             ticket_type_id=ticket_type.id,
             status=TicketStatus.PENDING_PAYMENT,
         ).count() == 1
+    engine.dispose()
+
+
+def test_repeated_initialization_failures_leave_capacity_and_wallet_clear(tmp_path):
+    class RejectingProvider:
+        name = "paystack"
+
+        def initialize(self, reference, amount, currency, email):
+            raise PaymentProviderError("provider_rejection", "Rejected", http_status=400)
+
+    engine = create_engine(f"sqlite:///{tmp_path / 'repeated-failures.db'}")
+    Base.metadata.create_all(engine)
+    with Session(engine, expire_on_commit=False) as db:
+        organizer, buyer, _outsider, event_model = setup(db)
+        ticket_type = create_ticket_type(
+            db,
+            event_model.id,
+            TicketTypeCreate(name="Paid", price=Decimal(100), quantity=1),
+            organizer,
+        )
+        for attempt in range(2):
+            order = create_order(
+                db,
+                event_model.id,
+                OrderCreate(
+                    ticket_type_id=ticket_type.id,
+                    quantity=1,
+                    idempotency_key=f"repeated-failure-order-{attempt}",
+                ),
+                buyer,
+            )
+            with pytest.raises(HTTPException) as rejected:
+                initialize_payment(
+                    db,
+                    order,
+                    buyer.email,
+                    f"repeated-failure-payment-{attempt}",
+                    RejectingProvider(),
+                )
+            assert rejected.value.status_code == 502
+            assert list_event_ticket_types(event_model.id, db, buyer)[0]["availability"] == 1
+            assert ticket_wallet(db, buyer) == []
+        assert db.query(Ticket).filter_by(status=TicketStatus.CANCELLED).count() == 2
     engine.dispose()

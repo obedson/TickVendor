@@ -4,7 +4,9 @@ type CryptoProvider=Pick<Crypto,'getRandomValues'|'subtle'>;
 
 const DATABASE='tickvendor-private-offline';
 const STORE='ticket-wallet';
-const RECORD='current-wallet';
+// Version the encrypted snapshot so clients cannot revive reservation artifacts
+// cached before the wallet's admission-history filtering was corrected.
+const RECORD='current-wallet-v2';
 
 export async function encryptTickets(tickets:OfflineTicket[],key:CryptoKey,cryptoProvider:CryptoProvider=crypto):Promise<EncryptedTickets>{
   const iv=cryptoProvider.getRandomValues(new Uint8Array(12));

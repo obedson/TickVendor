@@ -4,12 +4,12 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, status
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from src.api.auth import get_current_user
 from src.database import get_db
-from src.models import Event, Ticket, TicketStatus, TicketType, User
+from src.models import Event, Order, OrderStatus, Ticket, TicketStatus, TicketType, User
 from src.schemas.ticket import (
     OrderCreate,
     OrderResponse,
@@ -52,9 +52,14 @@ def ticket_wallet(
     expire_pending_orders(db, user_id=current_user.id)
     rows = db.execute(select(Ticket, Event, TicketType).join(Event, Event.id == Ticket.event_id)
                       .join(TicketType, TicketType.id == Ticket.ticket_type_id)
+                      .outerjoin(Order, Order.id == Ticket.order_id)
                       .where(
                           Ticket.attendee_id == current_user.id,
                           Ticket.status.notin_([TicketStatus.RESERVED, TicketStatus.PENDING_PAYMENT]),
+                          or_(
+                              Ticket.order_id.is_(None),
+                              Order.status.in_([OrderStatus.CONFIRMED, OrderStatus.REFUNDED]),
+                          ),
                       )
                       .order_by(Ticket.created_at.desc()))
     result = []

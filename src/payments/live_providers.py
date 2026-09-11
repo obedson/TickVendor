@@ -8,7 +8,19 @@ from decimal import Decimal
 import httpx
 
 from src.config import settings
-from src.payments.providers import PaymentInitialization, PaymentVerification
+from src.payments.providers import (
+    PaymentInitialization,
+    PaymentProviderError,
+    PaymentVerification,
+)
+
+
+def _provider_message(response: httpx.Response) -> str:
+    try:
+        message = response.json().get("message")
+    except (ValueError, AttributeError):
+        message = None
+    return str(message or "Provider request was rejected").replace("\r", " ").replace("\n", " ")[:300]
 
 
 class PaystackProvider:
@@ -33,21 +45,48 @@ class PaystackProvider:
     def initialize(
         self, reference: str, amount: Decimal, currency: str, email: str
     ) -> PaymentInitialization:
-        response = httpx.post(
-            "https://api.paystack.co/transaction/initialize",
-            headers=self.headers,
-            json={
-                "reference": reference,
-                "amount": int(amount * 100),
-                "currency": currency,
-                "email": email,
-                "callback_url": f"{self.callback_url.rstrip('/')}/payment/return",
-            },
-            timeout=15,
-        )
-        response.raise_for_status()
-        data = response.json()["data"]
-        return PaymentInitialization(data["reference"], data["authorization_url"])
+        try:
+            response = httpx.post(
+                "https://api.paystack.co/transaction/initialize",
+                headers=self.headers,
+                json={
+                    "reference": reference,
+                    "amount": int(amount * 100),
+                    "currency": currency,
+                    "email": email,
+                    "callback_url": f"{self.callback_url.rstrip('/')}/payment/return",
+                },
+                timeout=15,
+            )
+            response.raise_for_status()
+        except httpx.TimeoutException as exc:
+            raise PaymentProviderError("timeout", "Paystack request timed out") from exc
+        except httpx.HTTPStatusError as exc:
+            raise PaymentProviderError(
+                "provider_rejection",
+                _provider_message(exc.response),
+                http_status=exc.response.status_code,
+            ) from exc
+        except httpx.RequestError as exc:
+            raise PaymentProviderError("connection", "Could not connect to Paystack") from exc
+        try:
+            payload = response.json()
+            if payload.get("status") is False:
+                raise PaymentProviderError(
+                    "provider_rejection", str(payload.get("message") or "Paystack rejected initialization")
+                )
+            data = payload["data"]
+            provider_reference = data["reference"]
+            authorization_url = data["authorization_url"]
+            if not isinstance(provider_reference, str) or not isinstance(authorization_url, str):
+                raise TypeError("invalid initialization fields")
+        except PaymentProviderError:
+            raise
+        except (AttributeError, KeyError, TypeError, ValueError) as exc:
+            raise PaymentProviderError(
+                "invalid_response", "Paystack returned an invalid initialization response"
+            ) from exc
+        return PaymentInitialization(provider_reference, authorization_url)
 
     def refund(self, provider_reference: str, amount: Decimal) -> dict[str, object]:
         response = httpx.post(

@@ -18,7 +18,7 @@ from src.models import (
     User,
 )
 from src.monitoring import emit
-from src.payments.providers import PaymentProvider
+from src.payments.providers import PaymentProvider, PaymentProviderError
 from src.services.notification import audit, notify
 from src.services.ticket import release_pending_order
 
@@ -41,11 +41,19 @@ def initialize_payment(db: Session, order: Order, user_email: str, idempotency_k
             order.reference, order.total_amount, order.currency, user_email
         )
     except Exception as exc:
+        diagnostic = {
+            "provider": provider.name,
+            "order_id": str(order.id),
+            "order_reference": order.reference,
+            "error_type": type(exc).__name__,
+            "failure_kind": exc.kind if isinstance(exc, PaymentProviderError) else "unexpected",
+        }
+        if isinstance(exc, PaymentProviderError):
+            diagnostic["provider_http_status"] = exc.http_status
+            diagnostic["provider_message"] = exc.safe_message
         emit(
             "payment_initialization_failure",
-            provider=provider.name,
-            order_id=str(order.id),
-            error_type=type(exc).__name__,
+            **diagnostic,
         )
         release_pending_order(
             db, order, reason="payment_provider_initialization_failed", actor_id=order.user_id

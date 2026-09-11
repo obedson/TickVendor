@@ -19,7 +19,16 @@ def emit(event: str, **fields: Any) -> None:
         headers = {}
         if settings.monitoring_api_token:
             headers["Authorization"] = f"Bearer {settings.monitoring_api_token.get_secret_value()}"
-        httpx.post(settings.metrics_endpoint, json=payload, headers=headers, timeout=3).raise_for_status()
+        try:
+            httpx.post(
+                settings.metrics_endpoint, json=payload, headers=headers, timeout=3
+            ).raise_for_status()
+        except Exception as exc:  # noqa: BLE001 - observability must not break product flows
+            logger.warning({
+                "event": "monitoring_delivery_failed",
+                "request_id": request_id_context.get(),
+                "exception_type": type(exc).__name__,
+            })
 
 
 def capture_exception(exc: Exception, **fields: Any) -> None:

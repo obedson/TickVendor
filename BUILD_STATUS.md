@@ -789,3 +789,31 @@ integrated product evidence. TickVendor is not specification-complete or product
 - Changed-file Ruff passed. Frontend production build passed. `git diff --check` passed. Playwright and the full backend suite were intentionally not run.
 - Real Paystack test-mode checkout opening, return navigation, signed webhook delivery/replay, provider-declined/abandoned payment, late-payment refund handling, Render worker operation, and PostgreSQL multi-worker locking still require deployed external verification. Provider-side refund initiation already exists but remains externally unverified. The accepted-before-process-crash boundary between Paystack initialization and local payment persistence also remains an external recovery/reconciliation verification item.
 - No traceability completion counts were changed.
+
+## Paid-ticket staging follow-up reconciliation (2026-09-11)
+
+### Second-round staging evidence
+
+- After deploying `33df213`, paid `Launch Team Contribution` (NGN 100) checkout still did not open Paystack. The participant received the corrected `Payment checkout could not be started. Your ticket reservation was released; please try again.` message and availability returned to 100. This externally verifies initialization-failure classification and immediate capacity rollback.
+- My Tickets nevertheless displayed multiple `Launch Team Meeting` / `Launch Team Contribution` cards with `cancelled` status, while the previously valid/used free ticket correctly remained visible.
+
+### Wallet and repeat-attempt findings
+
+- The prior wallet query excluded only `reserved` and `pending_payment`; it intentionally grouped every `cancelled`, `refunded`, and `expired` ticket row into the specification's Cancelled Tickets area. An initialization failure changes the paid order and its reservation ticket to `cancelled`, so the endpoint returned that never-issued reservation as a cancelled QR ticket. This was a backend eligibility defect, not CSS and not primarily stale React state.
+- The wallet now requires the ticket's order to be `confirmed` or `refunded` (or permits a ticket with no order) in addition to excluding `reserved` and `pending_payment`. Consequently, failed/expired checkout reservations are absent, while active and used tickets and legitimately cancelled/refunded issued tickets remain available as required by §11.
+- The encrypted offline-wallet record was versioned so a client falling back offline cannot revive a snapshot populated under the old eligibility rule.
+- Each explicit retry after immediate initialization failure creates a new order/reservation because the preceding order is terminal and is not reopened. The terminal orders, reservation rows, and `order.cancelled` audits remain as immutable checkout history; only live `pending` reservations are reused. This one-record-per-explicit-attempt behavior is retained for auditability, but terminal reservation rows are no longer projected as ticket-wallet credentials or counted as inventory.
+- Focused repeated-failure coverage performs two independent rejected initializations: both reservations become terminal, wallet output remains empty, and availability returns to the full quantity after each attempt. A live pending reservation consumes exactly one unit, and verified payment keeps exactly that one unit consumed by activating the existing ticket row.
+
+### Paystack request and diagnostics
+
+- Repository and current Paystack contract agree: `POST https://api.paystack.co/transaction/initialize`, `Authorization: Bearer <secret>`, JSON content type via the HTTP client's `json` request, amount converted from Decimal naira to integer kobo, currency, participant email, unique order reference, fully qualified `/payment/return` callback, 15-second timeout, and extraction of `data.reference` plus `data.authorization_url`. Provider metadata is optional and is not sent. `access_code` is not required by the redirect integration.
+- No repository-side request-shape defect was found. Remaining live failures can be caused by an invalid/revoked or wrong-mode Paystack key, account/currency restrictions, rejected amount/email/reference/callback, duplicate provider reference, Paystack HTTP failure, Render DNS/TLS/outbound connection failure, timeout, or a malformed/unexpected provider response.
+- Paystack initialization now classifies timeout, connection failure, provider HTTP rejection, top-level provider rejection, and invalid response separately. The server-only `payment_initialization_failure` event records request ID, provider, order ID/reference, exception class, failure kind, provider HTTP status, and a bounded single-line provider message. It never records the secret, Authorization header, full payload, or payment credentials; participants continue receiving the safe generic rollback message.
+- Monitoring delivery failure can no longer interrupt payment rollback or replace the participant-facing response.
+- For the next staging attempt, inspect Render logs for `event=payment_initialization_failure` and retain: deployment/commit, timestamp, request ID, order ID/reference, `failure_kind`, `error_type`, `provider_http_status`, and `provider_message`. Also retain the adjacent API request status. If no such event appears, verify that this commit is deployed and application log level includes INFO. Do not copy the Paystack key or Authorization header.
+
+### Focused verification and remaining external check
+
+- Focused backend payment, ticket, callback/status, and free-ticket files: 21 passed with one existing Starlette/httpx deprecation warning. Changed-file Ruff and the frontend production build passed. Playwright and the full backend suite were not run.
+- The exact live Paystack rejection remains externally unresolved until the new safe Render diagnostic event from a deployed attempt is captured. No traceability completion counts were changed.

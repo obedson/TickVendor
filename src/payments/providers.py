@@ -5,6 +5,22 @@ from decimal import Decimal
 from typing import Protocol
 
 
+class PaymentProviderError(RuntimeError):
+    """Safe, structured provider failure details for server-side diagnostics."""
+
+    def __init__(
+        self,
+        kind: str,
+        message: str,
+        *,
+        http_status: int | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.kind = kind
+        self.safe_message = message[:300]
+        self.http_status = http_status
+
+
 @dataclass(frozen=True)
 class PaymentInitialization:
     provider_reference: str
