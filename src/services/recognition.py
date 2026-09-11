@@ -12,6 +12,7 @@ from src.models import (
     ActivityStatus,
     Attendance,
     AttendanceStatus,
+    AttendanceVerification,
     Badge,
     BadgeAward,
     Contribution,
@@ -30,6 +31,7 @@ from src.models import (
     Task,
     TaskAssignment,
     TaskAssignmentStatus,
+    VerificationMethod,
 )
 from src.services.achievement import evaluate_condition
 from src.services.impact import award_points
@@ -47,12 +49,35 @@ def longest_consecutive_days(values) -> int:
     return longest
 
 
-def user_metrics(db: Session, user_id, community_id) -> dict[str, int]:
-    attendance_count = db.scalar(select(func.count()).select_from(Attendance).where(
+def qualified_attendance_count(db: Session, user_id, community_id=None) -> int:
+    """Count attendances whose configured required verification methods are satisfied."""
+    query = select(Attendance, Event).join(Event, Event.id == Attendance.event_id).where(
         Attendance.user_id == user_id,
-        Attendance.event_id.in_(select(Event.id).where(Event.community_id == community_id)),
         Attendance.status.notin_([AttendanceStatus.NOT_CHECKED_IN, AttendanceStatus.REJECTED]),
-    ))
+    )
+    if community_id is not None:
+        query = query.where(Event.community_id == community_id)
+    rows = list(db.execute(query))
+    if not rows:
+        return 0
+    attendance_ids = [attendance.id for attendance, _event in rows]
+    valid_by_attendance: dict[object, set[VerificationMethod]] = {}
+    for signal in db.scalars(select(AttendanceVerification).where(
+        AttendanceVerification.attendance_id.in_(attendance_ids),
+        AttendanceVerification.is_valid.is_(True),
+    )):
+        valid_by_attendance.setdefault(signal.attendance_id, set()).add(signal.method)
+    return sum(
+        1
+        for attendance, event in rows
+        if {VerificationMethod(method) for method in event.required_verification_methods}.issubset(
+            valid_by_attendance.get(attendance.id, set())
+        )
+    )
+
+
+def user_metrics(db: Session, user_id, community_id) -> dict[str, int]:
+    attendance_count = qualified_attendance_count(db, user_id, community_id)
     activity_dates = db.scalars(select(Activity.occurred_at).where(
         Activity.user_id == user_id,
         Activity.community_id == community_id,

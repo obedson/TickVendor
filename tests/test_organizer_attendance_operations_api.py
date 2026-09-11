@@ -5,7 +5,18 @@ from sqlalchemy.orm import sessionmaker
 import src.models  # noqa: F401
 from src.database import Base, get_db
 from src.main import create_app
-from src.models import Membership, MembershipRole, Ticket, TicketStatus, TicketType
+from src.models import (
+    Attendance,
+    AttendanceStatus,
+    AttendanceVerification,
+    AuditLog,
+    Membership,
+    MembershipRole,
+    Ticket,
+    TicketStatus,
+    TicketType,
+    VerificationMethod,
+)
 from src.security import create_access_token
 from tests.test_database import create_event_context
 
@@ -32,6 +43,18 @@ def test_organizer_ticket_validation_returns_valid_and_rejects_wrong_event(tmp_p
     assert valid.status_code == 200 and valid.json()["result"] == "valid"
     wrong = client.post(f"/api/v1/events/{event_id}/tickets/validate", headers=headers, json={"qr_token": ticket.qr_token})
     assert wrong.status_code == 200 and wrong.json()["result"] == "already_used"
+    roster = client.get(f"/api/v1/events/{event_id}/attendance/roster", headers=headers)
+    assert roster.status_code == 200
+    assert roster.json()[0]["attendance_status"] == "qr_verified"
+    assert roster.json()[0]["verification_methods"] == ["qr"]
+    assert roster.json()[0]["ticket_statuses"] == ["used"]
     with sessions() as db:
         assert db.get(Ticket, ticket_id).status == TicketStatus.USED
+        attendance = db.query(Attendance).filter_by(event_id=event_id, user_id=organizer_id).one()
+        assert attendance.status == AttendanceStatus.QR_VERIFIED
+        assert db.query(AttendanceVerification).filter_by(
+            attendance_id=attendance.id, method=VerificationMethod.QR
+        ).count() == 1
+        assert db.query(AuditLog).filter_by(action="attendance.verified").count() == 1
+        assert db.query(AuditLog).filter_by(action="ticket.used").count() == 1
     engine.dispose()

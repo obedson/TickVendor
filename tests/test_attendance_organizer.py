@@ -9,7 +9,15 @@ from sqlalchemy.orm import Session
 
 import src.models  # noqa: F401
 from src.database import Base
-from src.models import Attendance, AttendanceStatus, Membership, MembershipRole, User
+from src.models import (
+    Attendance,
+    AttendanceStatus,
+    AttendanceVerification,
+    Membership,
+    MembershipRole,
+    User,
+    VerificationMethod,
+)
 from src.services.attendance import organizer_verify, qr_verify
 from tests.test_database import create_event_context
 
@@ -26,7 +34,15 @@ def test_organizer_can_verify_attendance(tmp_path):
                                 status=AttendanceStatus.CHECKED_IN, checked_in_at=datetime.now(UTC))
         db.add(attendance); db.commit()
         organizer_verify(db, attendance, organizer, True, "Confirmed at venue")
+        organizer_verify(db, attendance, organizer, True, "Confirmed at venue")
+        with pytest.raises(HTTPException) as conflict:
+            organizer_verify(db, attendance, organizer, False, "Changed decision")
+        assert conflict.value.status_code == 409
         assert attendance.status == AttendanceStatus.ORGANIZER_VERIFIED
+        assert db.query(AttendanceVerification).filter_by(
+            attendance_id=attendance.id,
+            method=VerificationMethod.ORGANIZER,
+        ).count() == 1
     engine.dispose()
 
 

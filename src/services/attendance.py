@@ -90,6 +90,54 @@ def award_qualified_attendance(db: Session, attendance: Attendance) -> None:
     evaluate_recognition(db, attendance.user_id, event.community_id)
 
 
+def record_qr_attendance(
+    db: Session,
+    event: Event,
+    ticket: Ticket,
+    verifier: User,
+    *,
+    verified_at: datetime | None = None,
+) -> tuple[Attendance, bool]:
+    """Attach one QR signal to the attendee's event record without committing.
+
+    Ticket validation and the dedicated attendance endpoint both use this primitive so a
+    successful entrance scan cannot leave the ticket and attendance records disconnected.
+    """
+    now = verified_at or datetime.now(UTC)
+    attendance = db.scalar(select(Attendance).where(
+        Attendance.event_id == event.id,
+        Attendance.user_id == ticket.attendee_id,
+    ).with_for_update())
+    if attendance is None:
+        attendance = Attendance(
+            event_id=event.id,
+            user_id=ticket.attendee_id,
+            ticket_id=ticket.id,
+            status=AttendanceStatus.CHECKED_IN,
+            checked_in_at=now,
+        )
+        db.add(attendance)
+        db.flush()
+    elif attendance.ticket_id is None:
+        attendance.ticket_id = ticket.id
+
+    existing = db.scalar(select(AttendanceVerification).where(
+        AttendanceVerification.attendance_id == attendance.id,
+        AttendanceVerification.method == VerificationMethod.QR,
+    ))
+    if existing is not None:
+        return attendance, False
+
+    db.add(AttendanceVerification(
+        attendance_id=attendance.id,
+        method=VerificationMethod.QR,
+        is_valid=True,
+        verified_at=now,
+        verifier_id=verifier.id,
+    ))
+    return attendance, True
+
+
 def evaluate_attendance_abuse(db: Session, attendance: Attendance) -> Attendance:
     """Flag implausible transitions and burst patterns conservatively."""
     current = db.scalar(select(AttendanceVerification).where(
@@ -187,6 +235,9 @@ def check_in(db: Session, event: Event, user: User, payload: AttendanceCheckIn) 
     db.commit()
     if event.geofence_enabled:
         calculate_attendance_confidence(db, attendance)
+    audit(db, actor_id=user.id, community_id=event.community_id,
+          action="attendance.checked_in", target_type="attendance", target_id=attendance.id,
+          metadata={"event_id": str(event.id), "gps_submitted": payload.latitude is not None})
     award_qualified_attendance(db, attendance)
     evaluate_attendance_abuse(db, attendance)
     return attendance
@@ -280,10 +331,23 @@ def organizer_verify(db: Session, attendance: Attendance, organizer: User, appro
     if not event.organizer_verification_enabled:
         raise HTTPException(status_code=409, detail="Organizer verification is disabled")
     require_community_role(db, event.community_id, organizer, MembershipRole.ORGANIZER)
-    db.add(AttendanceVerification(
-        attendance_id=attendance.id, method=VerificationMethod.ORGANIZER,
-        is_valid=approve, verified_at=datetime.now(UTC), verifier_id=organizer.id, reason=reason,
+    signal = db.scalar(select(AttendanceVerification).where(
+        AttendanceVerification.attendance_id == attendance.id,
+        AttendanceVerification.method == VerificationMethod.ORGANIZER,
     ))
+    if signal is not None and signal.is_valid == approve and signal.reason == reason:
+        return attendance
+    if signal is not None:
+        raise HTTPException(status_code=409, detail="Organizer verification already recorded")
+    signal = AttendanceVerification(
+        attendance_id=attendance.id,
+        method=VerificationMethod.ORGANIZER,
+        is_valid=approve,
+        verified_at=datetime.now(UTC),
+        verifier_id=organizer.id,
+        reason=reason,
+    )
+    db.add(signal)
     db.commit()
     calculate_attendance_confidence(db, attendance)
     award_qualified_attendance(db, attendance)
@@ -311,23 +375,27 @@ def qr_verify(db: Session, attendance: Attendance, ticket: Ticket, verifier: Use
         raise HTTPException(status_code=403, detail="Ticket does not match attendance")
     if ticket.status not in {TicketStatus.ACTIVE, TicketStatus.USED}:
         raise HTTPException(status_code=409, detail="Ticket is not valid for attendance")
-    existing = db.scalar(select(AttendanceVerification).where(
-        AttendanceVerification.attendance_id == attendance.id,
-        AttendanceVerification.method == VerificationMethod.QR,
-    ))
-    if existing is not None:
+    updated, added = record_qr_attendance(db, event, ticket, verifier)
+    if updated.id != attendance.id:
+        raise HTTPException(status_code=409, detail="Ticket attendance record conflict")
+    if not added:
         attendance.flagged_for_review = True
         attendance.review_reason = "Duplicate QR verification requires organizer review"
         db.commit()
         return attendance
-    db.add(AttendanceVerification(
-        attendance_id=attendance.id,
-        method=VerificationMethod.QR,
-        is_valid=True,
-        verified_at=datetime.now(UTC),
-        verifier_id=verifier.id,
-    ))
+    ticket_was_active = ticket.status == TicketStatus.ACTIVE
+    if ticket_was_active:
+        ticket.status = TicketStatus.USED
+        ticket.used_at = datetime.now(UTC)
+        ticket.validated_by_id = verifier.id
     db.commit()
     calculate_attendance_confidence(db, attendance)
     award_qualified_attendance(db, attendance)
+    audit(db, actor_id=verifier.id, community_id=event.community_id,
+          action="attendance.verified", target_type="attendance", target_id=attendance.id,
+          metadata={"event_id": str(event.id), "method": VerificationMethod.QR.value})
+    if ticket_was_active:
+        audit(db, actor_id=verifier.id, community_id=event.community_id,
+              action="ticket.used", target_type="ticket", target_id=ticket.id,
+              metadata={"event_id": str(event.id)})
     return attendance

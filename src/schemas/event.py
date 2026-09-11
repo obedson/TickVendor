@@ -109,3 +109,5 @@ class EventResponse(BaseModel):
     status: EventStatus
     published_at: datetime | None
     venue: VenueResponse | None
+    geofence_enabled: bool
+    required_verification_methods: list[str]

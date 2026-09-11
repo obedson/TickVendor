@@ -31,6 +31,10 @@ def test_admin_can_update_attendance_configuration_and_member_is_denied(tmp_path
                "peer_selection_limit": 4, "required_verification_methods": ["qr", "peer"]}
     response = client.patch(f"/api/v1/communities/{community}/events/{event}/attendance-config", headers={"Authorization": f"Bearer {create_access_token(admin, 'participant')}"}, json=payload)
     assert response.status_code == 200, response.text
+    loaded = client.get(f"/api/v1/communities/{community}/events/{event}/attendance-config", headers={"Authorization": f"Bearer {create_access_token(admin, 'participant')}"})
+    assert loaded.status_code == 200
+    assert loaded.json()["required_verification_methods"] == ["qr", "peer"]
+    assert loaded.json()["geofence_enabled"] is True
     denied = client.patch(f"/api/v1/communities/{community}/events/{event}/attendance-config", headers={"Authorization": f"Bearer {create_access_token(member, 'participant')}"}, json=payload)
     assert denied.status_code == 403
     engine.dispose()

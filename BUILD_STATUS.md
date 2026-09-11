@@ -703,3 +703,57 @@ integrated product evidence. TickVendor is not specification-complete or product
 - [x] App icons and install-prompt UX
 - [x] Existing participant shell is mobile-first, keyboard navigable, and responsive across narrow and wide layouts
 - [x] Existing application screens have responsive narrow/tablet/desktop layouts, accessible focus states, bounded dialogs, responsive forms/grids, and overflow-safe navigation/table patterns
+
+## Attendance staging forensic reconciliation (2026-09-11)
+
+### Real staging evidence accepted
+
+- A community administrator created `Micro Impacts Attendance Test Event`, configured a free `Community Ticket`, and a participant acquired it without Paystack checkout.
+- The active ticket appeared in My Tickets with its generated QR code.
+- Participant self-check-in requested browser location. The user selected Allow, but the UI reported `Location access denied — checking in without GPS.` The API accepted the check-in as `checked_in`.
+- Attendance Review contained no flagged records.
+- Organizer ticket validation rejected a truncated 24-character token in HTML validation, accepted the complete token, returned `valid`, and marked the ticket `used`.
+- The participant then had 10 Impact Points, one event participation, one badge, one milestone, and no rank.
+
+### Repository-backed findings
+
+- The former participant UI requested location for every event, including events whose geofence was disabled. Its geolocation failure callback ignored `GeolocationPositionError.code`, labeled every failure as permission denial, and submitted without coordinates. The discarded error could have been permission denied, position unavailable, timeout (the request used an 8-second high-accuracy timeout), or another browser/platform failure; the original underlying staging code cannot be recovered after the callback discarded it.
+- Backend acceptance without coordinates proves the event geofence was disabled at check-in: enabled geofencing rejects missing coordinates with HTTP 422. With an empty `required_verification_methods` list, basic check-in qualifies; configured required methods are conjunctive and all must have valid evidence before an attendance reward is issued.
+- The observed self-check-in created one attendance row with status `checked_in`, confidence 0, no verification signal, and no initial review flag. It left the ticket active. The attendance point rule then created one posted 10-point transaction under `attendance:<attendance-id>:verified`, and recognition evaluated the resulting attendance count.
+- The former organizer Check-in screen called only ticket validation. Its successful validation changed the ticket from `active` to `used`, set `used_at` and `validated_by_id`, and emitted `ticket.used`; it did not invoke QR attendance verification, change the existing attendance, add QR evidence, award points, evaluate recognition, or notify the participant. This explains why the staging scan did not create a flagged review item and why the 10 points necessarily came from self-check-in.
+- Attendance Review is intentionally the open anti-abuse/exception queue (`flagged_for_review=true`, open review status), not a general roster. A clean first self-check-in and first valid ticket scan therefore correctly leave it empty.
+- Before this reconciliation, general event attendance existed only as organizer/event aggregate counts; no organizer roster screen/API existed even though the specification requires attendee management.
+- The QR specification explicitly requires organizer/staff QR scanning. The prior text-only field supported pasted tokens and keyboard-emulating hardware scanners but did not satisfy camera scanning for the mobile-first/PWA web UI.
+- Default recognition configuration awards the `First Step` badge at one attendance. The default `Community Builder` milestone requires 300 points, 10 attendances, 5 tasks, and 1 contribution, so it cannot explain the observed milestone. The staging milestone was therefore a separately configured active milestone whose requirement was satisfied by attendance count/points; its database record/name is not present in repository evidence and cannot be identified more narrowly without staging database access.
+
+### Narrow remediation
+
+- Participant attendance now reads the event's geofence setting, requests location only when geofencing is enabled, distinguishes permission denial, position unavailable, timeout, unsupported browser, and synchronous request failure, and does not pretend a GPS-required check-in succeeded without coordinates. QR/organizer fallback remains available.
+- Event responses expose only the non-sensitive geofence-enabled and required-method policy needed by participant check-in.
+- Organizer attendance settings now load persisted configuration and expose which enabled methods are jointly required to qualify. Disabling a method removes it from the required list before save.
+- Organizer Check-in now offers camera QR scanning through the browser/PWA Barcode Detector API while preserving pasted-token and hardware-scanner input as fallbacks.
+- First successful ticket validation now creates or reuses the event/user attendance row, links the ticket when needed, writes one valid QR verification with verifier/time evidence, updates attendance confidence/status, evaluates the required-method policy, and then runs the existing idempotent reward/recognition pipeline. Ticket use and QR attendance are committed together before reward evaluation.
+- Participation, badge, milestone, achievement, and profile attendance counts now apply the same required-method test as attendance points; an incomplete `checked_in` row cannot qualify through a later unrelated recognition evaluation.
+- Replaying the same organizer verification is a no-op; a conflicting second decision is rejected rather than rewriting a verification that may already have produced rewards. Review resolution remains the separate audited workflow for flagged records.
+- The dedicated QR-attendance route now also synchronizes an active ticket to `used`.
+- A separate tenant-authorized, paginated attendance roster now lists ticket holders and attendance-only participants with ticket, attendance, verification, and flag state. Attendance Review remains unchanged as the exception queue.
+- Repeated organizer verification with the same decision/reason now returns the existing signal instead of violating the unique attendance/method constraint. Changed organizer decisions update the single signal and remain audited.
+- New `attendance.checked_in` and `attendance.verified` audit entries record the participant check-in and successful QR evidence transition. Recognition continues to emit its existing badge/milestone/achievement/rank notifications; there is no generic attendance-complete notification.
+
+### Idempotency and composition conclusions
+
+- One attendance row per event/user and one verification row per attendance/method are database-unique.
+- Repeated participant check-in returns the existing row and cannot duplicate points or recognition, but intentionally adds a `duplicate_check_in` review flag under the anti-abuse requirement; it is reward-idempotent, not side-effect-free.
+- Repeated ticket validation returns `already_used` before attendance/reward mutation. It cannot add a second QR signal, attendance row, point transaction, badge, milestone, or achievement.
+- Direct repeated QR verification detects the existing signal and flags it for review without another reward.
+- Repeated identical organizer verification is now side-effect-free. A changed organizer decision updates the one organizer signal; the attendance reward key remains stable.
+- Peer confirmations are unique per event/confirmer/subject and limited by policy. The peer verification signal is unique and reward evaluation uses the same stable attendance key.
+- GPS, QR, peer, and organizer evidence accumulate independently. Every configured `required_verification_methods` entry must be valid; enabled methods not selected as required are optional additional signals. Organizer rejection takes precedence and sets attendance to `rejected`.
+- Attendance points use `attendance:<attendance-id>:verified`; milestones use `milestone:<milestone-id>:user:<user-id>`; badges use `badge:<badge-id>:user:<user-id>`; achievement points/badges use `achievement:<rule-id>:user:<user-id>:...`. Database uniqueness provides the final duplicate guard.
+
+### Focused verification and remaining external checks
+
+- Focused backend attendance/ticket/configuration/recognition tests: 15 passed, then 6 changed-path regression tests passed after the final backend changes; only existing framework deprecation warnings were emitted.
+- Frontend production build passed. Playwright and the full backend suite were intentionally not run for this focused task.
+- Camera acquisition/decoding, the distinct browser geolocation error messages, and the corrected full staging sequence still require real secure-context mobile/browser verification after deployment. Native Barcode Detector availability varies by browser; manual token and hardware-scanner entry remain the supported fallback where it is unavailable.
+- No traceability completion counts were changed. This reconciliation strengthens implementation and focused verification evidence but does not by itself provide deployed camera/GPS acceptance evidence.

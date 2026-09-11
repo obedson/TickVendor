@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import { apiJson, ApiError, getLiveToken } from './api';
 import { EmptyState } from './AppShell';
+import { locationErrorMessage } from './location';
 import type { OfflineTicket } from './offlineTickets';
 
 type AttendanceProps = { token: string; tickets: OfflineTicket[] };
 type Candidate = { participant_id: string; display_name?: string };
 type CheckInResult = { status: string; message?: string };
+type EventAttendanceSettings = { geofence_enabled: boolean; required_verification_methods: string[] };
 
 export function Attendance({ token, tickets }: AttendanceProps) {
   const [ticket, setTicket] = useState<OfflineTicket | null>(tickets[0] ?? null);
@@ -14,7 +16,8 @@ export function Attendance({ token, tickets }: AttendanceProps) {
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [confirmedIds, setConfirmedIds] = useState<Set<string>>(new Set());
   const [error, setError] = useState('');
-  const [geoStatus, setGeoStatus] = useState<'idle' | 'requesting' | 'granted' | 'denied'>('idle');
+  const [geoStatus, setGeoStatus] = useState<'idle' | 'requesting' | 'granted' | 'failed'>('idle');
+  const [geoMessage, setGeoMessage] = useState('');
 
   const liveToken = () => getLiveToken() ?? token;
 
@@ -35,11 +38,12 @@ export function Attendance({ token, tickets }: AttendanceProps) {
     loadCandidates();
   }, [ticket, token]);
 
-  const checkIn = () => {
+  const checkIn = async () => {
     if (!ticket?.event_id) return;
     setBusy(true);
     setError('');
     setCheckInStatus('');
+    setGeoMessage('');
 
     const submit = (latitude?: number, longitude?: number, accuracy?: number) => {
       apiJson<CheckInResult>(`events/${ticket.event_id}/attendance/check-in`, {
@@ -55,23 +59,47 @@ export function Attendance({ token, tickets }: AttendanceProps) {
         .finally(() => setBusy(false));
     };
 
-    if (!navigator.geolocation) {
+    let settings: EventAttendanceSettings;
+    try {
+      settings = await apiJson<EventAttendanceSettings>(`events/${ticket.event_id}`, {}, liveToken());
+    } catch {
+      // The backend remains authoritative if event settings cannot be refreshed.
       submit();
       return;
     }
 
+    if (!settings.geofence_enabled) {
+      setGeoStatus('idle');
+      submit();
+      return;
+    }
+
+    if (!navigator.geolocation) {
+      setGeoStatus('failed');
+      setGeoMessage('Location is not supported by this browser. Use event QR or organizer verification.');
+      setBusy(false);
+      return;
+    }
+
     setGeoStatus('requesting');
-    navigator.geolocation.getCurrentPosition(
-      position => {
-        setGeoStatus('granted');
-        submit(position.coords.latitude, position.coords.longitude, position.coords.accuracy);
-      },
-      () => {
-        setGeoStatus('denied');
-        submit(); // fall back to non-GPS check-in
-      },
-      { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 },
-    );
+    try {
+      navigator.geolocation.getCurrentPosition(
+        position => {
+          setGeoStatus('granted');
+          submit(position.coords.latitude, position.coords.longitude, position.coords.accuracy);
+        },
+        geolocationError => {
+          setGeoStatus('failed');
+          setGeoMessage(locationErrorMessage(geolocationError));
+          setBusy(false);
+        },
+        { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 },
+      );
+    } catch {
+      setGeoStatus('failed');
+      setGeoMessage('Location could not be requested. Use event QR or organizer verification.');
+      setBusy(false);
+    }
   };
 
   const confirm = async (subject_id: string) => {
@@ -153,8 +181,8 @@ export function Attendance({ token, tickets }: AttendanceProps) {
           {geoStatus === 'requesting' && (
             <p className="info-msg" style={{ marginBottom: '1rem' }}>Requesting your location for GPS verification…</p>
           )}
-          {geoStatus === 'denied' && (
-            <p className="info-msg" style={{ marginBottom: '1rem' }}>Location access denied — checking in without GPS.</p>
+          {geoStatus === 'failed' && geoMessage && (
+            <p role="alert" className="info-msg" style={{ marginBottom: '1rem' }}>{geoMessage}</p>
           )}
 
           {checkInStatus && <p role="status" className="success-msg" style={{ marginBottom: '1rem' }}>{checkInStatus}</p>}

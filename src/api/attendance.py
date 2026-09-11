@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -15,11 +15,13 @@ from src.models import (
     Attendance,
     AttendanceReviewStatus,
     AttendanceStatus,
+    AttendanceVerification,
     Event,
     EventStaff,
     EventStaffRole,
     MembershipRole,
     PeerConfirmation,
+    Profile,
     Ticket,
     User,
 )
@@ -158,6 +160,64 @@ def list_review(
     if reason:
         query = query.where(Attendance.review_reason.like(f"%{reason}%"))
     return [_review_payload(item) for item in db.scalars(query.order_by(Attendance.created_at.desc()))]
+
+
+@router.get("/roster")
+def attendance_roster(
+    event_id: UUID,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
+    limit: int = Query(default=100, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+):
+    """Return ticket holders and attendance-only participants for organizer operations."""
+    event = event_or_404(db, event_id)
+    _require_review_access(db, event, user)
+    participant_ids = select(Ticket.attendee_id).where(Ticket.event_id == event_id).union(
+        select(Attendance.user_id).where(Attendance.event_id == event_id)
+    )
+    participants = db.execute(
+        select(User, Profile)
+        .join(Profile, Profile.user_id == User.id)
+        .where(User.id.in_(participant_ids))
+        .order_by(Profile.display_name, User.id)
+        .limit(limit)
+        .offset(offset)
+    ).all()
+    user_ids = [participant.id for participant, _profile in participants]
+    tickets = list(db.scalars(select(Ticket).where(
+        Ticket.event_id == event_id, Ticket.attendee_id.in_(user_ids)
+    ))) if user_ids else []
+    attendances = list(db.scalars(select(Attendance).where(
+        Attendance.event_id == event_id, Attendance.user_id.in_(user_ids)
+    ))) if user_ids else []
+    attendance_by_user = {item.user_id: item for item in attendances}
+    ticket_statuses: dict[UUID, list[str]] = {}
+    for ticket in tickets:
+        ticket_statuses.setdefault(ticket.attendee_id, []).append(ticket.status.value)
+    verification_methods: dict[UUID, list[str]] = {}
+    attendance_ids = [item.id for item in attendances]
+    if attendance_ids:
+        for signal in db.scalars(select(AttendanceVerification).where(
+            AttendanceVerification.attendance_id.in_(attendance_ids),
+            AttendanceVerification.is_valid.is_(True),
+        )):
+            verification_methods.setdefault(signal.attendance_id, []).append(signal.method.value)
+    return [
+        {
+            "participant_id": str(participant.id),
+            "display_name": profile.display_name,
+            "email": participant.email,
+            "ticket_statuses": sorted(ticket_statuses.get(participant.id, [])),
+            "attendance_id": str(attendance.id) if attendance else None,
+            "attendance_status": attendance.status.value if attendance else AttendanceStatus.NOT_CHECKED_IN.value,
+            "checked_in_at": attendance.checked_in_at.isoformat() if attendance and attendance.checked_in_at else None,
+            "verification_methods": sorted(verification_methods.get(attendance.id, [])) if attendance else [],
+            "flagged_for_review": attendance.flagged_for_review if attendance else False,
+        }
+        for participant, profile in participants
+        for attendance in [attendance_by_user.get(participant.id)]
+    ]
 
 
 @router.post("/{attendance_id}/review", response_model=AttendanceReviewResponse)

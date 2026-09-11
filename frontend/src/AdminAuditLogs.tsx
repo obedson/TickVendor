@@ -16,6 +16,7 @@ const ACTION_LABELS: Record<string, string> = {
   'ticket.cancelled': 'Ticket cancelled',
   'ticket.refunded': 'Ticket refunded',
   'attendance.verified': 'Attendance verified',
+  'attendance.checked_in': 'Attendance checked in',
   'attendance.rejected': 'Attendance rejected',
   'attendance.override': 'Attendance override',
   'attendance.review_cleared': 'Attendance review cleared',

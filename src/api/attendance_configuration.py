@@ -17,6 +17,20 @@ from src.services.notification import audit
 
 router = APIRouter(prefix="/communities/{community_id}/events", tags=["attendance"])
 
+CONFIGURATION_FIELDS = (
+    "qr_attendance_enabled",
+    "peer_confirmation_enabled",
+    "confirmations_required",
+    "organizer_verification_enabled",
+    "geofence_enabled",
+    "geofence_radius_meters",
+    "max_peer_confirmations",
+    "peer_confirmation_deadline",
+    "peer_selection_limit",
+    "peer_eligibility_statuses",
+    "required_verification_methods",
+)
+
 
 class AttendanceConfigurationInput(BaseModel):
     qr_attendance_enabled: bool | None = None
@@ -44,6 +58,22 @@ class AttendanceConfigurationInput(BaseModel):
         if self.geofence_enabled and self.geofence_radius_meters is None:
             raise ValueError("geofence radius is required when enabling geofence")
         return self
+
+
+@router.get("/{event_id}/attendance-config")
+def get_attendance_config(
+    community_id: UUID,
+    event_id: UUID,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
+):
+    require_community_role(db, community_id, user, MembershipRole.ORGANIZER)
+    event = db.scalar(select(Event).where(Event.id == event_id, Event.community_id == community_id))
+    if event is None:
+        raise HTTPException(status_code=404, detail="Event not found")
+    return {field: getattr(event, field) for field in CONFIGURATION_FIELDS} | {
+        "event_id": str(event.id)
+    }
 
 
 @router.patch("/{event_id}/attendance-config")

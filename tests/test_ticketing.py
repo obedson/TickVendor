@@ -11,19 +11,27 @@ from sqlalchemy.orm import Session
 import src.models  # noqa: F401
 from src.database import Base
 from src.models import (
+    Attendance,
+    AttendanceStatus,
+    AttendanceVerification,
     Community,
     Event,
     EventCategory,
     EventStatus,
+    ImpactTransaction,
     Membership,
     MembershipRole,
     Notification,
     Organization,
+    PointRule,
     Ticket,
     TicketStatus,
     User,
+    VerificationMethod,
 )
+from src.schemas.attendance import AttendanceCheckIn
 from src.schemas.ticket import OrderCreate, TicketTypeCreate
+from src.services.attendance import check_in
 from src.services.ticket import create_order, create_ticket_type, validate_ticket
 
 
@@ -65,6 +73,11 @@ def test_free_order_is_idempotent_wallet_ticket_and_duplicate_scan_is_safe(tmp_p
         assert repeated.id == order.id
         ticket = db.query(Ticket).filter_by(order_id=order.id).one()
         assert ticket.status == TicketStatus.ACTIVE
+        db.add(PointRule(source_type="attendance", points=10))
+        db.commit()
+        attendance = check_in(db, event_model, buyer, AttendanceCheckIn(ticket_id=ticket.id))
+        assert attendance.status == AttendanceStatus.CHECKED_IN
+        assert db.query(ImpactTransaction).filter_by(source_type="attendance").count() == 1
         assert db.query(Notification).filter_by(notification_type="ticket_confirmed").one().user_id == buyer.id
         with pytest.raises(HTTPException) as limit:
             create_order(db, event_model.id, OrderCreate(
@@ -77,6 +90,12 @@ def test_free_order_is_idempotent_wallet_ticket_and_duplicate_scan_is_safe(tmp_p
         assert result == "valid"
         result, _ = validate_ticket(db, event_model.id, ticket.qr_token, organizer)
         assert result == "already_used"
+        assert attendance.status == AttendanceStatus.QR_VERIFIED
+        assert db.query(Attendance).filter_by(event_id=event_model.id, user_id=buyer.id).count() == 1
+        assert db.query(AttendanceVerification).filter_by(
+            attendance_id=attendance.id, method=VerificationMethod.QR
+        ).count() == 1
+        assert db.query(ImpactTransaction).filter_by(source_type="attendance").count() == 1
     engine.dispose()
 
 

@@ -13,8 +13,6 @@ from sqlalchemy.orm import Session
 from src.api.auth import get_current_user
 from src.database import get_db
 from src.models import (
-    Attendance,
-    AttendanceStatus,
     Badge,
     BadgeAward,
     Event,
@@ -33,7 +31,12 @@ from src.models import (
     User,
 )
 from src.security import decode_access_token
-from src.services.recognition import current_rank, next_rank, user_metrics
+from src.services.recognition import (
+    current_rank,
+    next_rank,
+    qualified_attendance_count,
+    user_metrics,
+)
 
 router = APIRouter(prefix="/profiles", tags=["profiles"])
 optional_bearer = HTTPBearer(auto_error=False)
@@ -111,10 +114,7 @@ def my_profile(
             )
         ))
         # Attendance count across all communities
-        events_attended = db.scalar(select(func.count()).select_from(Attendance).where(
-            Attendance.user_id == user.id,
-            Attendance.status.notin_([AttendanceStatus.NOT_CHECKED_IN, AttendanceStatus.REJECTED]),
-        )) or 0
+        events_attended = qualified_attendance_count(db, user.id)
         tasks_completed = db.scalar(select(func.count()).select_from(TaskAssignment).where(
             TaskAssignment.assignee_id == user.id,
             TaskAssignment.status == TaskAssignmentStatus.VERIFIED,

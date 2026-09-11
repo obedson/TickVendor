@@ -127,10 +127,27 @@ def validate_ticket(db: Session, event_id: UUID, qr_token: str, staff: User) -> 
         return "already_used", ticket
     if ticket.status != TicketStatus.ACTIVE:
         return "invalid_status", ticket
+    attendance = None
+    qr_added = False
+    if event.qr_attendance_enabled:
+        from src.services.attendance import record_qr_attendance
+
+        attendance, qr_added = record_qr_attendance(db, event, ticket, staff)
     ticket.status = TicketStatus.USED
     ticket.used_at = datetime.now(UTC)
     ticket.validated_by_id = staff.id
     db.commit()
+    if attendance is not None and qr_added:
+        from src.services.attendance import (
+            award_qualified_attendance,
+            calculate_attendance_confidence,
+        )
+
+        calculate_attendance_confidence(db, attendance)
+        award_qualified_attendance(db, attendance)
+        audit(db, actor_id=staff.id, community_id=event.community_id,
+              action="attendance.verified", target_type="attendance", target_id=attendance.id,
+              metadata={"event_id": str(event_id), "method": "qr"})
     audit(db, actor_id=staff.id, community_id=event.community_id, action="ticket.used",
           target_type="ticket", target_id=ticket.id, metadata={"event_id": str(event_id)})
     return "valid", ticket
