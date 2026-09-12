@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
+import './management.css';
 import { OrganizerAttendanceConfig } from './OrganizerAttendanceConfig';
-import { apiJson, ApiError, apiFetchAuth, getLiveToken } from './api';
+import { apiJson, ApiError, getLiveToken } from './api';
 import { EmptyState } from './AppShell';
+import { EventCover } from './EventCover';
+import { EventCoverEditor } from './EventCoverEditor';
 
 type Event = {
   id: string;
@@ -12,6 +15,7 @@ type Event = {
   starts_at: string;
   ends_at: string;
   category: string;
+  cover_image_url?: string | null;
   online_url?: string | null;
   venue?: {
     name: string;
@@ -67,7 +71,7 @@ export function OrganizerEvents({ token, communityId }: { token: string; communi
 
   const load = async () => {
     setLoading(true); setError('');
-    try { setEvents(await apiJson<Event[]>('communities/organizer/events', {}, liveToken())); }
+    try { setEvents((await apiJson<Event[]>('communities/organizer/events', {}, liveToken())).filter(event => event.community_id === communityId)); }
     catch (cause) { setError(cause instanceof ApiError ? cause.message : 'Unable to load events'); }
     finally { setLoading(false); }
   };
@@ -95,11 +99,11 @@ export function OrganizerEvents({ token, communityId }: { token: string; communi
       .then(setCommunities)
       .catch(() => setCommunities([]));
     loadCategories();
-  }, [token]);
+  }, [token, communityId]);
 
   const create = async (e: React.FormEvent) => {
     e.preventDefault();
-    const community = communities.find(item => item.id === communityId) || communities[0];
+    const community = communities.find(item => item.id === communityId);
     if (!community) { setError('Join an active community before creating an event.'); return; }
     setSaving(true); setError(''); setMessage('');
     try {
@@ -225,7 +229,7 @@ setForm({
   const cancelForm = () => { setEditing(null); setShowForm(false); setForm(emptyForm); setError(''); };
 
   return (
-    <div>
+    <div className="management-screen">
       <div className="page-header">
         <div className="page-header-text">
           <p className="eyebrow">Operations</p>
@@ -397,6 +401,8 @@ setForm({
               <span>📍 {event.venue?.name || 'Online'}{event.venue?.city ? `, ${event.venue.city}` : ''}</span>
             </div>
 
+            <EventCover url={event.cover_image_url} title={event.title} category={event.category} />
+            <details><summary>Manage event cover</summary><EventCoverEditor eventId={event.id} token={liveToken()} hasCover={Boolean(event.cover_image_url)} onSaved={load} /></details>
             {/* Inline config panel */}
             {configEvent?.id === event.id && (
               <div style={{ borderTop: '1px solid var(--tv-border)', paddingTop: '1rem', display: 'grid', gap: '1.25rem' }}>

@@ -264,6 +264,23 @@ export function AppShell({
   onWorkspaceChange: (workspace: 'participant' | 'management' | 'platform', communityId?: string) => void;
 }) {
   const [moreOpen, setMoreOpen] = useState(false);
+  const sheetRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (!moreOpen) return;
+    const previous = document.activeElement as HTMLElement | null;
+    sheetRef.current?.querySelector<HTMLButtonElement>('button')?.focus();
+    const keyboard = (event: globalThis.KeyboardEvent) => {
+      if (event.key === 'Escape') { setMoreOpen(false); return; }
+      if (event.key !== 'Tab') return;
+      const buttons = sheetRef.current?.querySelectorAll<HTMLButtonElement>('button');
+      if (!buttons?.length) return;
+      const first = buttons[0], last = buttons[buttons.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    };
+    document.addEventListener('keydown', keyboard);
+    return () => { document.removeEventListener('keydown', keyboard); previous?.focus(); };
+  }, [moreOpen]);
   const [collapsedGroups, setCollapsedGroups] = useState<string[]>(['Impact', 'Settings']);
 
   const go = (id: string) => {
@@ -442,6 +459,7 @@ export function AppShell({
       {moreOpen && (
         <div className="mobile-sheet-backdrop" onClick={() => setMoreOpen(false)}>
           <section
+            ref={sheetRef}
             className="mobile-sheet"
             role="dialog"
             aria-modal="true"
@@ -450,6 +468,7 @@ export function AppShell({
           >
             <div className="sheet-handle" aria-hidden="true" />
             <h2 id="more-sheet-title">More</h2>
+            <button onClick={() => setMoreOpen(false)}>Close navigation</button>
             {moreItems.map(item => (
               <button key={item.id} onClick={() => go(item.id)} className={isActive(item.id) ? 'active' : ''}>
                 <span aria-hidden="true">{item.icon}</span>

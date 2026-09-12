@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import './management.css';
 import { EmptyState } from './AppShell';
 import { apiJson, ApiError, getLiveToken } from './api';
 
@@ -44,7 +45,7 @@ export function OrganizerAttendanceReview({ token, eventId }: { token: string; e
   };
 
   return (
-    <div>
+    <div className="management-screen">
       <div className="page-header">
         <div className="page-header-text">
           <p className="eyebrow">Operations</p>

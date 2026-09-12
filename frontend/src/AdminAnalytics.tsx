@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import './management.css';
 import { apiJson, ApiError, getLiveToken } from './api';
 
 type Summary = {
@@ -43,7 +44,7 @@ export function AdminAnalytics({ token, communityId }: { token: string; communit
 
   if (error) {
     return (
-      <div>
+      <div className="management-screen">
         <div className="page-header"><div className="page-header-text"><p className="eyebrow">Administration</p><h1>Community analytics</h1></div></div>
         <p role="alert" className="error">{error}</p>
       </div>
@@ -52,7 +53,7 @@ export function AdminAnalytics({ token, communityId }: { token: string; communit
 
   if (!data) {
     return (
-      <div>
+      <div className="management-screen">
         <div className="page-header"><div className="page-header-text"><p className="eyebrow">Administration</p><h1>Community analytics</h1></div></div>
         <p role="status" className="text-muted">Loading analytics…</p>
       </div>
@@ -91,7 +92,7 @@ export function AdminAnalytics({ token, communityId }: { token: string; communit
 ];
 
   return (
-    <div>
+    <div className="management-screen">
       <div className="page-header">
         <div className="page-header-text">
           <p className="eyebrow">Administration</p>
@@ -104,7 +105,7 @@ export function AdminAnalytics({ token, communityId }: { token: string; communit
         {groups.map(group => (
           <div key={group.label}>
             <h2 style={{ fontSize: '1rem', color: 'var(--tv-muted)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: '.75rem' }}>{group.label}</h2>
-            <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))' }}>
+            <div className="grid">
               {group.metrics.map(({ label, value, icon }) => (
                 <article className="card" key={label}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '.5rem' }}>

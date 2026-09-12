@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import './management.css';
 import { EmptyState } from './AppShell';
 import { apiJson, ApiError, getLiveToken } from './api';
 
@@ -87,7 +88,7 @@ export function AdminAuditLogs({ token, communityId }: { token: string; communit
   useEffect(() => { load(); }, [token, communityId, offset, action]);
 
   return (
-    <div>
+    <div className="management-screen">
       <div className="page-header">
         <div className="page-header-text">
           <p className="eyebrow">Administration</p>
@@ -103,7 +104,7 @@ export function AdminAuditLogs({ token, communityId }: { token: string; communit
               onChange={e => { setOffset(0); setAction(e.target.value); }}
               placeholder="Filter by action…"
               aria-label="Action filter"
-              style={{ width: '18rem' }}
+              className="filter-control"
             />
           </div>
         </div>

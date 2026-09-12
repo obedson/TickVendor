@@ -94,7 +94,7 @@ export function ProfileEditor({ token }: { token: string }) {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gap: '1.25rem', gridTemplateColumns: 'minmax(0,1fr) minmax(0,280px)' }}>
+      <div className="content-with-aside">
         {/* Profile form */}
         <div className="panel">
           <h2 style={{ fontSize: '1.1rem', marginBottom: '1.25rem' }}>Profile information</h2>

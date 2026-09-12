@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import './management.css';
 import { EmptyState } from './AppShell';
 import { apiJson, ApiError, getLiveToken } from './api';
 
@@ -110,7 +111,7 @@ export function OrganizerMembers({ token, communityId }: { token: string; commun
   });
 
   return (
-    <div>
+    <div className="management-screen">
       <div className="page-header">
         <div className="page-header-text">
           <p className="eyebrow">Community administration</p>
@@ -126,7 +127,7 @@ export function OrganizerMembers({ token, communityId }: { token: string; commun
               onChange={e => setSearch(e.target.value)}
               placeholder="Search members…"
               aria-label="Search members"
-              style={{ width: '16rem' }}
+              className="filter-control"
             />
           </div>
           <button className="accent sm" onClick={() => setShowInvite(!showInvite)}>
@@ -188,7 +189,8 @@ export function OrganizerMembers({ token, communityId }: { token: string; commun
 
       <div className="responsive-table">
         {filtered.length > 0 && (
-          <table>
+          <table className="management-table">
+<caption>Community members</caption>
             <thead>
               <tr>
                 <th>Member</th>
@@ -201,7 +203,7 @@ export function OrganizerMembers({ token, communityId }: { token: string; commun
             <tbody>
               {filtered.map(member => (
                 <tr key={member.id}>
-                  <td>
+                  <td data-label="Member">
                     <div style={{ display: 'flex', alignItems: 'center', gap: '.65rem' }}>
                       <div style={{ width: '2rem', height: '2rem', borderRadius: '50%', background: 'var(--tv-accent-light)', display: 'grid', placeItems: 'center', color: 'var(--tv-accent)', fontWeight: 800, fontSize: '.8rem', flexShrink: 0 }}>
                         {(member.display_name || member.username || '?').slice(0, 1).toUpperCase()}
@@ -212,12 +214,12 @@ export function OrganizerMembers({ token, communityId }: { token: string; commun
                       </div>
                     </div>
                   </td>
-                  <td><span className={`chip ${ROLE_COLORS[member.role] || 'chip-default'}`}>{member.role}</span></td>
-                  <td><span className={`chip ${STATUS_COLORS[member.status] || 'chip-default'}`}>{member.status}</span></td>
-                  <td style={{ fontSize: '.8rem', color: 'var(--tv-muted)' }}>
+                  <td data-label="Role"><span className={`chip ${ROLE_COLORS[member.role] || 'chip-default'}`}>{member.role}</span></td>
+                  <td data-label="Status"><span className={`chip ${STATUS_COLORS[member.status] || 'chip-default'}`}>{member.status}</span></td>
+                  <td data-label="Joined" style={{ fontSize: '.8rem', color: 'var(--tv-muted)' }}>
                     {member.joined_at ? new Date(member.joined_at).toLocaleDateString() : '—'}
                   </td>
-                  <td>
+                  <td data-label="Actions">
                     <div style={{ display: 'flex', gap: '.4rem', flexWrap: 'wrap' }}>
                       <button
                         className="secondary sm"

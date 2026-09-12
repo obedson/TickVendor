@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import './management.css';
 import { apiJson, ApiError, getLiveToken } from './api';
 
 type Rule = { id: string; source_type: string; points: number; max_awards_per_user?: number; is_active: boolean };
@@ -45,7 +46,7 @@ export function AdminPointRules({ token, communityId }: { token: string; communi
   };
 
   return (
-    <section className="panel">
+    <section className="panel management-screen">
       <h2>Point rules</h2>
       {error && <p role="alert" className="error">{error}</p>}
       {message && <p role="status" className="success-msg">{message}</p>}

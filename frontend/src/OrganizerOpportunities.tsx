@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import './management.css';
 import { apiJson, ApiError } from './api';
 import { EmptyState } from './AppShell';
 
@@ -69,7 +70,7 @@ export function OrganizerOpportunities({ token, communityId }: { token: string; 
   };
 
   return (
-    <div>
+    <div className="management-screen">
       <div className="page-header">
         <div className="page-header-text">
           <p className="eyebrow">Operations</p>

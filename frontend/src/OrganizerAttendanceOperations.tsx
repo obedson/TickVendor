@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import './management.css';
 import { apiJson, ApiError, getLiveToken } from './api';
 
 type Validation = { result: string; ticket?: { public_id: string; attendee_id: string; status: string } | null };
@@ -141,7 +142,7 @@ export function OrganizerAttendanceOperations({ token, eventId }: { token: strin
   const resultColor = result?.result === 'valid' ? 'chip-green' : result?.result === 'already_used' ? 'chip-yellow' : result ? 'chip-red' : '';
 
   return (
-    <div>
+    <div className="management-screen">
       <div className="page-header">
         <div className="page-header-text">
           <p className="eyebrow">Operations</p>
@@ -150,7 +151,7 @@ export function OrganizerAttendanceOperations({ token, eventId }: { token: strin
         </div>
       </div>
 
-      <div style={{ display: 'grid', gap: '1.25rem', gridTemplateColumns: 'minmax(0,1fr) minmax(0,320px)' }}>
+      <div className="content-with-aside">
         <div className="panel">
           <h2 style={{ fontSize: '1.1rem', marginBottom: '1rem' }}>Scan QR code</h2>
           <p style={{ fontSize: '.875rem', color: 'var(--tv-muted)', marginBottom: '1.25rem' }}>
@@ -198,14 +199,15 @@ export function OrganizerAttendanceOperations({ token, eventId }: { token: strin
         <h2 style={{ fontSize: '1.1rem', marginBottom: '.25rem' }}>Attendance roster</h2>
         <p className="text-muted text-sm" style={{ marginBottom: '1rem' }}>Ticket holders and attendance-only participants for this event.</p>
         {rosterLoading ? <p role="status" className="text-muted">Loading attendance roster…</p> : !roster.length ? <p className="empty">No attendees or ticket holders yet.</p> : (
-          <div className="table-wrap"><table>
+          <div className="table-wrap"><table className="management-table">
+<caption>Event attendance roster</caption>
             <thead><tr><th>Participant</th><th>Ticket</th><th>Attendance</th><th>Verification</th></tr></thead>
             <tbody>{roster.map(item => (
               <tr key={item.participant_id}>
-                <td><strong>{item.display_name}</strong><br /><span className="text-muted text-sm">{item.email}</span></td>
-                <td>{item.ticket_statuses.length ? item.ticket_statuses.join(', ') : 'No ticket'}</td>
-                <td>{item.attendance_status}{item.flagged_for_review ? ' ⚠' : ''}</td>
-                <td>{item.verification_methods.length ? item.verification_methods.join(', ') : 'None'}</td>
+                <td data-label="Participant"><strong>{item.display_name}</strong><br /><span className="text-muted text-sm">{item.email}</span></td>
+                <td data-label="Ticket">{item.ticket_statuses.length ? item.ticket_statuses.join(', ') : 'No ticket'}</td>
+                <td data-label="Attendance">{item.attendance_status}{item.flagged_for_review ? ' ⚠' : ''}</td>
+                <td data-label="Verification">{item.verification_methods.length ? item.verification_methods.join(', ') : 'None'}</td>
               </tr>
             ))}</tbody>
           </table></div>

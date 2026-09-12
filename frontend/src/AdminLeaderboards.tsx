@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import './management.css';
 import { apiJson, ApiError, getLiveToken } from './api';
 
 type Board = { id: string; name: string; slug: string; metric: string; period: string; max_entries: number; is_enabled: boolean; event_id?: string | null };
@@ -45,7 +46,7 @@ export function AdminLeaderboards({ token, communityId }: { token: string; commu
   };
 
   return (
-    <section className="panel">
+    <section className="panel management-screen">
       <h2>Leaderboard configuration</h2>
       {error && <p role="alert" className="error">{error}</p>}
       {message && <p role="status" className="success-msg">{message}</p>}

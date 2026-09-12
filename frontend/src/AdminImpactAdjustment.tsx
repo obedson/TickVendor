@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import './management.css';
 import { apiJson, ApiError, getLiveToken } from './api';
 
 type Member = { user_id: string; display_name?: string; username?: string; status: string };
@@ -47,7 +48,7 @@ export function AdminImpactAdjustment({ token, communityId }: { token: string; c
   };
 
   return (
-    <section className="panel">
+    <section className="panel management-screen">
       <h2>Manual Impact Point adjustment</h2>
       <p style={{ color: 'var(--tv-muted)', marginBottom: '1.25rem' }}>Adjustments are append-only and audited.</p>
       {error && <p role="alert" className="error">{error}</p>}

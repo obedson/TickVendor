@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import './management.css';
 import { apiJson, ApiError, getLiveToken } from './api';
 
 type Config = {
@@ -93,12 +94,12 @@ export function OrganizerAttendanceConfig({ token, communityId, eventId }: { tok
   );
 
   return (
-    <form onSubmit={save}>
+    <form className="management-screen" onSubmit={save}>
       <h4 style={{ marginBottom: '1rem' }}>Attendance configuration</h4>
 
       <div style={{ marginBottom: '1rem' }}>
         <CheckRow label="QR code verification" field="qr_attendance_enabled" description="Allow check-in via ticket QR code scan." />
-        <CheckRow label="GPS / geofence verification" field="geofence_enabled" description="Require participants to be within the event geofence." />
+        <CheckRow label="GPS / geofence verification" field="geofence_enabled" description="Use the event geofence for participant location check-in." />
         <CheckRow label="Organizer verification" field="organizer_verification_enabled" description="Allow organizers to manually verify attendance." />
         <CheckRow label="Peer confirmation" field="peer_confirmation_enabled" description="Allow participants to confirm each other's attendance." />
       </div>

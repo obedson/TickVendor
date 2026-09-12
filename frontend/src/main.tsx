@@ -1,7 +1,7 @@
 import { StrictMode, Suspense, lazy, useEffect, useState, useCallback } from 'react';
 import { createRoot } from 'react-dom/client';
 import { fetchWithRetry } from './fetchWithRetry';
-import { API_BASE, ApiError, apiJson, apiFetchAuth, addAuthListener, persistSession, clearSession, getLiveToken, type SessionData } from './api';
+import { API_BASE, ApiError, apiJson, addAuthListener, persistSession, clearSession, getLiveToken, type SessionData } from './api';
 const Notifications = lazy(() => import('./Notifications').then(m => ({ default: m.Notifications })));
 const Communities = lazy(() => import('./Communities').then(m => ({ default: m.Communities })));
 const OrganizerDashboard = lazy(() => import('./OrganizerDashboard').then(m => ({ default: m.OrganizerDashboard })));
@@ -30,12 +30,16 @@ import { cacheTicketWallet, clearCachedTicketWallet, loadCachedTicketWallet, typ
 import './designTokens.css';
 import './styles.css';
 import './workspace-selector.css';
+import './management.css';
 import { AppShell, EmptyState, type WorkspaceCommunity } from './AppShell';
 import { HomeDashboard } from './HomeDashboard';
+import { EventCover } from './EventCover';
+import { SponsoredPlacement } from './SponsoredPlacement';
+import { EventSupport } from './EventSupport';
+import { ManagedEventSelector } from './ManagedEventSelector';
 
 interface BeforeInstallPromptEvent extends Event { prompt: () => Promise<void>; userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }> }
-type EventItem = { id: string; title: string; description: string; category: string; starts_at: string; ends_at?: string; venue?: { name: string; city?: string } | null };
-type User = { id: string; email: string; role: string; username: string; display_name: string };
+type EventItem = { id: string; title: string; description: string; category: string; cover_image_url?: string | null; starts_at: string; ends_at?: string; venue?: { name: string; city?: string } | null };
 type Session = SessionData;
 type TicketType = { id: string; name: string; description?: string; price: string; currency: string; availability: number; max_per_user: number };
 
@@ -265,6 +269,7 @@ function EventsView({
   if (selected) {
     return (
       <div>
+        <EventCover url={selected.cover_image_url} title={selected.title} category={selected.category} />
         <div className="page-header">
           <div className="page-header-text">
             <button className="link" onClick={() => setSelected(null)} style={{ marginBottom: '.75rem', display: 'inline-flex', alignItems: 'center', gap: '.35rem' }}>
@@ -275,11 +280,13 @@ function EventsView({
           </div>
         </div>
 
-        <div style={{ display: 'grid', gap: '1.5rem', gridTemplateColumns: 'minmax(0,1fr) minmax(0,320px)' }}>
+        <div className="content-with-aside">
           <div>
             <div className="panel" style={{ marginBottom: '1rem' }}>
               <h2 style={{ fontSize: '1.1rem', marginBottom: '.75rem' }}>About this event</h2>
-              <p style={{ color: 'var(--tv-muted)', lineHeight: '1.7' }}>{selected.description}</p>
+              <p className="event-story">{selected.description}</p>
+              <EventSupport />
+              <SponsoredPlacement surface="event-detail" />
             </div>
             <div className="panel">
               <h2 style={{ fontSize: '1.1rem', marginBottom: '.75rem' }}>Date &amp; location</h2>
@@ -378,9 +385,11 @@ function EventsView({
           onAction={query ? () => setQuery('') : undefined}
         />
       )}
+      <SponsoredPlacement surface="discover" />
       <div className="grid">
         {events.map(event => (
-          <article className="card" key={event.id} style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
+          <article className="card event-card" key={event.id} style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
+            <EventCover url={event.cover_image_url} title={event.title} category={event.category} />
             <p className="eyebrow" style={{ marginBottom: 0 }}>{event.category}</p>
             <h3 style={{ margin: 0 }}>{event.title}</h3>
             <p style={{ color: 'var(--tv-muted)', fontSize: '.875rem', flex: 1, margin: 0 }}>
@@ -531,7 +540,9 @@ function App() {
             (item.membership?.role === 'admin' || item.membership?.role === 'organizer'))
           .map(item => ({ id: item.id, name: item.community?.name ?? item.name, role: item.membership.role, status: item.membership.status }));
         setManagedCommunities(manageable);
-        if (!manageable.some(item => item.id === selectedCommunityId)) setSelectedCommunityId(manageable[0]?.id || '');
+        if (selectedCommunityId && !manageable.some(item => item.id === selectedCommunityId)) {
+          setSelectedCommunityId(''); setWorkspace('participant'); setView('home');
+        }
       })
       .catch(() => setManagedCommunities([]));
   }, [session?.access_token]);
@@ -660,13 +671,15 @@ function App() {
       selectedCommunity={managedCommunities.find(item => item.id === selectedCommunityId)}
       managedCommunities={managedCommunities}
       onWorkspaceChange={(next, communityId) => {
+        if (next === 'management' && !managedCommunities.some(item => item.id === communityId)) return;
+        if (next === 'platform' && !isSuperAdmin) return;
         setWorkspace(next);
         if (next === 'participant') { navigateTo('home'); }
         else if (next === 'platform' && isSuperAdmin) { navigateTo('platform-admin'); }
-        else { setSelectedCommunityId(communityId || managedCommunities[0]?.id || ''); navigateTo('organizer-dashboard'); }
+        else { setSelectedCommunityId(communityId!); navigateTo('organizer-dashboard'); }
       }}
     >
-      <Suspense fallback={<PageLoader />}>
+      <Suspense key={`${workspace}:${selectedCommunityId}`} fallback={<PageLoader />}>
         <main id="main">
           {view === 'home' && <HomeDashboard token={session.access_token} onDiscover={() => navigateTo('events')} onTasks={() => navigateTo('tasks')} onTickets={() => navigateTo('tickets')} />}
           {view === 'events' && (
@@ -693,8 +706,8 @@ function App() {
           {view === 'organizer-opportunities' && <OrganizerOpportunities token={session.access_token} communityId={selectedCommunityId} />}
           {view === 'organizer-tasks' && <OrganizerTaskQueue token={session.access_token} communityId={selectedCommunityId} />}
           {view === 'organizer-members' && <OrganizerMembers token={session.access_token} communityId={selectedCommunityId} />}
-          {view === 'organizer-review' && <OrganizerAttendanceReview token={session.access_token} eventId={events[0]?.id || ''} />}
-          {view === 'organizer-attendance' && <OrganizerAttendanceOperations token={session.access_token} eventId={events[0]?.id || ''} />}
+          {view === 'organizer-review' && <ManagedEventSelector token={session.access_token} communityId={selectedCommunityId}>{eventId => <OrganizerAttendanceReview token={session.access_token} eventId={eventId} />}</ManagedEventSelector>}
+          {view === 'organizer-attendance' && <ManagedEventSelector token={session.access_token} communityId={selectedCommunityId}>{eventId => <OrganizerAttendanceOperations token={session.access_token} eventId={eventId} />}</ManagedEventSelector>}
           {view === 'admin-rules' && workspace === 'management' && <AdminPointRules token={session.access_token} communityId={selectedCommunityId} />}
           {view === 'admin-bands' && workspace === 'management' && <AdminContributionBands token={session.access_token} communityId={selectedCommunityId} />}
           {view === 'admin-leaderboards' && workspace === 'management' && <AdminLeaderboards token={session.access_token} communityId={selectedCommunityId} />}

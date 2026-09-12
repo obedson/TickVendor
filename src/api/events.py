@@ -1,10 +1,14 @@
 """Event creation, management, publishing, and discovery routes."""
 
+import hmac
+import time
 from decimal import Decimal
+from pathlib import Path
 from typing import Annotated
-from uuid import UUID
+from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, File, Query, Response, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile, status
+from fastapi.responses import FileResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
@@ -22,10 +26,29 @@ from src.services.event import (
     soft_delete_event,
     update_event,
 )
-from src.storage import LocalObjectStorage, S3ObjectStorage, event_cover_key
+from src.storage import (
+    cover_delivery_url,
+    event_cover_key,
+    get_object_storage,
+    local_signature,
+    managed_cover_key,
+)
 from src.uploads import safe_upload_name, validate_image_upload
 
 router = APIRouter(prefix="/events", tags=["events"])
+
+
+@router.get("/media/local", include_in_schema=False)
+def local_cover(key: str, expires: int, signature: str):
+    if settings.storage_provider != "local" or expires < int(time.time()) or not hmac.compare_digest(
+        local_signature(key, expires).encode(), signature.encode()
+    ):
+        raise HTTPException(status_code=403, detail="Media link expired or invalid")
+    root = Path(settings.storage_local_root).resolve()
+    path = (root / key).resolve()
+    if root not in path.parents or not path.is_file():
+        raise HTTPException(status_code=404, detail="Media not found")
+    return FileResponse(path, headers={"Cache-Control": "private, no-store"})
 
 
 @router.get("/categories")
@@ -69,26 +92,43 @@ async def upload_cover_image(
 
     event = get_event_for_management(db, event_id, current_user)
     data = await validate_image_upload(upload)
-    filename = safe_upload_name(str(event.id), upload.filename, upload.content_type)
+    filename = safe_upload_name(uuid4().hex, upload.filename, upload.content_type)
     key = event_cover_key(event.community_id, event.id, filename)
-    if settings.storage_provider == "s3":
-        storage = S3ObjectStorage(
-            bucket=settings.storage_bucket or "", region=settings.storage_region,
-            endpoint=settings.storage_endpoint,
-            access_key=settings.storage_access_key.get_secret_value() if settings.storage_access_key else None,
-            secret_key=settings.storage_secret_key.get_secret_value() if settings.storage_secret_key else None,
-            signed_url_ttl_seconds=settings.storage_signed_url_ttl_seconds,
-        )
-    else:
-        storage = LocalObjectStorage(settings.storage_local_root)
+    storage = get_object_storage()
+    previous_key = managed_cover_key(event.cover_image_url, event.community_id, event.id)
     stored = storage.put(key, data, upload.content_type or "application/octet-stream")
     event.cover_image_url = stored.url
-    db.commit()
     from src.services.notification import audit
+    try:
+        audit(db, actor_id=current_user.id, community_id=event.community_id,
+              action="event.cover_image_updated", target_type="event", target_id=event.id,
+              metadata={"cover_image_url": event.cover_image_url}, commit=False)
+        db.commit()
+    except Exception:
+        db.rollback()
+        storage.delete(key)
+        raise
+    if previous_key:
+        storage.delete(previous_key)
+    return {"cover_image_url": cover_delivery_url(event.cover_image_url, event.community_id, event.id)}
+
+
+@router.delete("/{event_id}/cover-image", status_code=204)
+def delete_cover_image(
+    event_id: UUID, db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    from src.services.event import get_event_for_management
+    from src.services.notification import audit
+    event = get_event_for_management(db, event_id, current_user)
+    key = managed_cover_key(event.cover_image_url, event.community_id, event.id)
+    event.cover_image_url = None
     audit(db, actor_id=current_user.id, community_id=event.community_id,
-          action="event.cover_image_updated", target_type="event", target_id=event.id,
-          metadata={"cover_image_url": event.cover_image_url})
-    return {"cover_image_url": event.cover_image_url}
+          action="event.cover_image_removed", target_type="event", target_id=event.id, commit=False)
+    db.commit()
+    if key:
+        get_object_storage().delete(key)
+    return Response(status_code=204)
 
 
 @router.get("/nearby")
@@ -148,7 +188,16 @@ def update(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> Event:
-    return update_event(db, event_id, payload, current_user)
+    from src.services.event import get_event_for_management
+    previous = get_event_for_management(db, event_id, current_user)
+    old_key = managed_cover_key(previous.cover_image_url, previous.community_id, previous.id)
+    event = update_event(db, event_id, payload, current_user)
+    if (
+        "cover_image_url" in payload.model_fields_set and old_key
+        and managed_cover_key(event.cover_image_url, event.community_id, event.id) != old_key
+    ):
+        get_object_storage().delete(old_key)
+    return event
 
 
 @router.post("/{event_id}/publish", response_model=EventResponse)

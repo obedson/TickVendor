@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { EmptyState } from './AppShell';
 import { apiJson, ApiError } from './api';
+import { SponsoredPlacement } from './SponsoredPlacement';
 
 type HomeData = {
   display_name?: string;
@@ -144,6 +145,7 @@ export function HomeDashboard({
       </section>
 
       {/* Two-column action area */}
+      <SponsoredPlacement surface="home" />
       <section className="home-columns" aria-label="Next actions and upcoming tickets">
         <article className="panel">
           <p className="eyebrow">Next actions</p>

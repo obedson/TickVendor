@@ -14,6 +14,7 @@ export function Attendance({ token, tickets }: AttendanceProps) {
   const [checkInStatus, setCheckInStatus] = useState('');
   const [busy, setBusy] = useState(false);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
+  const [peerMessage, setPeerMessage] = useState('');
   const [confirmedIds, setConfirmedIds] = useState<Set<string>>(new Set());
   const [error, setError] = useState('');
   const [geoStatus, setGeoStatus] = useState<'idle' | 'requesting' | 'granted' | 'failed'>('idle');
@@ -23,10 +24,15 @@ export function Attendance({ token, tickets }: AttendanceProps) {
 
   const loadCandidates = async () => {
     if (!ticket?.event_id) return;
+    setPeerMessage('');
     try {
       setCandidates(await apiJson<Candidate[]>(`events/${ticket.event_id}/attendance/peer-candidates`, {}, liveToken()));
-    } catch {
+    } catch (cause) {
       setCandidates([]);
+      setPeerMessage(cause instanceof ApiError && cause.status === 403
+        ? 'Peer confirmation is available after you meet this event’s attendance eligibility requirements.'
+        : cause instanceof ApiError && cause.status === 409 ? 'Peer confirmation is disabled for this event.'
+        : cause instanceof Error ? cause.message : 'Unable to load peer confirmations.');
     }
   };
 
@@ -147,7 +153,7 @@ export function Attendance({ token, tickets }: AttendanceProps) {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gap: '1.25rem', gridTemplateColumns: 'minmax(0,1fr) minmax(0,320px)' }}>
+      <div className="content-with-aside">
         {/* Check-in panel */}
         <div className="panel">
           <h2 style={{ fontSize: '1.1rem', marginBottom: '1rem' }}>Event check-in</h2>
@@ -209,6 +215,7 @@ export function Attendance({ token, tickets }: AttendanceProps) {
             Confirm attendance for other participants at this event.
           </p>
 
+          {peerMessage && <p role="status" className="info-msg">{peerMessage}</p>}
           {!candidates.length ? (
             <p className="empty">No peer confirmations available right now.</p>
           ) : (

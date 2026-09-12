@@ -25,6 +25,7 @@ from src.models import (
     User,
 )
 from src.services.notification import audit
+from src.storage import cover_delivery_url
 
 router = APIRouter(prefix="/communities", tags=["communities"])
 
@@ -97,6 +98,7 @@ def organizer_events(db: Annotated[Session, Depends(get_db)], user: Annotated[Us
     return [{"id": str(event.id), "community_id": str(event.community_id), "title": event.title, "description": event.description,
              "status": event.status.value, "starts_at": event.starts_at, "ends_at": event.ends_at,
              "category": event.category,
+             "cover_image_url": cover_delivery_url(event.cover_image_url, event.community_id, event.id),
              "venue": {"name": event.venue.name, "city": event.venue.city} if event.venue else None}
             for event in rows]
 

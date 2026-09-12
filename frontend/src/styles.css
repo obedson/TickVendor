@@ -235,6 +235,7 @@ label > span.label-text {
   margin-bottom: .35rem;
 }
 
+input:not([type]),
 input[type="text"],
 input[type="email"],
 input[type="password"],
@@ -335,7 +336,7 @@ input[type="radio"] {
 /* --- Grid -------------------------------------------------- */
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
   gap: 1rem;
 }
 
@@ -1225,7 +1226,7 @@ tbody tr:hover { background: var(--tv-surface-sunken); }
   .form-grid { grid-template-columns: 1fr; }
 }
 
-@media (max-width: 650px) {
+@media (max-width: 900px) {
   :root { --tv-header-h: 3.75rem; }
 
   .app-header { padding: 0 1rem; }

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import './management.css';
 import { apiJson, ApiError, getLiveToken } from './api';
 
 type Summary = {
@@ -28,7 +29,7 @@ export function OrganizerDashboard({ token }: { token: string }) {
 
   if (error) {
     return (
-      <div>
+      <div className="management-screen">
         <div className="page-header">
           <div className="page-header-text">
             <p className="eyebrow">Operations</p>
@@ -42,7 +43,7 @@ export function OrganizerDashboard({ token }: { token: string }) {
 
   if (!data) {
     return (
-      <div>
+      <div className="management-screen">
         <div className="page-header">
           <div className="page-header-text">
             <p className="eyebrow">Operations</p>
@@ -68,7 +69,7 @@ export function OrganizerDashboard({ token }: { token: string }) {
   ];
 
   return (
-    <div>
+    <div className="management-screen">
       <div className="page-header">
         <div className="page-header-text">
           <p className="eyebrow">Operations</p>
@@ -77,7 +78,8 @@ export function OrganizerDashboard({ token }: { token: string }) {
         </div>
       </div>
 
-      <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))' }}>
+      <p className="text-muted">This organizer summary covers all your events. Community-specific analytics are available under Settings → Analytics.</p>
+      <div className="grid">
         {metrics.map(({ label, value, icon, color }) => (
           <article className="card" key={label}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '.5rem' }}>

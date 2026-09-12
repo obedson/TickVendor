@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
+import { SponsoredPlacement } from './SponsoredPlacement';
 import { apiJson, ApiError } from './api';
 import { EmptyState } from './AppShell';
 
@@ -105,7 +106,7 @@ export function Opportunities({ token }: { token: string }) {
           </div>
         </div>
 
-        <div style={{ display: 'grid', gap: '1.25rem', gridTemplateColumns: 'minmax(0,1fr) minmax(0,300px)' }}>
+        <div className="content-with-aside">
           <div>
             <div className="panel" style={{ marginBottom: '1rem' }}>
               <h2 style={{ fontSize: '1.1rem', marginBottom: '.75rem' }}>About this opportunity</h2>
@@ -181,7 +182,8 @@ export function Opportunities({ token }: { token: string }) {
       )}
 
       <div className="grid">
-        {items.map(item => (
+        {items.map((item, index) => (
+          <Fragment key={item.id}>
           <article className="card" key={item.id} style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
             <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
               <span className={`chip ${DIMENSION_COLORS[item.dimension] || 'chip-default'}`}>{item.dimension}</span>
@@ -205,6 +207,8 @@ export function Opportunities({ token }: { token: string }) {
               View opportunity
             </button>
           </article>
+          {index === 2 && items.length > 3 && <div className="result-placement"><SponsoredPlacement surface="opportunities" /></div>}
+          </Fragment>
         ))}
       </div>
     </div>

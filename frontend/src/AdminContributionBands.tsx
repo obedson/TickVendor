@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import './management.css';
 import { apiJson, ApiError, getLiveToken } from './api';
 
 type Band = { id: string; currency: string; minimum_amount: string; maximum_amount?: string | null; points: number; per_user_period_cap?: number | null; is_active: boolean };
@@ -76,7 +77,7 @@ export function AdminContributionBands({ token, communityId }: { token: string; 
   };
 
   return (
-    <section className="panel">
+    <section className="panel management-screen">
       <h2>Contribution Tiers</h2>
       <p style={{ color: 'var(--tv-muted)', marginBottom: '1.25rem' }}>
         Define contribution ranges and the Impact Points members earn for each tier.

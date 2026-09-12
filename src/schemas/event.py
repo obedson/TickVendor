@@ -4,7 +4,15 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, HttpUrl, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    EmailStr,
+    Field,
+    HttpUrl,
+    field_serializer,
+    model_validator,
+)
 
 from src.models import EventStatus, LocationType
 
@@ -111,3 +119,8 @@ class EventResponse(BaseModel):
     venue: VenueResponse | None
     geofence_enabled: bool
     required_verification_methods: list[str]
+
+    @field_serializer("cover_image_url")
+    def deliver_cover(self, value: str | None) -> str | None:
+        from src.storage import cover_delivery_url
+        return cover_delivery_url(value, self.community_id, self.id)
