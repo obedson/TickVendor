@@ -61,6 +61,7 @@ class TicketResponse(BaseModel):
 class TicketWalletResponse(TicketResponse):
     event_title: str
     event_starts_at: datetime
+    event_ends_at: datetime | None = None
     venue_name: str | None
     venue_address: str | None
     ticket_type_name: str

@@ -53,6 +53,8 @@ def test_search_returns_organizers_and_only_authorized_tasks(tmp_path):
         'id': str(community.id),
         'name': 'Search Community',
         'slug': 'search-community',
+        'is_public': True,
+        'membership_access': 'invite_only',
         'logo_url': None,
         'description': None,
         'counts': {

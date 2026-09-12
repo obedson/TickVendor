@@ -59,8 +59,10 @@ class Venue(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
 
 class Event(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
+    is_suspended: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     __tablename__ = "events"
     __table_args__ = (
+        Index("ix_events_suspended", "is_suspended"),
         Index("ix_events_discovery", "status", "starts_at"),
         Index("ix_events_community_status", "community_id", "status"),
         Index("ix_events_search_title", "status", "title"),

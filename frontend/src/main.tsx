@@ -37,6 +37,7 @@ import { EventCover } from './EventCover';
 import { SponsoredPlacement } from './SponsoredPlacement';
 import { EventSupport } from './EventSupport';
 import { ManagedEventSelector } from './ManagedEventSelector';
+import { archiveItem, usePersonalArchive } from './PersonalHistory';
 
 interface BeforeInstallPromptEvent extends Event { prompt: () => Promise<void>; userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }> }
 type EventItem = { id: string; title: string; description: string; category: string; cover_image_url?: string | null; starts_at: string; ends_at?: string; venue?: { name: string; city?: string } | null };
@@ -414,7 +415,13 @@ function EventsView({
 }
 
 /* ── Tickets view ────────────────────────────────────────── */
-function TicketsView({ tickets }: { tickets: OfflineTicket[] }) {
+function TicketsView({ tickets, token }: { tickets: OfflineTicket[]; token: string }) {
+  const [view, setView] = useState('active');
+  const [archiveError, setArchiveError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const archive = usePersonalArchive(token, 'ticket');
+  const historical = (ticket: OfflineTicket) => ['used', 'cancelled', 'refunded', 'expired'].includes(ticket.status) || Boolean(ticket.event_ends_at && new Date(ticket.event_ends_at).getTime() < Date.now());
+  const visible = tickets.filter(ticket => view === 'archived' ? archive.ids.has(ticket.id || '') : !archive.ids.has(ticket.id || '') && (view === 'history' ? historical(ticket) : !historical(ticket)));
   return (
     <div>
       <div className="page-header">
@@ -424,14 +431,16 @@ function TicketsView({ tickets }: { tickets: OfflineTicket[] }) {
           <p>Your event tickets with QR codes for check-in.</p>
         </div>
       </div>
-      {!tickets.length ? (
+      <nav className="section-tabs" aria-label="Ticket wallet filters">{['active', 'history', 'archived'].map(value => <button key={value} className="secondary" aria-pressed={view === value} onClick={() => setView(value)}>{value === 'active' ? 'Active / Upcoming' : value === 'history' ? 'History' : 'Archived'}</button>)}</nav>
+      {(archive.error || archiveError) && <p className="error" role="alert">{archive.error || archiveError}</p>}
+      {!visible.length ? (
         <EmptyState
-          title="No tickets yet"
-          description="Acquire a ticket from an event to see it here. Your tickets are stored securely on this device."
+          title={tickets.length ? 'No tickets in this view' : 'No tickets yet'}
+          description={tickets.length ? 'Check Active / Upcoming, History or Archived for your other tickets.' : 'Acquire a ticket from an event to see it here. Your tickets are stored securely on this device.'}
         />
       ) : (
         <div className="ticket-wallet">
-          {tickets.map(ticket => <TicketQr key={ticket.public_id} ticket={ticket} />)}
+          {visible.map(ticket => <div key={ticket.public_id}><TicketQr ticket={ticket} />{(historical(ticket) || archive.ids.has(ticket.id || '')) && <button className="secondary" disabled={busy || !ticket.id} onClick={async () => { setBusy(true); setArchiveError(''); try { await archiveItem(token, 'ticket', ticket.id!, !archive.ids.has(ticket.id || '')); } catch (cause) { setArchiveError(cause instanceof Error ? cause.message : 'Archive action failed.'); } finally { setBusy(false); } }}>{archive.ids.has(ticket.id || '') ? 'Restore to wallet' : 'Archive ticket'}</button>}</div>)}
         </div>
       )}
     </div>
@@ -489,6 +498,12 @@ function App() {
   const [workspace, setWorkspace] = useState<'participant' | 'management' | 'platform'>('participant');
   const [managedCommunities, setManagedCommunities] = useState<WorkspaceCommunity[]>([]);
   const [selectedCommunityId, setSelectedCommunityId] = useState('');
+  const [membershipRevision, setMembershipRevision] = useState(0);
+  useEffect(() => {
+    const changed = () => setMembershipRevision(value => value + 1);
+    window.addEventListener('tickvendor-memberships-changed', changed);
+    return () => window.removeEventListener('tickvendor-memberships-changed', changed);
+  }, []);
 
   const isSuperAdmin = session?.user?.role === 'super_admin';
 
@@ -536,7 +551,7 @@ function App() {
     apiJson<any[]>('communities/me', {}, getLiveToken() ?? session.access_token)
       .then(items => {
         const manageable = items
-          .filter(item => item.membership?.status === 'active' &&
+          .filter(item => item.membership?.status === 'active' && item.community?.is_active !== false &&
             (item.membership?.role === 'admin' || item.membership?.role === 'organizer'))
           .map(item => ({ id: item.id, name: item.community?.name ?? item.name, role: item.membership.role, status: item.membership.status }));
         setManagedCommunities(manageable);
@@ -545,7 +560,7 @@ function App() {
         }
       })
       .catch(() => setManagedCommunities([]));
-  }, [session?.access_token]);
+  }, [session?.access_token, membershipRevision]);
 
   // Load events — public endpoint, no auth required, but use fetchWithRetry for resilience.
   const loadEvents = useCallback(() => {
@@ -693,7 +708,7 @@ function App() {
               onRetry={loadEvents}
             />
           )}
-          {view === 'tickets' && <TicketsView tickets={tickets} />}
+          {view === 'tickets' && <TicketsView tickets={tickets} token={session.access_token} />}
           {view === 'opportunities' && <Opportunities token={session.access_token} />}
           {view === 'attendance' && <Attendance token={session.access_token} tickets={tickets} />}
           {view === 'tasks' && <Tasks token={session.access_token} />}

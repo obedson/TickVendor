@@ -1,4 +1,6 @@
 /* Shared width and form contracts for participant and management screens. */
+.governance-dialog { width: min(36rem, calc(100% - 2rem)); max-height: calc(100dvh - 2rem); margin: auto; overflow: auto; border: 1px solid var(--tv-border); }
+.governance-dialog::backdrop { background: rgb(15 23 42 / .6); }
 .app-main, .app-main > *, .management-screen, .panel, .card,
 .content-with-aside > *, .form-row > *, .form-grid > *, .grid > * { min-width: 0; }
 .app-main { overflow-wrap: anywhere; }

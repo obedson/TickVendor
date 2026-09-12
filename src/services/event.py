@@ -23,6 +23,7 @@ from src.models import (
     Venue,
 )
 from src.schemas.event import EventCreate, EventUpdate
+from src.services.availability import require_available, visible_content
 from src.services.notification import audit
 
 
@@ -47,6 +48,7 @@ def nearby_events(db: Session, latitude: Decimal, longitude: Decimal, radius_km:
                   limit: int) -> list[tuple[Event, float]]:
     candidates = db.scalars(select(Event).options(selectinload(Event.venue)).join(Event.venue).where(
         Event.status == EventStatus.PUBLISHED, Event.deleted_at.is_(None),
+        visible_content(Event),
         Venue.latitude.is_not(None), Venue.longitude.is_not(None), Event.ends_at >= datetime.now(UTC),
     ).limit(500))
     result = [(event, event_distance_km(latitude, longitude, event.venue)) for event in candidates]
@@ -115,6 +117,7 @@ def create_event(db: Session, payload: EventCreate, user: User) -> Event:
 
 def get_event_for_management(db: Session, event_id: UUID, user: User) -> Event:
     event = db.scalar(select(Event).options(selectinload(Event.venue)).where(Event.id == event_id))
+    require_available(db, event)
     if event is None:
         raise HTTPException(status_code=404, detail="Event not found")
     if user.role != PlatformRole.SUPER_ADMIN:
@@ -178,6 +181,7 @@ def discover_events(
     city: str | None = None, price: str | None = None, sort: str = "soonest",
 ) -> list[Event]:
     query = select(Event).options(selectinload(Event.venue)).where(
+        visible_content(Event),
         Event.status == EventStatus.PUBLISHED, Event.deleted_at.is_(None)
     )
     if search:

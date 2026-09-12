@@ -34,9 +34,9 @@ def test_admin_changes_are_audited_and_outsiders_are_denied(tmp_path):
     app.dependency_overrides[get_db]=override_get_db;client=TestClient(app);admin_id,outsider_id,community_id,membership_id,rank_id,award_id=ids
     headers=lambda uid:{'Authorization':f"Bearer {create_access_token(uid,'participant')}"}
     path=f'/api/v1/admin/communities/{community_id}'
-    assert client.patch(f'{path}/memberships/{membership_id}/role',json={'role':'organizer'},headers=headers(outsider_id)).status_code==403
-    assert client.patch(f'{path}/memberships/{membership_id}/role',json={'role':'organizer'},headers=headers(admin_id)).status_code==200
+    assert client.patch(f'{path}/memberships/{membership_id}/role',json={'role':'organizer','reason':'Assign responsibility'},headers=headers(outsider_id)).status_code==403
+    assert client.patch(f'{path}/memberships/{membership_id}/role',json={'role':'organizer','reason':'Assign responsibility'},headers=headers(admin_id)).status_code==200
     assert client.patch(f'{path}/ranks/{rank_id}',json={'minimum_points':25},headers=headers(admin_id)).status_code==200
     assert client.post(f'{path}/badge-awards/{award_id}/revoke',json={'reason':'Awarded in error'},headers=headers(admin_id)).status_code==204
-    with sessions() as db:assert {row.action for row in db.query(AuditLog)} >= {'user.role_changed','rank.changed','badge.revoked'}
+    with sessions() as db:assert {row.action for row in db.query(AuditLog)} >= {'membership.role_changed','rank.changed','badge.revoked'}
     engine.dispose()

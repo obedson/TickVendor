@@ -1,5 +1,17 @@
 # TickVendor Build Status
 
+## Governance / membership / moderation / personal-space continuation — 2026-09-12
+
+- Resumed the existing interrupted working tree from `4a89a0225df39c6b99df28f5f0b305a93588e3dc`; no reset, stash, discard, push or deployment. Prior responsive/media/payment/attendance work preserved.
+- Implemented explicit membership access policies and invitation/join/request/leave transitions; backend-enforced Super Admin-only community Admin assignment/demotion, tenant checks, reasons, audits and preference-aware notifications. Closed the legacy admin role-route bypass during final review.
+- Added platform inspection and reversible user/community/event/opportunity/task moderation, separate from domain lifecycle; enforced current-action suspension gates, including QR/organizer attendance endpoints missed by the initial shared lookup integration. Read-only event roster/review remains available under existing community authority.
+- Added owned, reversible presentation archives for notifications, historical tickets, verified assignments and completed/closed opportunity participation. No financial/attendance/Impact/recognition record deletion or status mutation. Existing failed-reservation wallet filtering and QR credentials preserved.
+- Reviewed intentional Community/Platform Admin extraction and component mounting. Added native reason confirmations, searchable/paginated governance, member controls matching authority and membership-aware workspace refresh.
+- Migration `b7c8d9e0f123` follows actual prior head `9f0a1b2c3d4e`; single Alembic head. Isolated SQLite previous-head upgrade, constraint/index checks, downgrade/re-upgrade and PostgreSQL SQL compilation pass. Live PostgreSQL execution/concurrency remains unverified.
+- Focused combined backend run: **38 passed** (14 selected files; one existing Starlette/httpx deprecation warning). After strengthening the populated evidence-preservation regression, the final governance/moderation/archive rerun passed **9 tests**. Focused frontend governance/management/location/offline tests: **34 passed**. Final TypeScript/Vite build, ESLint, changed-file Ruff and `git diff --check` pass. Route inventory has no duplicate method/path pairs. Local commit identity is reported with delivery.
+- Detailed design, exact API/schema inventory, last-Admin decision, immutable-record policy, test commands and participant/Admin/Super Admin acceptance checklist: `docs/GOVERNANCE_MEMBERSHIP_MODERATION_2026_09_12.md`.
+- No manual staging or viewport testing claimed. Required external verification includes 320/360/390/414/768/1024/1280px flows, keyboard/dialog behavior, notification delivery, PostgreSQL migration and concurrency. Community creation has an authorized API but its dedicated UI form remains unfinished. No overall completion assessment or authoritative traceability count/percentage changes.
+
 ## Spec Reconciliation Remediation Pass 2 — 2026-09-10
 
 Branch: `duo/feature/spec-reconciliation-remediation`

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { apiJson, ApiError, getLiveToken } from './api';
 import { enqueueAction, flushActions } from './offlineQueue';
 import { EmptyState } from './AppShell';
+import { PersonalHistory, usePersonalArchive } from './PersonalHistory';
 
 type Notification = { id: string; title: string; message: string; read_at: string | null; notification_type?: string; created_at?: string };
 type Preferences = { in_app_enabled: boolean; email_enabled: boolean; push_enabled: boolean; muted_types: string[] };
@@ -13,6 +14,7 @@ const PREF_SETTINGS = [
 ];
 
 export function Notifications({ token }: { token: string }) {
+  const archive = usePersonalArchive(token, 'notification');
   const [items, setItems] = useState<Notification[]>([]);
   const [prefs, setPrefs] = useState<Preferences | null>(null);
   const [statusMsg, setStatusMsg] = useState('');
@@ -48,7 +50,7 @@ export function Notifications({ token }: { token: string }) {
   };
 
   const markAllRead = async () => {
-    const unread = items.filter(n => !n.read_at);
+    const unread = items.filter(n => !n.read_at && !archive.ids.has(n.id));
     await Promise.all(unread.map(n => markRead(n)));
     setStatusMsg('All notifications marked as read.');
   };
@@ -63,8 +65,8 @@ export function Notifications({ token }: { token: string }) {
     }
   };
 
-  const unreadCount = items.filter(n => !n.read_at).length;
-  const filteredItems = filter === 'unread' ? items.filter(n => !n.read_at) : items;
+  const unreadCount = items.filter(n => !n.read_at && !archive.ids.has(n.id)).length;
+  const filteredItems = items.filter(item => !archive.ids.has(item.id) && (filter !== 'unread' || !item.read_at));
 
   return (
     <div>
@@ -83,6 +85,8 @@ export function Notifications({ token }: { token: string }) {
         </div>
       </div>
 
+      <PersonalHistory token={token} kind="notification" title="Manage Inbox and Archived notifications" />
+      {archive.error && <p role="alert" className="error">{archive.error}</p>}
       {loading && <p role="status" className="text-muted">Loading notifications…</p>}
       {error && <p role="alert" className="error">{error}</p>}
       {statusMsg && <p role="status" aria-live="polite" className="info-msg" style={{ marginBottom: '1rem' }}>{statusMsg}</p>}

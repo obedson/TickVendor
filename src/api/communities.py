@@ -60,6 +60,8 @@ def detail(
         "slug": community.slug,
         "logo_url": community.logo_url,
         "description": community.description,
+        "membership_access": community.membership_access.value,
+        "is_public": community.is_public,
         "counts": {
             "members": count(Membership, *active_members),
             "administrators": count(

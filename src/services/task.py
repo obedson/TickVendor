@@ -18,6 +18,7 @@ from src.models import (
     TaskSubmission,
     User,
 )
+from src.services.availability import require_available
 from src.services.event import as_utc
 from src.services.impact import award_points
 from src.services.notification import audit, notify
@@ -36,6 +37,7 @@ def create_task(db: Session, community_id, creator: User, **values) -> Task:
 
 
 def assign_task(db: Session, task: Task, assignee_id, assigner: User) -> TaskAssignment:
+    require_available(db, task)
     require_community_role(db, task.community_id, assigner, MembershipRole.ORGANIZER)
     member = db.scalar(select(Membership).where(
         Membership.community_id == task.community_id,
@@ -50,6 +52,7 @@ def assign_task(db: Session, task: Task, assignee_id, assigner: User) -> TaskAss
 
 def transition_assignment(db: Session, assignment: TaskAssignment, user: User,
                           target: TaskAssignmentStatus) -> TaskAssignment:
+    require_available(db, db.get(Task, assignment.task_id))
     if assignment.assignee_id != user.id:
         raise HTTPException(status_code=403, detail="Task is not assigned to this user")
     allowed = {
@@ -77,6 +80,7 @@ def _validate_evidence(task: Task, evidence_text, evidence_url, evidence_attachm
 
 
 def submit_task(db: Session, assignment: TaskAssignment, user: User, evidence_text=None, evidence_url=None, evidence_attachments=None):
+    require_available(db, db.get(Task, assignment.task_id))
     if assignment.assignee_id != user.id:
         raise HTTPException(status_code=403, detail="Task is not assigned to this user")
     if assignment.status not in {TaskAssignmentStatus.ASSIGNED, TaskAssignmentStatus.ACCEPTED, TaskAssignmentStatus.IN_PROGRESS, TaskAssignmentStatus.REJECTED}:
@@ -108,6 +112,7 @@ def submit_task(db: Session, assignment: TaskAssignment, user: User, evidence_te
 
 
 def verify_task(db: Session, assignment: TaskAssignment, verifier: User, approve: bool):
+    require_available(db, db.get(Task, assignment.task_id))
     task = db.get(Task, assignment.task_id)
     require_community_role(db, task.community_id, verifier, MembershipRole.ORGANIZER)
     if assignment.status != TaskAssignmentStatus.SUBMITTED:

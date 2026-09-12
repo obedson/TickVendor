@@ -24,9 +24,17 @@ class MembershipRole(str, enum.Enum):
 
 class MembershipStatus(str, enum.Enum):
     INVITED = "invited"
+    PENDING = "pending"
+    DECLINED = "declined"
     ACTIVE = "active"
     SUSPENDED = "suspended"
     LEFT = "left"
+
+
+class MembershipAccess(str, enum.Enum):
+    OPEN = "open"
+    APPROVAL_REQUIRED = "approval_required"
+    INVITE_ONLY = "invite_only"
 
 
 class Community(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
@@ -45,6 +53,10 @@ class Community(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     logo_url: Mapped[str | None] = mapped_column(String(2048))
     is_public: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    membership_access: Mapped[MembershipAccess] = mapped_column(
+        Enum(MembershipAccess, native_enum=False, length=24),
+        default=MembershipAccess.INVITE_ONLY, nullable=False,
+    )
 
     organization: Mapped[Organization] = relationship(back_populates="communities")
     memberships: Mapped[list[Membership]] = relationship(
@@ -57,6 +69,7 @@ class Membership(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __table_args__ = (
         UniqueConstraint("community_id", "user_id", name="uq_membership_community_user"),
         Index("ix_memberships_user_status", "user_id", "status"),
+        Index("ix_memberships_community_status", "community_id", "status"),
     )
 
     community_id: Mapped[Any] = mapped_column(

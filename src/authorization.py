@@ -34,7 +34,7 @@ def require_community_role(
     minimum_role: MembershipRole = MembershipRole.MEMBER,
 ) -> Membership:
     community = db.get(Community, community_id)
-    if community is None or not community.is_active:
+    if community is None or community.deleted_at is not None:
         raise HTTPException(status_code=404, detail="Community not found")
     if current_user.role == PlatformRole.SUPER_ADMIN:
         return Membership(
@@ -43,6 +43,8 @@ def require_community_role(
             role=MembershipRole.ADMIN,
             status=MembershipStatus.ACTIVE,
         )
+    if not community.is_active:
+        raise HTTPException(status_code=403, detail="Community is suspended")
     membership = db.scalar(
         select(Membership).where(
             Membership.community_id == community_id,

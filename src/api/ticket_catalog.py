@@ -19,6 +19,8 @@ router = APIRouter(tags=["ticketing"])
 def list_event_ticket_types(event_id: UUID, db: Annotated[Session, Depends(get_db)], user: Annotated[User, Depends(get_current_user)]):
     expire_pending_orders(db, event_id=event_id)
     event = db.scalar(select(Event).where(Event.id == event_id))
+    from src.services.availability import require_available
+    require_available(db, event)
     if event is None:
         from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="Event not found")

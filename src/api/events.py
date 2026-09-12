@@ -161,9 +161,11 @@ def list_events(
 
 @router.get("/{event_id}", response_model=EventResponse)
 def get_event(event_id: UUID, db: Annotated[Session, Depends(get_db)]) -> Event:
+    from src.services.availability import visible_content
     event = db.scalar(
         select(Event).options(selectinload(Event.venue)).where(
-            Event.id == event_id, Event.status == EventStatus.PUBLISHED, Event.deleted_at.is_(None)
+            Event.id == event_id, Event.status == EventStatus.PUBLISHED, Event.deleted_at.is_(None),
+            visible_content(Event),
         )
     )
     if event is None:

@@ -22,6 +22,7 @@ from src.models import (
     User,
 )
 from src.services.activity import verify_activity
+from src.services.availability import require_available, visible_content
 from src.services.notification import audit, notify
 
 
@@ -31,6 +32,7 @@ def _as_utc(value: datetime) -> datetime:
 
 def _opportunity(db: Session, opportunity_id: UUID) -> ActivityOpportunity:
     item = db.get(ActivityOpportunity, opportunity_id)
+    require_available(db, item)
     if item is None or item.deleted_at is not None:
         raise HTTPException(status_code=404, detail="Opportunity not found")
     return item
@@ -86,6 +88,7 @@ def list_opportunities(db: Session, user: User, community_id: UUID | None = None
             & (Membership.status == MembershipStatus.ACTIVE),
         ).where(
             ActivityOpportunity.status == OpportunityStatus.PUBLISHED,
+            visible_content(ActivityOpportunity),
             ActivityOpportunity.deleted_at.is_(None),
             ActivityOpportunity.ends_at >= datetime.now(UTC),
             (ActivityOpportunity.members_only.is_(False) | (Membership.id.is_not(None))),

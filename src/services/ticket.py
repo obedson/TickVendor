@@ -118,7 +118,9 @@ def release_pending_order(
 
 
 def manage_event(db: Session, event_id: UUID, user: User) -> Event:
+    from src.services.availability import require_available
     event = db.get(Event, event_id)
+    require_available(db, event)
     if event is None:
         raise HTTPException(status_code=404, detail="Event not found")
     membership = require_community_role(db, event.community_id, user, MembershipRole.ORGANIZER)
@@ -138,6 +140,8 @@ def create_ticket_type(db: Session, event_id: UUID, payload: TicketTypeCreate, u
 
 
 def create_order(db: Session, event_id: UUID, payload: OrderCreate, user: User) -> Order:
+    from src.services.availability import require_available
+    require_available(db, db.get(Event, event_id))
     expire_pending_orders(db, event_id=event_id)
     existing = db.scalar(select(Order).where(Order.idempotency_key == payload.idempotency_key))
     if existing:

@@ -56,6 +56,8 @@ def list_tasks(community_id: UUID, db: Annotated[Session, Depends(get_db)],
     from src.authorization import require_community_role
     require_community_role(db, community_id, user)
     query = select(Task).where(Task.community_id == community_id, Task.is_active.is_(True))
+    from src.services.availability import visible_content
+    query = query.where(visible_content(Task))
     if status_filter:
         query = query.where(Task.id.in_(select(TaskAssignment.task_id).where(TaskAssignment.status == status_filter)))
     return [

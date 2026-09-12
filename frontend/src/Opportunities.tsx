@@ -2,6 +2,7 @@ import { Fragment, useEffect, useState } from 'react';
 import { SponsoredPlacement } from './SponsoredPlacement';
 import { apiJson, ApiError } from './api';
 import { EmptyState } from './AppShell';
+import { PersonalHistory } from './PersonalHistory';
 
 type Opportunity = {
   id: string;
@@ -172,6 +173,7 @@ export function Opportunities({ token }: { token: string }) {
         </div>
       </div>
 
+      <PersonalHistory token={token} kind="opportunity" title="My registrations, history and archived participation" />
       {loading && <p role="status" className="text-muted">Loading opportunities…</p>}
       {error && <p role="alert" className="error">{error}</p>}
       {!loading && !error && !items.length && (

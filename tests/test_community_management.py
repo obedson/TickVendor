@@ -53,8 +53,9 @@ def test_admin_can_update_and_manage_members_with_audit(tmp_path):
     added = client.post(f"/api/v1/communities/{community}/members", headers=headers(admin), json={"user_id": str(outsider), "role": "member"})
     assert added.status_code == 201
     membership_id = added.json()["id"]
-    assert client.patch(f"/api/v1/communities/{community}/members/{membership_id}/role", headers=headers(admin), json={"role": "organizer"}).status_code == 200
-    assert client.patch(f"/api/v1/communities/{community}/members/{membership_id}/status", headers=headers(admin), json={"status": "active"}).status_code == 200
+    assert client.post(f"/api/v1/communities/{community}/membership/accept", headers=headers(outsider)).status_code == 200
+    assert client.patch(f"/api/v1/communities/{community}/members/{membership_id}/role", headers=headers(admin), json={"role": "organizer", "reason": "Organize community events"}).status_code == 200
+    assert client.patch(f"/api/v1/communities/{community}/members/{membership_id}/status", headers=headers(admin), json={"status": "active", "reason": "Keep membership active"}).status_code == 200
     with sessions() as db:
         assert db.query(Membership).filter_by(id=membership_id).one().status == __import__("src.models", fromlist=["MembershipStatus"]).MembershipStatus.ACTIVE
         assert db.query(__import__("src.models", fromlist=["AuditLog"]).AuditLog).filter_by(community_id=community).count() >= 3

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { apiJson, ApiError, getLiveToken } from './api';
 import { EmptyState } from './AppShell';
+import { PersonalHistory, usePersonalArchive } from './PersonalHistory';
 
 type TaskConfig = {
   video_url?: string;
@@ -45,6 +46,7 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export function Tasks({ token, communityId }: { token: string; communityId?: string }) {
+  const archive = usePersonalArchive(token, 'task');
   const [tasks, setTasks] = useState<Task[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [selected, setSelected] = useState<Task | null>(null);
@@ -66,7 +68,7 @@ export function Tasks({ token, communityId }: { token: string; communityId?: str
     setNoCommunity(false);
     try {
       const communities = communityId ? [{ id: communityId }] : await apiJson<{ id: string }[]>('communities/me', {}, liveToken());
-      const id = communities[0]?.id;
+      const id = communityId || communities.find((item: any) => item.membership?.status === 'active' && item.community?.is_active !== false)?.id;
       if (!id) { setNoCommunity(true); setTasks([]); setAssignments([]); return; }
       const [a, t] = await Promise.all([
         apiJson<Assignment[]>('task-assignments/me', {}, liveToken()),
@@ -140,6 +142,7 @@ export function Tasks({ token, communityId }: { token: string; communityId?: str
 
   const filteredTasks = tasks.filter(task => {
     const assignment = assignments.find(a => a.task_id === task.id);
+    if (assignment && archive.ids.has(assignment.id)) return false;
     const status = assignment?.status || 'available';
     if (filter === 'active') return !['verified', 'rejected'].includes(status);
     if (filter === 'completed') return ['verified', 'rejected'].includes(status);
@@ -156,6 +159,8 @@ export function Tasks({ token, communityId }: { token: string; communityId?: str
         </div>
       </div>
 
+      <PersonalHistory token={token} kind="task" title="Completed, history and archived assignments" />
+      {archive.error && <p role="alert" className="error">{archive.error}</p>}
       {loading && <p role="status" className="text-muted">Loading tasks…</p>}
       {error && <p role="alert" className="error">{error}</p>}
       {statusMsg && <p role="status" className="success-msg" style={{ marginBottom: '1rem' }}>{statusMsg}</p>}

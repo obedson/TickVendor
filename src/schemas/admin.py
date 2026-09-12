@@ -82,6 +82,7 @@ class BadgeRevokeInput(BaseModel):
 
 class MembershipRoleUpdateInput(BaseModel):
     role: Literal["member", "organizer", "admin"]
+    reason: str = Field(min_length=3, max_length=1000)
 
 
 class RankUpdateInput(BaseModel):

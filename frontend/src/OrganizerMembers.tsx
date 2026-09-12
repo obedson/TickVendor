@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import './management.css';
+import { GovernanceConfirm } from './GovernanceConfirm';
+import { CommunityAccessEditor } from './CommunityAccessEditor';
 import { EmptyState } from './AppShell';
 import { apiJson, ApiError, getLiveToken } from './api';
 
@@ -28,12 +30,16 @@ export function OrganizerMembers({ token, communityId }: { token: string; commun
   const [inviting, setInviting] = useState(false);
   const [roleChangeTarget, setRoleChangeTarget] = useState<Member | null>(null);
   const [newRole, setNewRole] = useState('');
+  const [viewerId, setViewerId] = useState('');
+  const [membershipAction, setMembershipAction] = useState<{ member: Member; action: string } | null>(null);
+  useEffect(() => { apiJson<{ id: string }>('auth/me', {}, getLiveToken() ?? token).then(user => setViewerId(user.id)).catch(() => setViewerId('')); }, [token]);
+  const canManage = members.some(member => member.user_id === viewerId && member.role === 'admin' && member.status === 'active');
   const liveToken = () => getLiveToken() ?? token;
 
   const getCommunityId = async (): Promise<string | undefined> => {
     if (communityId) return communityId;
     const memberships = await apiJson<any[]>('communities/me', {}, liveToken());
-    return memberships[0]?.id;
+    return memberships.find(item => item.membership?.status === 'active' && item.community?.is_active && item.membership?.role === 'admin')?.id;
   };
 
   const load = async () => {
@@ -50,37 +56,25 @@ export function OrganizerMembers({ token, communityId }: { token: string; commun
 
   useEffect(() => { load(); }, [token, communityId]);
 
-  const updateStatus = async (member: Member, status: string) => {
-    try {
-      const id = await getCommunityId();
-      await apiJson<unknown>(`communities/${id}/members/${member.id}/status`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status }),
-      }, liveToken());
-      setMessage(`${member.display_name || member.username || 'Member'} ${status === 'active' ? 'activated' : 'deactivated'}.`);
-      await load();
-    } catch (cause) {
-      setError(cause instanceof ApiError ? cause.message : 'Unable to update membership.');
-    }
+  const changeRole = async (reason: string) => {
+    if (!roleChangeTarget || !newRole) return;
+    const id = await getCommunityId();
+    await apiJson(`communities/${id}/members/${roleChangeTarget.id}/role`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ role: newRole, reason }),
+    }, liveToken());
+    setMessage('Membership role updated.'); await load();
   };
 
-  const changeRole = async () => {
-    if (!roleChangeTarget || !newRole) return;
-    try {
-      const id = await getCommunityId();
-      await apiJson<unknown>(`communities/${id}/members/${roleChangeTarget.id}/role`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ role: newRole }),
-      }, liveToken());
-      setMessage(`${roleChangeTarget.display_name || roleChangeTarget.username || 'Member'}'s role changed to ${newRole}.`);
-      setRoleChangeTarget(null);
-      setNewRole('');
-      await load();
-    } catch (cause) {
-      setError(cause instanceof ApiError ? cause.message : 'Unable to change role.');
-    }
+  const updateMembership = async (reason: string) => {
+    if (!membershipAction) return;
+    const { member, action } = membershipAction;
+    const id = await getCommunityId();
+    const review = ['approved', 'rejected'].includes(action);
+    await apiJson(review ? `communities/${id}/membership-requests/${member.id}/${action}` : `communities/${id}/members/${member.id}/status`, {
+      method: review ? 'POST' : 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(review ? { reason } : { reason, status: action }),
+    }, liveToken());
+    setMessage('Membership updated.'); await load();
   };
 
   const inviteMember = async (e: React.FormEvent) => {
@@ -112,6 +106,7 @@ export function OrganizerMembers({ token, communityId }: { token: string; commun
 
   return (
     <div className="management-screen">
+      {canManage && communityId && <CommunityAccessEditor token={token} communityId={communityId} />}
       <div className="page-header">
         <div className="page-header-text">
           <p className="eyebrow">Community administration</p>
@@ -130,14 +125,14 @@ export function OrganizerMembers({ token, communityId }: { token: string; commun
               className="filter-control"
             />
           </div>
-          <button className="accent sm" onClick={() => setShowInvite(!showInvite)}>
+          {canManage && <button className="accent sm" onClick={() => setShowInvite(!showInvite)}>
             {showInvite ? 'Cancel' : '+ Invite member'}
-          </button>
+          </button>}
         </div>
       </div>
 
       {/* Invite form */}
-      {showInvite && (
+      {canManage && showInvite && (
         <div className="panel" style={{ marginBottom: '1.5rem' }}>
           <h2 style={{ fontSize: '1rem', marginBottom: '1rem' }}>Invite a member</h2>
           <form onSubmit={inviteMember} style={{ display: 'grid', gap: '.75rem' }}>
@@ -178,8 +173,8 @@ export function OrganizerMembers({ token, communityId }: { token: string; commun
         <EmptyState
           title="No members"
           description="This community has no members yet. Invite someone to get started."
-          action="Invite member"
-          onAction={() => setShowInvite(true)}
+          action={canManage ? "Invite member" : undefined}
+          onAction={canManage ? () => setShowInvite(true) : undefined}
         />
       )}
 
@@ -221,18 +216,12 @@ export function OrganizerMembers({ token, communityId }: { token: string; commun
                   </td>
                   <td data-label="Actions">
                     <div style={{ display: 'flex', gap: '.4rem', flexWrap: 'wrap' }}>
-                      <button
-                        className="secondary sm"
-                        onClick={() => { setRoleChangeTarget(member); setNewRole(member.role); }}
-                        title="Change role"
-                      >
-                        Change role
-                      </button>
-                      {member.status === 'active' ? (
-                        <button className="secondary sm" onClick={() => updateStatus(member, 'inactive')}>Deactivate</button>
-                      ) : member.status === 'inactive' ? (
-                        <button className="accent sm" onClick={() => updateStatus(member, 'active')}>Activate</button>
-                      ) : null}
+                      {canManage && viewerId && member.user_id !== viewerId && member.role !== 'admin' && <>
+                        {['active', 'suspended'].includes(member.status) && <><button className="secondary sm" title="Change role" onClick={() => { setRoleChangeTarget(member); setNewRole(member.role); }}>Change role</button>
+                        <button className="secondary sm" onClick={() => setMembershipAction({ member, action: member.status === 'active' ? 'suspended' : 'active' })}>{member.status === 'active' ? 'Deactivate' : 'Activate'}</button></>}
+                        {member.status === 'pending' && <><button onClick={() => setMembershipAction({ member, action: 'approved' })}>Approve request</button><button className="secondary" onClick={() => setMembershipAction({ member, action: 'rejected' })}>Reject request</button></>}
+                      </>}
+                      {member.role === 'admin' && <small>Managed by Platform Super Admin</small>}
                     </div>
                   </td>
                 </tr>
@@ -242,33 +231,10 @@ export function OrganizerMembers({ token, communityId }: { token: string; commun
         )}
       </div>
 
-      {/* Role change confirmation modal */}
-      {roleChangeTarget && (
-        <div
-          style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.5)', zIndex: 300, display: 'grid', placeItems: 'center', padding: '1rem' }}
-          onClick={() => setRoleChangeTarget(null)}
-        >
-          <div className="panel" style={{ width: 'min(100%, 28rem)' }} onClick={e => e.stopPropagation()}>
-            <h2 style={{ fontSize: '1.1rem', marginBottom: '1rem' }}>Change role</h2>
-            <p style={{ color: 'var(--tv-muted)', marginBottom: '1rem' }}>
-              Change role for <strong>{roleChangeTarget.display_name || roleChangeTarget.username || 'this member'}</strong>
-            </p>
-            <label>
-              <span className="label-text">New role</span>
-              <select value={newRole} onChange={e => setNewRole(e.target.value)}>
-                <option value="member">Member</option>
-                <option value="organizer">Organizer</option>
-              </select>
-            </label>
-            <div className="form-actions" style={{ marginTop: '1rem' }}>
-              <button className="accent" onClick={changeRole} disabled={newRole === roleChangeTarget.role}>
-                Confirm role change
-              </button>
-              <button className="secondary" onClick={() => setRoleChangeTarget(null)}>Cancel</button>
-            </div>
-          </div>
-        </div>
-      )}
+      {roleChangeTarget && <GovernanceConfirm title={`Change role for ${roleChangeTarget.display_name || roleChangeTarget.username || 'member'}`} consequence="Changes Member/Organizer authority in this community only." onClose={() => setRoleChangeTarget(null)} onConfirm={changeRole}>
+        <label>New role<select value={newRole} onChange={event => setNewRole(event.target.value)}><option value="member">Member</option><option value="organizer">Organizer</option></select></label>
+      </GovernanceConfirm>}
+      {membershipAction && <GovernanceConfirm title={`${membershipAction.action} — ${membershipAction.member.display_name || membershipAction.member.username || 'member'}`} consequence="Membership access will change; participation and audit history remain." onClose={() => setMembershipAction(null)} onConfirm={updateMembership} />}
     </div>
   );
 }

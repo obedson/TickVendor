@@ -20,6 +20,7 @@ from src.models import (
     Task,
     User,
 )
+from src.services.availability import visible_content
 
 router = APIRouter(prefix="/search", tags=["search"])
 
@@ -32,9 +33,11 @@ def global_search(
 ):
     pattern = f"%{q.lower()}%"
     events = db.scalars(select(Event).where(
+        visible_content(Event), Event.deleted_at.is_(None),
         Event.status == EventStatus.PUBLISHED, func.lower(Event.title).like(pattern)
     ).limit(20))
     communities = db.scalars(select(Community).where(
+        Community.is_active.is_(True), Community.deleted_at.is_(None),
         Community.is_public.is_(True), func.lower(Community.name).like(pattern)
     ).limit(20))
     public_profiles = list(db.scalars(select(Profile).where(
@@ -70,6 +73,7 @@ def global_search(
             Membership.user_id == user.id,
             Membership.status == MembershipStatus.ACTIVE,
             Task.is_active.is_(True),
+            visible_content(Task),
             func.lower(Task.title).like(pattern),
         )
         .limit(20)

@@ -18,6 +18,7 @@ from src.models.badge import Badge, BadgeAward
 from src.models.community import (
     Community,
     Membership,
+    MembershipAccess,
     MembershipRole,
     MembershipStatus,
 )
@@ -48,6 +49,7 @@ from src.models.opportunity import (
 )
 from src.models.organization import Organization
 from src.models.payment import Payment, PaymentStatus
+from src.models.personal_archive import PersonalArchive
 from src.models.preference import NotificationPreference
 from src.models.rank import Rank, RankProgression, RankRequirement
 from src.models.scheduled_notification import ScheduledNotification, ScheduledNotificationStatus
@@ -100,6 +102,7 @@ __all__ = [
     "Leaderboard",
     "LocationType",
     "Membership",
+    "MembershipAccess",
     "MembershipRole",
     "MembershipStatus",
     "Milestone",
@@ -118,6 +121,7 @@ __all__ = [
     "PaymentStatus",
     "PeerConfirmation",
     "PeerConfirmationDecision",
+    "PersonalArchive",
     "PlatformRole",
     "PointRule",
     "Profile",

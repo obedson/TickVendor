@@ -70,6 +70,7 @@ def ticket_wallet(
         result.append(TicketWalletResponse.model_validate({
             **{key: getattr(ticket, key) for key in ("id", "public_id", "qr_token", "event_id", "ticket_type_id", "attendee_id", "order_id", "status", "used_at")},
             "event_title": event.title, "event_starts_at": event.starts_at,
+            "event_ends_at": event.ends_at,
             "venue_name": event.venue.name if event.venue else None,
             "venue_address": event.venue.address if event.venue else None,
             "ticket_type_name": ticket_type.name, "group": group,

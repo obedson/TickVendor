@@ -36,8 +36,10 @@ class OpportunityRegistrationStatus(str, enum.Enum):
 
 
 class ActivityOpportunity(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
+    is_suspended: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     __tablename__ = "activity_opportunities"
     __table_args__ = (
+        Index("ix_activity_opportunities_suspended", "is_suspended"),
         Index("ix_activity_opportunities_discovery", "status", "starts_at"),
         Index("ix_activity_opportunities_community_status", "community_id", "status"),
     )

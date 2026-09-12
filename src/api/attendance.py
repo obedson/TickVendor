@@ -40,10 +40,13 @@ from src.services.notification import audit
 router = APIRouter(prefix="/events/{event_id}/attendance", tags=["attendance"])
 
 
-def event_or_404(db: Session, event_id: UUID) -> Event:
+def event_or_404(db: Session, event_id: UUID, *, action: bool = True) -> Event:
+    from src.services.availability import require_available
     event = db.get(Event, event_id)
     if event is None:
         raise HTTPException(status_code=404, detail="Event not found")
+    if action:
+        require_available(db, event)
     return event
 
 
@@ -102,6 +105,7 @@ def qr_attendance(
     db: Annotated[Session, Depends(get_db)],
     user: Annotated[User, Depends(get_current_user)],
 ):
+    event_or_404(db, event_id)
     attendance = db.get(Attendance, payload.attendance_id)
     ticket = db.get(Ticket, payload.ticket_id)
     if attendance is None or attendance.event_id != event_id or ticket is None:
@@ -118,6 +122,7 @@ def organizer_attendance_review(
     db: Annotated[Session, Depends(get_db)],
     user: Annotated[User, Depends(get_current_user)],
 ):
+    event_or_404(db, event_id)
     attendance = db.get(Attendance, attendance_id)
     if attendance is None or attendance.event_id != event_id:
         raise HTTPException(status_code=404, detail="Attendance not found")
@@ -150,7 +155,7 @@ def list_review(
     user: Annotated[User, Depends(get_current_user)], participant_id: UUID | None = None,
     reason: str | None = None, review_status: AttendanceReviewStatus = AttendanceReviewStatus.OPEN,
 ):
-    event = event_or_404(db, event_id)
+    event = event_or_404(db, event_id, action=False)
     _require_review_access(db, event, user)
     query = select(Attendance).where(
         Attendance.event_id == event_id, Attendance.flagged_for_review.is_(True),
@@ -172,7 +177,7 @@ def attendance_roster(
     offset: int = Query(default=0, ge=0),
 ):
     """Return ticket holders and attendance-only participants for organizer operations."""
-    event = event_or_404(db, event_id)
+    event = event_or_404(db, event_id, action=False)
     _require_review_access(db, event, user)
     admission_statuses = [TicketStatus.PAID, TicketStatus.ACTIVE, TicketStatus.USED]
     participant_ids = select(Ticket.attendee_id).where(

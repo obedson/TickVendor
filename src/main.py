@@ -22,12 +22,14 @@ from src.api.communities import router as communities_router
 from src.api.community_management import router as community_management_router
 from src.api.contribution_configuration import router as contribution_configuration_router
 from src.api.events import router as events_router
+from src.api.governance import router as governance_router
 from src.api.leaderboard_configuration import router as leaderboard_configuration_router
 from src.api.leaderboards import router as leaderboards_router
 from src.api.notification_configuration import router as notification_configuration_router
 from src.api.notifications import router as notifications_router
 from src.api.opportunities import router as opportunities_router
 from src.api.payments import router as payments_router
+from src.api.personal_archive import router as personal_archive_router
 from src.api.profiles import router as profiles_router
 from src.api.search import router as search_router
 from src.api.tasks import router as tasks_router
@@ -55,6 +57,8 @@ def create_app() -> FastAPI:
     application.include_router(audit_router, prefix=settings.api_v1_prefix)
     application.include_router(category_router, prefix=settings.api_v1_prefix)
     application.include_router(platform_router, prefix=settings.api_v1_prefix)
+    application.include_router(governance_router, prefix=settings.api_v1_prefix)
+    application.include_router(personal_archive_router, prefix=settings.api_v1_prefix)
     application.include_router(attendance_router, prefix=settings.api_v1_prefix)
     application.include_router(attendance_configuration_router, prefix=settings.api_v1_prefix)
     application.include_router(contribution_configuration_router, prefix=settings.api_v1_prefix)

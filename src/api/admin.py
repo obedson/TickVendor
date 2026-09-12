@@ -17,7 +17,6 @@ from src.models import (
     Badge,
     BadgeAward,
     EventCategory,
-    Membership,
     MembershipRole,
     Milestone,
     MilestoneRequirement,
@@ -39,6 +38,7 @@ from src.schemas.admin import (
     RankUpdateInput,
 )
 from src.services.achievement import evaluate_condition
+from src.services.governance import manage_membership
 from src.services.notification import audit
 
 router = APIRouter(prefix="/admin/communities/{community_id}", tags=["admin"])
@@ -275,16 +275,8 @@ def update_membership_role(
     community_id: UUID, membership_id: UUID, payload: MembershipRoleUpdateInput,
     db: Annotated[Session, Depends(get_db)], user: Annotated[User, Depends(get_current_user)],
 ):
-    require_admin(db, community_id, user)
-    membership = db.get(Membership, membership_id)
-    if membership is None or membership.community_id != community_id:
-        raise HTTPException(status_code=404, detail="Membership not found")
-    if membership.user_id == user.id:
-        raise HTTPException(status_code=409, detail="Administrators cannot change their own role")
-    previous = membership.role.value; membership.role = MembershipRole(payload.role); db.commit()
-    audit(db, actor_id=user.id, community_id=community_id, action="user.role_changed",
-          target_type="membership", target_id=membership.id,
-          metadata={"user_id": str(membership.user_id), "from": previous, "to": payload.role})
+    membership = manage_membership(db, community_id, membership_id, user,
+                                   "role_changed", payload.reason, MembershipRole(payload.role))
     return {"id": str(membership.id), "role": membership.role.value}
 
 

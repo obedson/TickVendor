@@ -31,6 +31,7 @@ from src.models import (
     User,
 )
 from src.security import decode_access_token
+from src.services.availability import visible_content
 from src.services.recognition import (
     current_rank,
     next_rank,
@@ -69,6 +70,7 @@ def organizer_profile(user_id: UUID, db: Annotated[Session, Depends(get_db)]):
     if user is None or user.profile is None or user.profile.visibility == ProfileVisibility.PRIVATE:
         raise HTTPException(status_code=404, detail="Organizer not found")
     events = list(db.scalars(select(Event).where(
+        visible_content(Event), Event.deleted_at.is_(None),
         Event.organizer_id == user_id, Event.status == EventStatus.PUBLISHED
     ).order_by(Event.starts_at)))
     if not events:

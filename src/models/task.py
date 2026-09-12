@@ -50,8 +50,10 @@ class TaskAssignmentStatus(str, enum.Enum):
 
 
 class Task(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    is_suspended: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     __tablename__ = "tasks"
     __table_args__ = (
+        Index("ix_tasks_suspended", "is_suspended"),
         Index("ix_tasks_community_due", "community_id", "due_at"),
         Index("ix_tasks_search_title", "community_id", "is_active", "title"),
     )
