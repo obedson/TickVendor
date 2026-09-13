@@ -1,5 +1,9 @@
 import { useEffect, useState } from 'react';
 import './management.css';
+import { useDraftState } from './formRecovery';
+import { useRevealFocus, TaskDialog } from './RevealFocus';
+import { LearningBuilder, buildLearning, emptyLearning } from './LearningTask';
+import { GovernanceConfirm } from './GovernanceConfirm';
 import { EmptyState } from './AppShell';
 import { apiJson, ApiError, getLiveToken } from './api';
 
@@ -12,6 +16,8 @@ type Submission = {
   evidence_text?: string;
   evidence_url?: string;
   evidence_attachments: string[];
+  answers?: Record<string, unknown>;
+  assessment_result?: Record<string, unknown>;
 };
 
 type Task = {
@@ -28,11 +34,12 @@ type Task = {
   required_evidence_types: string[];
 };
 
-type Member = { id: string; user_id: string; username?: string; display_name?: string };
+type Member = { id: string; user_id: string; username?: string; display_name?: string; status?: string };
 
 const TASK_TYPES = [
   { value: 'general', label: 'General' },
   { value: 'video', label: 'Video / YouTube' },
+  { value: 'quiz', label: 'Quiz / Assessment' },
   { value: 'social_follow', label: 'Social Follow / Subscribe' },
   { value: 'survey', label: 'Survey' },
   { value: 'referral', label: 'Referral / Invite' },
@@ -50,7 +57,8 @@ const emptyTaskForm = {
   description: '',
   due_at: '',
   priority: 'normal',
-  impact_point_reward: '10',
+  impact_point_reward: '0',
+  learning: emptyLearning,
   verification_required: true,
   task_type: 'general',
   required_evidence_types: ['text'] as string[],
@@ -67,7 +75,7 @@ const emptyTaskForm = {
   instructions: '',
 };
 
-function buildTaskConfig(form: typeof emptyTaskForm): Record<string, string | number> {
+function buildTaskConfig(form: typeof emptyTaskForm): Record<string, unknown> {
   switch (form.task_type) {
     case 'video': return { ...(form.video_url && { video_url: form.video_url }), ...(form.platform && { platform: form.platform }) };
     case 'social_follow': return { ...(form.platform && { platform: form.platform }), ...(form.handle && { handle: form.handle }), ...(form.profile_url && { profile_url: form.profile_url }) };
@@ -91,7 +99,16 @@ export function OrganizerTaskQueue({ token, communityId }: { token: string; comm
   const [expanded, setExpanded] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
   const [rejectingId, setRejectingId] = useState<string | null>(null);
-  const [taskForm, setTaskForm] = useState(emptyTaskForm);
+  const draft = useDraftState(communityId ? `community:${communityId}:task-create` : '', emptyTaskForm);
+  const taskForm = draft.value; const setTaskForm = draft.set;
+  const [discard, setDiscard] = useState(false);
+  const [memberQuery, setMemberQuery] = useState('');
+  const [policy, setPolicy] = useState<{ community_points: number; platform_maximum: number | null; warning: string | null } | null>(null);
+  useRevealFocus(view === 'create' ? view : '', '[data-task-editor]');
+  useRevealFocus(expanded, `[data-task-reveal="${expanded}"]`);
+  useRevealFocus(rejectingId, `[data-task-rejection="${rejectingId}"]`);
+  useRevealFocus(error, '.management-screen [role="alert"]');
+  useEffect(() => { if (communityId) apiJson<any>(`communities/${communityId}/task-point-policy`, {}, token).then(setPolicy).catch(() => setPolicy(null)); }, [communityId, token, view]);
   const [savingTask, setSavingTask] = useState(false);
   const [assigningTask, setAssigningTask] = useState<Task | null>(null);
   const [assigneeId, setAssigneeId] = useState('');
@@ -120,11 +137,11 @@ export function OrganizerTaskQueue({ token, communityId }: { token: string; comm
     try {
       const id = await getCommunityId();
       const [t, m] = await Promise.all([
-        apiJson<Task[]>(`communities/${id}/tasks`, {}, liveToken()),
+        apiJson<Task[]>(`communities/${id}/tasks?management=true`, {}, liveToken()),
         apiJson<{ members: Member[] }>(`communities/${id}/members`, {}, liveToken()),
       ]);
       setTasks(t);
-      setMembers(m.members);
+      setMembers(m.members.filter(item => item.status === 'active'));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Unable to load tasks');
     } finally { setLoading(false); }
@@ -142,7 +159,7 @@ export function OrganizerTaskQueue({ token, communityId }: { token: string; comm
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ approve, ...(reason && { reason }) }),
       }, liveToken());
-      setMessage(approve ? 'Task verified and points awarded.' : 'Task submission rejected.');
+      setMessage(approve ? 'Task verified. The participant notification reports the actual award.' : 'Task submission rejected.');
       setExpanded(null);
       setRejectingId(null);
       setRejectReason('');
@@ -168,12 +185,12 @@ export function OrganizerTaskQueue({ token, communityId }: { token: string; comm
           impact_point_reward: Number(taskForm.impact_point_reward),
           verification_required: taskForm.verification_required,
           task_type: taskForm.task_type,
-          task_config: buildTaskConfig(taskForm),
+          task_config: { ...buildTaskConfig(taskForm), ...buildLearning(taskForm.task_type, taskForm.learning) },
           required_evidence_types: taskForm.required_evidence_types,
         }),
       }, liveToken());
       setMessage('Task created successfully.');
-      setTaskForm(emptyTaskForm);
+      await draft.clear();
       setView('tasks');
     } catch (cause) {
       setError(cause instanceof ApiError ? cause.message : 'Unable to create task');
@@ -266,7 +283,9 @@ export function OrganizerTaskQueue({ token, communityId }: { token: string; comm
                 </div>
 
                 {expanded === item.assignment_id && (
-                  <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--tv-border)' }}>
+                  <div data-task-reveal={item.assignment_id} style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--tv-border)' }}>
+                    {item.assessment_result && <p>Assessment: {Object.entries(item.assessment_result).map(([key, value]) => `${key}: ${String(value)}`).join(' · ')}</p>}
+                    {item.answers && <ul>{Object.entries(item.answers).map(([key, value]) => <li key={key}>{key}: {Array.isArray(value) ? value.join(', ') : String(value)}</li>)}</ul>}
                     {item.evidence_text ? (
                       <div style={{ background: 'var(--tv-surface-sunken)', borderRadius: 'var(--tv-radius-md)', padding: '1rem', fontSize: '.875rem', lineHeight: '1.6' }}>
                         {item.evidence_text}
@@ -294,9 +313,9 @@ export function OrganizerTaskQueue({ token, communityId }: { token: string; comm
 
                 {/* Reject with reason */}
                 {rejectingId === item.assignment_id && (
-                  <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--tv-border)' }}>
+                  <div data-task-rejection={item.assignment_id} style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--tv-border)' }}>
                     <label>
-                      <span className="label-text">Rejection reason (optional)</span>
+                      <span className="label-text">Participant-visible revision reason</span>
                       <textarea
                         value={rejectReason}
                         onChange={e => setRejectReason(e.target.value)}
@@ -362,17 +381,16 @@ export function OrganizerTaskQueue({ token, communityId }: { token: string; comm
 
           {/* Assign task modal */}
           {assigningTask && (
-            <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.5)', zIndex: 300, display: 'grid', placeItems: 'center', padding: '1rem' }}
-              onClick={() => setAssigningTask(null)}>
+            <TaskDialog title="Assign task" onClose={() => setAssigningTask(null)}>
               <div className="panel" style={{ width: 'min(100%, 32rem)' }} onClick={e => e.stopPropagation()}>
                 <h2 style={{ fontSize: '1.1rem', marginBottom: '1rem' }}>Assign: {assigningTask.title}</h2>
                 <label>
-                  <span className="label-text">Select member</span>
+                  <span className="label-text">Search members</span><input value={memberQuery} onChange={e => setMemberQuery(e.target.value)} /><span className="label-text">Select member</span>
                   <select value={assigneeId} onChange={e => setAssigneeId(e.target.value)}>
                     <option value="">Choose a member…</option>
-                    {members.map(m => (
+                    {members.filter(m => `${m.display_name || ''} ${m.username || ''} ${m.user_id}`.toLowerCase().includes(memberQuery.toLowerCase())).map(m => (
                       <option key={m.user_id} value={m.user_id}>
-                        {m.display_name || m.username || m.user_id.slice(0, 8)}
+                        {m.display_name || `Private member (${m.user_id})`}{m.username ? ` (@${m.username})` : ''}
                       </option>
                     ))}
                   </select>
@@ -382,15 +400,17 @@ export function OrganizerTaskQueue({ token, communityId }: { token: string; comm
                   <button className="secondary" onClick={() => setAssigningTask(null)}>Cancel</button>
                 </div>
               </div>
-            </div>
+            </TaskDialog>
           )}
         </>
       )}
 
       {/* ── Create task form ── */}
       {view === 'create' && (
-        <div className="panel">
+        <div className="panel" data-task-editor>
           <h2 style={{ fontSize: '1.1rem', marginBottom: '1.25rem' }}>Create new task</h2>
+          <p role="status">{draft.ready ? 'Unfinished work is autosaved privately on this browser.' : 'Loading draft…'}</p>{draft.error && <p role="alert">{draft.error}</p>}
+          <p>{policy ? `Community award: ${policy.community_points} points. Platform maximum: ${policy.platform_maximum ?? 'not configured'}. ${policy.warning || 'Actual reward cannot exceed the effective community rule.'}` : 'Point guidance unavailable. Use zero points or retry before promising a reward.'}</p>
           <form onSubmit={createTask} style={{ display: 'grid', gap: '1rem' }}>
             <label>
               <span className="label-text">Task title *</span>
@@ -412,6 +432,7 @@ export function OrganizerTaskQueue({ token, communityId }: { token: string; comm
               </select>
             </label>
 
+            <LearningBuilder kind={taskForm.task_type} data={taskForm.learning} onChange={learning => setTaskForm({ ...taskForm, learning })} />
             {/* Per-type config fields */}
             {taskForm.task_type === 'video' && (
               <div style={{ background: 'var(--tv-surface-sunken)', padding: '1rem', borderRadius: 'var(--tv-radius-md)', display: 'grid', gap: '.75rem' }}>
@@ -493,7 +514,7 @@ export function OrganizerTaskQueue({ token, communityId }: { token: string; comm
               </label>
               <label>
                 <span className="label-text">Impact Points reward</span>
-                <input type="number" min="0" max="10000" value={taskForm.impact_point_reward}
+                <input type="number" min="0" max={policy?.community_points ?? 0} value={taskForm.impact_point_reward}
                   onChange={e => setTaskForm({ ...taskForm, impact_point_reward: e.target.value })} />
               </label>
               <label>
@@ -526,16 +547,17 @@ export function OrganizerTaskQueue({ token, communityId }: { token: string; comm
             </label>
 
             <div className="form-actions">
-              <button type="submit" className="accent" disabled={savingTask}>
+              <button type="submit" className="accent" disabled={savingTask || !draft.ready}>
                 {savingTask ? 'Creating…' : 'Create task'}
               </button>
-              <button type="button" className="secondary" onClick={() => { setView('tasks'); setTaskForm(emptyTaskForm); }}>
+              <button type="button" className="secondary" onClick={() => setDiscard(true)}>
                 Cancel
               </button>
             </div>
           </form>
         </div>
       )}
+      {discard && <GovernanceConfirm title="Discard task draft?" consequence="This removes your saved unfinished task." requireReason={false} onClose={() => setDiscard(false)} onConfirm={async () => { await draft.clear(); setView('tasks'); }} />}
     </div>
   );
 }

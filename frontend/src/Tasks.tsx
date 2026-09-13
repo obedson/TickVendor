@@ -1,9 +1,13 @@
 import { useEffect, useState } from 'react';
 import { apiJson, ApiError, getLiveToken } from './api';
+import { useDraftState } from './formRecovery';
+import { TaskDialog, useRevealFocus } from './RevealFocus';
+import { LearningAnswers, type LearningConfig } from './LearningTask';
+import { GovernanceConfirm } from './GovernanceConfirm';
 import { EmptyState } from './AppShell';
 import { PersonalHistory, usePersonalArchive } from './PersonalHistory';
 
-type TaskConfig = {
+type TaskConfig = LearningConfig & {
   video_url?: string;
   platform?: string;
   handle?: string;
@@ -19,6 +23,7 @@ type TaskConfig = {
 type Task = {
   id: string;
   title: string;
+  community_id: string;
   description: string;
   due_at?: string | null;
   priority: string;
@@ -30,7 +35,7 @@ type Task = {
   task_config?: TaskConfig;
   required_evidence_types?: string[];
 };
-type Assignment = { id: string; task_id: string; status: string; due_at?: string | null };
+type Assignment = { assessment_result?: { passed?: boolean; score?: number; attempt?: number; attempts_remaining?: number }; id: string; task_id: string; status: string; due_at?: string | null };
 
 const PRIORITY_COLORS: Record<string, string> = {
   high: 'chip-red',
@@ -50,12 +55,16 @@ export function Tasks({ token, communityId }: { token: string; communityId?: str
   const [tasks, setTasks] = useState<Task[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [selected, setSelected] = useState<Task | null>(null);
-  const [evidence, setEvidence] = useState('');
-  const [evidenceUrl, setEvidenceUrl] = useState('');
-  const [evidenceAttachments, setEvidenceAttachments] = useState<string[]>(['']);
+  const draft = useDraftState(selected ? `community:${selected.community_id}:task:${selected.id}:evidence` : '', { evidence: '', url: '', attachments: [''], answers: {} as Record<string, any>, requestKey: '' });
+  const evidence = draft.value.evidence; const evidenceUrl = draft.value.url; const evidenceAttachments = draft.value.attachments;
+  const setEvidence = (evidence: string) => draft.set(value => ({ ...value, evidence, requestKey: '' }));
+  const setEvidenceUrl = (url: string) => draft.set(value => ({ ...value, url, requestKey: '' }));
+  const setEvidenceAttachments = (attachments: string[]) => draft.set(value => ({ ...value, attachments, requestKey: '' }));
+  const [discardDraft, setDiscardDraft] = useState(false);
   const [urlError, setUrlError] = useState('');
   const [statusMsg, setStatusMsg] = useState('');
   const [error, setError] = useState('');
+  useRevealFocus(error, 'dialog[open] [role="alert"]');
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [noCommunity, setNoCommunity] = useState(false);
@@ -118,20 +127,25 @@ export function Tasks({ token, communityId }: { token: string; communityId?: str
     setBusy(true);
     setError('');
     try {
-      await apiJson<unknown>(`task-assignments/${assignment.id}/submissions`, {
+      const requestKey = draft.value.requestKey || crypto.randomUUID();
+      draft.set(value => ({ ...value, requestKey }));
+      await draft.flush();
+      const result = await apiJson<{ assessment_result?: { passed?: boolean; score?: number; attempts_remaining?: number } }>(`task-assignments/${assignment.id}/submissions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          answers: draft.value.answers,
+          idempotency_key: requestKey,
           evidence_text: evidence.trim() || null,
           evidence_url: evidenceUrl.trim() || null,
           evidence_attachments: validAttachments,
         }),
       }, liveToken());
-      setStatusMsg(selected.verification_required ? 'Submitted for verification.' : 'Task completed!');
+      if (result.assessment_result?.passed === false) { setError(`Assessment score: ${result.assessment_result.score}%. Attempts remaining: ${result.assessment_result.attempts_remaining}. Review and try again.`); draft.set(value => ({ ...value, requestKey: '' })); return; }
+      await draft.clear();
+      setStatusMsg(`${selected.verification_required ? 'Submitted for verification.' : 'Task completed!'}${result.assessment_result?.score !== undefined ? ` Assessment passed: ${result.assessment_result.score}%.` : ''}`);
       setSelected(null);
-      setEvidence('');
-      setEvidenceUrl('');
-      setEvidenceAttachments(['']);
+
       load();
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Unable to submit task');
@@ -244,6 +258,7 @@ export function Tasks({ token, communityId }: { token: string; communityId?: str
                   <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
                     <span className={`chip ${STATUS_COLORS[status] || 'chip-default'}`}>{status}</span>
                     <span className="chip chip-teal">+{task.impact_point_reward} pts</span>
+                    {assignment?.assessment_result?.passed !== undefined && <p>Last assessment: {assignment.assessment_result.passed ? 'passed' : 'not passed'}{assignment.assessment_result.score !== undefined ? ` (${assignment.assessment_result.score}%)` : ''}. Attempt {assignment.assessment_result.attempt}.{assignment.assessment_result.attempts_remaining !== undefined ? ` ${assignment.assessment_result.attempts_remaining} attempts remaining.` : ''}</p>}
                     {task.task_type && task.task_type !== 'general' && (
                       <span className="chip chip-default">{taskTypeLabel[task.task_type] || task.task_type}</span>
                     )}
@@ -259,9 +274,7 @@ export function Tasks({ token, communityId }: { token: string; communityId?: str
                       className="secondary sm"
                       onClick={() => {
                         setSelected(task);
-                        setEvidence('');
-                        setEvidenceUrl('');
-                        setEvidenceAttachments(['']);
+
                         setError('');
                         setUrlError('');
                       }}
@@ -284,15 +297,12 @@ export function Tasks({ token, communityId }: { token: string; communityId?: str
         const needsText = required.includes('text');
         const needsUrl = required.includes('url');
         const needsAttachment = required.includes('attachment');
-        const canSubmit = !busy &&
+        const canSubmit = !busy && draft.ready &&
           (!needsText || evidence.trim()) &&
           (!needsUrl || evidenceUrl.trim()) &&
           (!needsAttachment || evidenceAttachments.some(a => a.trim()));
         return (
-          <div
-            style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.5)', zIndex: 300, display: 'grid', placeItems: 'center', padding: '1rem' }}
-            onClick={() => { setSelected(null); setError(''); }}
-          >
+          <TaskDialog title="Submit task evidence" onClose={() => { if (!busy) { setSelected(null); setError(''); } }}>
             <div
               className="panel"
               style={{ width: 'min(100%, 40rem)', maxHeight: '90vh', overflow: 'auto' }}
@@ -346,6 +356,8 @@ export function Tasks({ token, communityId }: { token: string; communityId?: str
 
               {error && <p role="alert" className="error" style={{ marginBottom: '1rem' }}>{error}</p>}
 
+              <p role="status">{draft.ready ? 'Draft autosaves privately on this browser. Closing keeps it for recovery.' : 'Recovering draft…'}</p>{draft.error && <p role="alert">{draft.error}</p>}
+              {(config.assessment || config.checkpoints) && <LearningAnswers config={config} answers={draft.value.answers} onChange={answers => draft.set(value => ({ ...value, answers, requestKey: '' }))} />}
               {/* Text evidence */}
               <label>
                 <span className="label-text">
@@ -431,12 +443,14 @@ export function Tasks({ token, communityId }: { token: string; communityId?: str
                 >
                   {busy ? 'Submitting…' : 'Submit task'}
                 </button>
-                <button className="secondary" onClick={() => { setSelected(null); setError(''); }}>Cancel</button>
+                <button className="secondary" onClick={() => { setSelected(null); setError(''); }}>Close and keep draft</button>
+                <button className="secondary" disabled={busy} onClick={() => setDiscardDraft(true)}>Discard draft</button>
               </div>
             </div>
-          </div>
+          </TaskDialog>
         );
       })()}
+      {discardDraft && <GovernanceConfirm title="Discard evidence draft?" consequence="Your unsent answers and evidence will be removed from this browser." requireReason={false} onClose={() => setDiscardDraft(false)} onConfirm={async () => { await draft.clear(); setDiscardDraft(false); setSelected(null); }} />}
     </div>
   );
 }

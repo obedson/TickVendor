@@ -1,3 +1,4 @@
+import { useRevealFocus } from './RevealFocus';
 import { useEffect, useState } from 'react';
 import './management.css';
 import { OrganizerAttendanceConfig } from './OrganizerAttendanceConfig';
@@ -65,6 +66,8 @@ export function OrganizerEvents({ token, communityId }: { token: string; communi
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  useRevealFocus(showForm, '[data-event-editor]');
+  useRevealFocus(error, '.management-screen [role="alert"]');
   const [message, setMessage] = useState('');
 
   const liveToken = () => getLiveToken() ?? token;
@@ -252,7 +255,7 @@ setForm({
       {showForm && (
         <div className="panel" style={{ marginBottom: '1.5rem' }}>
           <h2 style={{ fontSize: '1.1rem', marginBottom: '1.25rem' }}>{editing ? `Edit: ${editing.title}` : 'Create new event'}</h2>
-          <form onSubmit={editing ? update : create}>
+          <form data-event-editor onSubmit={editing ? update : create}>
             <label>
               <span className="label-text">Event title</span>
               <input required minLength={3} value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} placeholder="e.g. Community Volunteer Day" />

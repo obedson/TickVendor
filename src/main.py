@@ -30,6 +30,7 @@ from src.api.notifications import router as notifications_router
 from src.api.opportunities import router as opportunities_router
 from src.api.payments import router as payments_router
 from src.api.personal_archive import router as personal_archive_router
+from src.api.point_ceilings import router as point_ceilings_router
 from src.api.profiles import router as profiles_router
 from src.api.search import router as search_router
 from src.api.tasks import router as tasks_router
@@ -59,6 +60,7 @@ def create_app() -> FastAPI:
     application.include_router(platform_router, prefix=settings.api_v1_prefix)
     application.include_router(governance_router, prefix=settings.api_v1_prefix)
     application.include_router(personal_archive_router, prefix=settings.api_v1_prefix)
+    application.include_router(point_ceilings_router, prefix=settings.api_v1_prefix)
     application.include_router(attendance_router, prefix=settings.api_v1_prefix)
     application.include_router(attendance_configuration_router, prefix=settings.api_v1_prefix)
     application.include_router(contribution_configuration_router, prefix=settings.api_v1_prefix)

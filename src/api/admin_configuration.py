@@ -15,12 +15,13 @@ from src.database import get_db
 from src.models import MembershipRole, PointRule, User
 from src.services.admin import adjust_points
 from src.services.notification import audit
+from src.services.point_policy import ceiling
 
 router = APIRouter(prefix="/admin/communities/{community_id}", tags=["admin"])
 
 
 class PointRuleInput(BaseModel):
-    source_type: str = Field(min_length=2, max_length=64)
+    source_type: str = Field(pattern=r"^[a-z][a-z0-9_]{1,63}$")
     points: int = Field(ge=-100000, le=100000)
     max_awards_per_user: int | None = Field(default=None, ge=1)
     is_active: bool = True
@@ -50,9 +51,20 @@ def list_point_rules(community_id: UUID, db: Annotated[Session, Depends(get_db)]
 def upsert_point_rule(community_id: UUID, payload: PointRuleInput, db: Annotated[Session, Depends(get_db)], user: Annotated[User, Depends(get_current_user)]):
     require_community_role(db, community_id, user, MembershipRole.ADMIN)
     rule = db.scalar(select(PointRule).where(PointRule.community_id == community_id, PointRule.source_type == payload.source_type))
+    maximum = ceiling(db, payload.source_type)
+    if payload.points < 0 or maximum is not None and payload.points > maximum:
+        raise HTTPException(422, "Community award must be nonnegative and within the platform maximum")
+    if maximum is None and payload.points > 0:
+        raise HTTPException(422, "Platform maximum is not configured for this source; ask a Super Admin first")
+    previous = {"points": rule.points, "is_active": rule.is_active} if rule else None
     if rule is None: rule = PointRule(community_id=community_id, source_type=payload.source_type); db.add(rule)
     for field, value in payload.model_dump().items(): setattr(rule, field, value)
-    db.flush(); audit(db, actor_id=user.id, community_id=community_id, action="point_rule.updated", target_type="point_rule", target_id=rule.id, metadata={"source_type": rule.source_type}, commit=False)
+    try:
+        db.flush()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(409, "Point rule conflict; reload and retry") from exc
+    audit(db, actor_id=user.id, community_id=community_id, action="point_rule.updated", target_type="point_rule", target_id=rule.id, metadata={"source_type": rule.source_type, "previous": previous, "result": payload.model_dump()}, commit=False)
     try: db.commit()
     except IntegrityError as exc: db.rollback(); raise HTTPException(status_code=409, detail="Point rule conflict") from exc
     return {"id": str(rule.id), "source_type": rule.source_type, "points": rule.points, "is_active": rule.is_active}

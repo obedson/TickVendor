@@ -2,9 +2,10 @@ import { useEffect, useState } from 'react';
 import './management.css';
 import { apiJson, ApiError, getLiveToken } from './api';
 
-type Rule = { id: string; source_type: string; points: number; max_awards_per_user?: number; is_active: boolean };
+type Rule = { id: string; source_type: string; points: number; max_awards_per_user?: number; is_active: boolean; community_id?: string | null };
 
 export function AdminPointRules({ token, communityId }: { token: string; communityId?: string }) {
+  const [caps, setCaps] = useState<{ source_type: string; maximum_points: number }[]>([]);
   const [rules, setRules] = useState<Rule[]>([]);
   const [community, setCommunity] = useState(communityId);
   const [source, setSource] = useState('task_completion');
@@ -13,6 +14,7 @@ export function AdminPointRules({ token, communityId }: { token: string; communi
   const [message, setMessage] = useState('');
   const liveToken = () => getLiveToken() ?? token;
 
+  useEffect(() => { apiJson<typeof caps>('point-ceilings', {}, token).then(setCaps).catch(() => setError('Unable to load platform ceilings.')); }, [token]);
   const load = async (id = community) => {
     if (!id) return;
     try {
@@ -62,8 +64,8 @@ export function AdminPointRules({ token, communityId }: { token: string; communi
           </select>
         </label>
         <label>
-          <span className="label-text">Points</span>
-          <input required type="number" min="0" value={points} onChange={e => setPoints(e.target.value)} />
+          <span className="label-text">Community award points</span><small>Platform maximum: {caps.find(c => c.source_type === source)?.maximum_points ?? 'not configured'}. Saving updates the one community rule for this source; history is audited.</small>
+          <input required type="number" min="0" max={caps.find(c => c.source_type === source)?.maximum_points} value={points} onChange={e => setPoints(e.target.value)} />
         </label>
         <div className="form-actions">
           <button type="submit" className="accent">Save point rule</button>
@@ -72,7 +74,7 @@ export function AdminPointRules({ token, communityId }: { token: string; communi
       <div className="stack">
         {rules.map(rule => (
           <article className="card" key={rule.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <strong>{rule.source_type.replace(/_/g, ' ')}</strong>
+            <strong>{rule.source_type.replace(/_/g, ' ')} — {rule.community_id ? 'Community rule' : 'Platform fallback'}</strong>
             <span>{rule.points} points · <span className={`chip ${rule.is_active ? 'chip-green' : 'chip-default'}`}>{rule.is_active ? 'Active' : 'Disabled'}</span></span>
           </article>
         ))}

@@ -7,13 +7,15 @@ from uuid import UUID
 from pydantic import BaseModel, Field, HttpUrl, field_validator
 
 from src.models import TaskPriority, TaskType
+from src.services.task_assessment import validate_config
 
 # Per-type config keys that are allowed for each task kind.
 _TASK_TYPE_CONFIG_KEYS: dict[str, set[str]] = {
     TaskType.GENERAL: set(),
-    TaskType.VIDEO: {"video_url", "platform"},
+    TaskType.VIDEO: {"video_url", "platform", "checkpoints"},
+    TaskType.QUIZ: {"assessment"},
     TaskType.SOCIAL_FOLLOW: {"platform", "handle", "profile_url"},
-    TaskType.SURVEY: {"survey_url", "survey_title"},
+    TaskType.SURVEY: {"survey_url", "survey_title", "assessment"},
     TaskType.REFERRAL: {"referral_target", "min_referrals"},
     TaskType.PHYSICAL: {"location", "instructions"},
 }
@@ -29,7 +31,7 @@ class TaskCreateInput(BaseModel):
     verification_required: bool = True
     attachments: list[HttpUrl] = Field(default_factory=list, max_length=10)
     task_type: TaskType = TaskType.GENERAL
-    task_config: dict[str, Any] = Field(default_factory=dict)
+    task_config: dict[str, Any] = Field(default_factory=dict, validate_default=True)
     required_evidence_types: list[str] = Field(default_factory=lambda: ["text"])
 
     @field_validator("task_config")
@@ -40,7 +42,7 @@ class TaskCreateInput(BaseModel):
         unknown = set(v.keys()) - allowed
         if unknown:
             raise ValueError(f"Unknown config keys for task type '{task_type}': {unknown}")
-        return v
+        return validate_config(task_type, v)
 
     @field_validator("required_evidence_types")
     @classmethod
@@ -57,6 +59,8 @@ class AssignmentInput(BaseModel):
 
 
 class SubmissionInput(BaseModel):
+    answers: dict[str, Any] = Field(default_factory=dict, max_length=30)
+    idempotency_key: str | None = Field(default=None, min_length=16, max_length=160)
     evidence_text: str | None = Field(default=None, max_length=10000)
     evidence_url: HttpUrl | None = None
     evidence_attachments: list[HttpUrl] = Field(default_factory=list, max_length=10)
@@ -64,6 +68,7 @@ class SubmissionInput(BaseModel):
 
 class VerificationInput(BaseModel):
     approve: bool
+    reason: str | None = Field(default=None, max_length=1000)
 
 
 class TaskResponse(BaseModel):
@@ -85,6 +90,7 @@ class TaskResponse(BaseModel):
 
 
 class TaskAssignmentResponse(BaseModel):
+    assessment_result: dict[str, Any] = Field(default_factory=dict)
     id: UUID
     task_id: UUID
     assignee_id: UUID

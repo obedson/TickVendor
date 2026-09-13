@@ -2,6 +2,8 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { apiJson, getLiveToken } from './api';
 import { GovernanceConfirm } from './GovernanceConfirm';
 import './management.css';
+import { PlatformPointCeilings } from './PlatformPointCeilings';
+import { useRevealFocus } from './RevealFocus';
 
 type Kind = 'user' | 'community' | 'event' | 'opportunity' | 'task';
 type Membership = { membership_id: string; id: string; name: string; community_name: string; role: string; status: string };
@@ -29,6 +31,7 @@ export function PlatformGovernance({ token, userRole, categories }: { token: str
   const [assignee, setAssignee] = useState('');
   const [selected, setSelected] = useState<Item | null>(null);
   const [historyTarget, setHistoryTarget] = useState('');
+  useRevealFocus(selected, '[data-governance-inspection]');
   const [history, setHistory] = useState<History[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -73,9 +76,10 @@ export function PlatformGovernance({ token, userRole, categories }: { token: str
   const changeSection = (next: string) => { setSection(next); setSelected(null); setItems([]); setOffset(0); setQ(''); setError(''); setMessage(''); setStatus(''); setSuspended(''); setHistoryTarget(''); setAfter(''); setBefore(''); setCommunity(''); setCreator(''); };
   if (userRole !== 'super_admin') return <p role="alert">Super Admin access required.</p>;
   return <section className="management-screen"><div className="page-header"><div><p className="eyebrow">Platform</p><h1>Platform Administration</h1></div></div>
-    <nav className="section-tabs" aria-label="Platform administration sections">{[['overview', 'Overview'], ['users', 'Users'], ['communities', 'Communities'], ['content', 'Content Moderation'], ['categories', 'Categories'], ['history', 'Moderation History']].map(([id, label]) => <button key={id} aria-pressed={section === id} className="secondary" onClick={() => changeSection(id)}>{label}</button>)}</nav>
+    <nav className="section-tabs" aria-label="Platform administration sections">{[['overview', 'Overview'], ['users', 'Users'], ['communities', 'Communities'], ['content', 'Content Moderation'], ['ceilings', 'Point Ceilings'], ['categories', 'Categories'], ['history', 'Moderation History']].map(([id, label]) => <button key={id} aria-pressed={section === id} className="secondary" onClick={() => changeSection(id)}>{label}</button>)}</nav>
     {error && <p className="error" role="alert">{error}</p>}{message && <p role="status">{message}</p>}
     {section === 'overview' && <div className="panel"><h2>Governance and oversight</h2><p>Assign community administrators, manage membership authority and apply reversible policy suspensions. Every governance change records a reason and history. Financial and participation evidence is retained.</p></div>}
+    {section === 'ceilings' && <PlatformPointCeilings token={token} />}
     {section === 'categories' && categories}
     {['users', 'communities', 'content'].includes(section) && <>
       <form className="panel" onSubmit={event => { event.preventDefault(); if (offset) setOffset(0); else void load(); }}>
@@ -86,7 +90,7 @@ export function PlatformGovernance({ token, userRole, categories }: { token: str
         <div className="form-row"><label>Created after<input type="date" value={after} onChange={event => setAfter(event.target.value)} /></label><label>Created before<input type="date" value={before} onChange={event => setBefore(event.target.value)} /></label></div><button disabled={loading}>Search</button>
       </form>
       {loading ? <p role="status">Loading…</p> : <div className="definition-list">{items.map(item => <article key={item.id} className="definition-card"><div><h2>{item.name}</h2><p>{item.email || item.community_name} {item.owner ? `· ${item.owner.name}` : ''}</p><span className="chip">{item.suspended ? 'Suspended' : 'Not suspended'}</span>{item.status && <span className="chip">{item.status}</span>}</div><button className="secondary" onClick={() => void inspect(item)}>Inspect {item.name}</button></article>)}{!items.length && <p>No matching records.</p>}</div>}
-      {selected && <section className="panel"><h2>{selected.name}</h2><p>{selected.description}</p>{selected.email && <p>{selected.email} · @{selected.username} · {selected.role} · Email {selected.is_email_verified ? 'verified' : 'unverified'}</p>}
+      {selected && <section className="panel" data-governance-inspection><h2>{selected.name}</h2><p>{selected.description}</p>{selected.email && <p>{selected.email} · @{selected.username} · {selected.role} · Email {selected.is_email_verified ? 'verified' : 'unverified'}</p>}
         {currentKind === 'community' && <p>{selected.is_public ? 'Public' : 'Private'} · {selected.membership_access?.replaceAll('_', ' ')} · {selected.member_count} active members</p>}
         {!(currentKind === 'user' && selected.role === 'super_admin') && <button className="secondary" onClick={() => setPending({ title: `${selected.suspended ? 'Restore' : 'Suspend'} ${selected.name}`, consequence: 'Suspension blocks ordinary access or content use. Existing records remain; restoration is reversible.', path: `${base}/${currentKind}/${selected.id}/moderation`, body: { suspended: !selected.suspended } })}>{selected.suspended ? 'Restore' : 'Suspend'}</button>}
         {selected.memberships && <><h3>Memberships and administrators</h3>{currentKind === 'community' && <p>{selected.active_admin_count} active Community Admins. Removing the final Admin leaves membership approvals and configuration under Super Admin oversight until another Admin is assigned.</p>}<div className="definition-list">{selected.memberships.map(member => <article className="definition-card" key={member.membership_id}><div><strong>{currentKind === 'user' ? member.community_name : member.name}</strong><p>{member.role} · {member.status}</p></div>{currentKind === 'community' && ['active', 'suspended'].includes(member.status) && <div className="form-actions">{(['member', 'organizer', 'admin'] as const).filter(role => role !== member.role).map(role => <button key={role} className="secondary" onClick={() => setPending({ title: `Change ${member.name} to ${role}`, consequence: 'This changes community authority, not the platform role.', path: `${base}/community/${selected.id}/memberships/${member.membership_id}`, method: 'PATCH', body: { action: 'role_changed', role } })}>Make {role}</button>)}<button className="secondary" onClick={() => setPending({ title: `Change membership access for ${member.name}`, consequence: 'History remains; suspended memberships cannot use community authority.', path: `${base}/community/${selected.id}/memberships/${member.membership_id}`, method: 'PATCH', body: { action: member.status === 'active' ? 'deactivated' : 'activated' } })}>{member.status === 'active' ? 'Deactivate' : 'Activate'}</button></div>}</article>)}</div><div className="form-actions"><button className="secondary" disabled={!selected.membership_offset} onClick={() => void inspect(selected, Math.max(0, (selected.membership_offset || 0) - 50))}>Previous memberships</button><button className="secondary" disabled={!selected.memberships_has_more} onClick={() => void inspect(selected, (selected.membership_offset || 0) + 50)}>Next memberships</button></div></>}

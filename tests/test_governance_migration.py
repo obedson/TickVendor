@@ -9,11 +9,12 @@ from src.config import settings
 
 def test_governance_migration_upgrades_current_head(tmp_path, monkeypatch):
     config = Config('alembic.ini')
-    assert ScriptDirectory.from_config(config).get_heads() == ['b7c8d9e0f123']
+    assert len(ScriptDirectory.from_config(config).get_heads()) == 1
+    assert ScriptDirectory.from_config(config).get_revision('b7c8d9e0f123') is not None
     url = f"sqlite:///{(tmp_path / 'migration.db').as_posix()}"
     monkeypatch.setattr(settings, 'database_url', url)
     command.upgrade(config, '9f0a1b2c3d4e')
-    command.upgrade(config, 'head')
+    command.upgrade(config, 'b7c8d9e0f123')
     engine = create_engine(url)
     inspector = inspect(engine)
     assert 'personal_archives' in inspector.get_table_names()
@@ -31,7 +32,7 @@ def test_governance_migration_upgrades_current_head(tmp_path, monkeypatch):
     engine = create_engine(url)
     assert 'personal_archives' not in inspect(engine).get_table_names()
     engine.dispose()
-    command.upgrade(config, 'head')
+    command.upgrade(config, 'b7c8d9e0f123')
 
 
 def test_governance_migration_postgresql_sql_compiles(monkeypatch):

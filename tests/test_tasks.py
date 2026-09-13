@@ -14,6 +14,7 @@ from src.models import (
     Membership,
     MembershipRole,
     Notification,
+    PointCeiling,
     PointRule,
     TaskAssignmentStatus,
     User,
@@ -36,6 +37,7 @@ def _submitted_task(db):
         Membership(community_id=community.id, user_id=organizer.id, role=MembershipRole.ORGANIZER),
         Membership(community_id=community.id, user_id=member.id, role=MembershipRole.MEMBER),
         PointRule(source_type="task_completion", points=20),
+        PointCeiling(source_type="task_completion", maximum_points=20),
     ])
     db.commit()
     task = create_task(db, community.id, organizer, title="Atomic task", description="Complete atomically",
@@ -58,6 +60,7 @@ def test_verified_task_awards_points_once(tmp_path):
             Membership(community_id=community.id, user_id=organizer.id, role=MembershipRole.ORGANIZER),
             Membership(community_id=community.id, user_id=member.id, role=MembershipRole.MEMBER),
             PointRule(source_type="task_completion", points=20),
+        PointCeiling(source_type="task_completion", maximum_points=20),
         ])
         db.commit()
         task = create_task(db, community.id, organizer, title="Do work", description="Complete work",

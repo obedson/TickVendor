@@ -12,6 +12,8 @@ from src.authorization import require_community_role
 from src.database import get_db
 from src.models import (
     MembershipRole,
+    Profile,
+    ProfileVisibility,
     Task,
     TaskAssignment,
     TaskAssignmentStatus,
@@ -26,6 +28,7 @@ from src.schemas.task import (
     TaskResponse,
     VerificationInput,
 )
+from src.services.point_policy import effective_task_points, task_policy
 from src.services.task import (
     assign_task,
     create_task,
@@ -33,6 +36,7 @@ from src.services.task import (
     transition_assignment,
     verify_task,
 )
+from src.services.task_assessment import participant_config
 
 router = APIRouter(tags=["tasks"])
 
@@ -40,26 +44,33 @@ router = APIRouter(tags=["tasks"])
 @router.get("/communities/{community_id}/task-verification-queue")
 def verification_queue(community_id: UUID, db: Annotated[Session, Depends(get_db)], user: Annotated[User, Depends(get_current_user)]):
     require_community_role(db, community_id, user, MembershipRole.ORGANIZER)
-    rows = db.execute(select(TaskAssignment, Task, TaskSubmission).join(Task, Task.id == TaskAssignment.task_id)
+    latest = select(TaskSubmission.id).where(TaskSubmission.assignment_id == TaskAssignment.id).order_by(TaskSubmission.submitted_at.desc(), TaskSubmission.id).limit(1).correlate(TaskAssignment).scalar_subquery()
+    rows = db.execute(select(TaskAssignment, Task, TaskSubmission, Profile).join(Task, Task.id == TaskAssignment.task_id)
                       .join(TaskSubmission, TaskSubmission.assignment_id == TaskAssignment.id)
-                      .where(Task.community_id == community_id, TaskAssignment.status == TaskAssignmentStatus.SUBMITTED)
+                      .outerjoin(Profile, Profile.user_id == TaskAssignment.assignee_id)
+                      .where(Task.community_id == community_id, TaskAssignment.status == TaskAssignmentStatus.SUBMITTED, TaskSubmission.id == latest)
                       .order_by(TaskSubmission.submitted_at, TaskAssignment.id))
     return [{"assignment_id": str(assignment.id), "task_id": str(task.id), "task_title": task.title,
              "assignee_id": str(assignment.assignee_id), "submitted_at": submission.submitted_at,
              "evidence_text": submission.evidence_text, "evidence_url": submission.evidence_url,
-             "evidence_attachments": submission.evidence_attachments} for assignment, task, submission in rows]
+             "evidence_attachments": submission.evidence_attachments, "answers": submission.answers,
+             "assessment_result": submission.assessment_result,
+             "assignee_name": (f"Private member ({assignment.assignee_id})" if profile.visibility == ProfileVisibility.PRIVATE else f"{profile.display_name} (@{profile.username})") if profile else "Community member"} for assignment, task, submission, profile in rows]
 
 
 @router.get("/communities/{community_id}/tasks", response_model=list[TaskResponse])
 def list_tasks(community_id: UUID, db: Annotated[Session, Depends(get_db)],
-               user: Annotated[User, Depends(get_current_user)], status_filter: TaskAssignmentStatus | None = None):
+               user: Annotated[User, Depends(get_current_user)], status_filter: TaskAssignmentStatus | None = None, management: bool = False):
     from src.authorization import require_community_role
     require_community_role(db, community_id, user)
+    if management:
+        require_community_role(db, community_id, user, MembershipRole.ORGANIZER)
     query = select(Task).where(Task.community_id == community_id, Task.is_active.is_(True))
     from src.services.availability import visible_content
     query = query.where(visible_content(Task))
     if status_filter:
         query = query.where(Task.id.in_(select(TaskAssignment.task_id).where(TaskAssignment.status == status_filter)))
+    policy = task_policy(db, community_id)
     return [
         {
             **{field: getattr(task, field) for field in (
@@ -68,6 +79,8 @@ def list_tasks(community_id: UUID, db: Annotated[Session, Depends(get_db)],
                 "verification_required", "attachments", "task_type", "task_config",
                 "required_evidence_types",
             )},
+            "task_config": task.task_config if management else participant_config(task.task_config),
+            "impact_point_reward": effective_task_points(db, task, policy),
             "status": "active",
         }
         for task in db.scalars(query.order_by(Task.due_at))
@@ -76,28 +89,34 @@ def list_tasks(community_id: UUID, db: Annotated[Session, Depends(get_db)],
 
 @router.get("/task-assignments/me", response_model=list[TaskAssignmentResponse])
 def my_assignments(db: Annotated[Session, Depends(get_db)], user: Annotated[User, Depends(get_current_user)]):
+    latest = select(TaskSubmission.id).where(TaskSubmission.assignment_id == TaskAssignment.id).order_by(TaskSubmission.submitted_at.desc(), TaskSubmission.id).limit(1).correlate(TaskAssignment).scalar_subquery()
     rows = db.execute(
-        select(TaskAssignment, Task)
+        select(TaskAssignment, Task, TaskSubmission)
         .join(Task, Task.id == TaskAssignment.task_id)
+        .outerjoin(TaskSubmission, TaskSubmission.id == latest)
         .where(TaskAssignment.assignee_id == user.id)
         .order_by(TaskAssignment.created_at)
     )
     return [
         {"id": assignment.id, "task_id": task.id, "assignee_id": assignment.assignee_id,
-         "status": assignment.status.value, "due_at": task.due_at}
-        for assignment, task in rows
+         "status": assignment.status.value, "due_at": task.due_at,
+         "assessment_result": submission.assessment_result if submission else {}}
+        for assignment, task, submission in rows
     ]
 
 
 @router.get("/task-assignments/me/details")
 def my_assignment_details(db: Annotated[Session, Depends(get_db)], user: Annotated[User, Depends(get_current_user)]):
     rows = db.execute(select(TaskAssignment, Task).join(Task, Task.id == TaskAssignment.task_id)
-                      .where(TaskAssignment.assignee_id == user.id).order_by(TaskAssignment.created_at))
+                      .where(TaskAssignment.assignee_id == user.id).order_by(TaskAssignment.created_at)).all()
+    policies = {task.community_id: None for _, task in rows}
+    for community_id in policies:
+        policies[community_id] = task_policy(db, community_id)
     return [{"id": str(assignment.id), "task_id": str(task.id), "title": task.title,
              "description": task.description, "due_at": task.due_at,
              "status": assignment.status.value, "verification_required": task.verification_required,
-             "impact_point_reward": task.impact_point_reward, "attachments": task.attachments,
-             "task_type": task.task_type, "task_config": task.task_config,
+             "impact_point_reward": effective_task_points(db, task, policies[task.community_id]), "attachments": task.attachments,
+             "task_type": task.task_type, "task_config": participant_config(task.task_config),
              "required_evidence_types": task.required_evidence_types}
             for assignment, task in rows]
 
@@ -141,8 +160,8 @@ def submit(assignment_id: UUID, payload: SubmissionInput,
     if assignment is None: raise HTTPException(status_code=404, detail="Assignment not found")
     submission = submit_task(db, assignment, user, payload.evidence_text,
                              str(payload.evidence_url) if payload.evidence_url else None,
-                             payload.evidence_attachments)
-    return {"id": str(submission.id)}
+                             [str(url) for url in payload.evidence_attachments], payload.answers, payload.idempotency_key)
+    return {"id": str(submission.id), "assessment_result": submission.assessment_result, "status": assignment.status.value}
 
 
 @router.post("/task-assignments/{assignment_id}/verify")
@@ -150,5 +169,20 @@ def verify(assignment_id: UUID, payload: VerificationInput,
            db: Annotated[Session, Depends(get_db)], user: Annotated[User, Depends(get_current_user)]):
     assignment = db.get(TaskAssignment, assignment_id)
     if assignment is None: raise HTTPException(status_code=404, detail="Assignment not found")
-    updated = verify_task(db, assignment, user, payload.approve)
+    updated = verify_task(db, assignment, user, payload.approve, payload.reason)
     return {"status": updated.status.value}
+
+
+@router.get("/communities/{community_id}/task-point-policy")
+def point_policy(community_id: UUID, db: Annotated[Session, Depends(get_db)], user: Annotated[User, Depends(get_current_user)]):
+    require_community_role(db, community_id, user)
+    return task_policy(db, community_id)
+
+
+@router.get("/task-assignments/{assignment_id}/attempts")
+def attempts(assignment_id: UUID, db: Annotated[Session, Depends(get_db)], user: Annotated[User, Depends(get_current_user)]):
+    assignment = db.get(TaskAssignment, assignment_id)
+    if assignment is None or assignment.assignee_id != user.id:
+        raise HTTPException(404, "Assignment not found")
+    return [{"id": str(row.id), "result": row.assessment_result, "submitted_at": row.submitted_at}
+            for row in db.scalars(select(TaskSubmission).where(TaskSubmission.assignment_id == assignment_id).order_by(TaskSubmission.submitted_at))]

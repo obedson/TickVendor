@@ -33,6 +33,7 @@ class TaskType(str, enum.Enum):
     """Supported task kinds. Each kind drives per-type config and evidence requirements."""
     GENERAL = "general"
     VIDEO = "video"           # Watch a video / YouTube link
+    QUIZ = "quiz"
     SOCIAL_FOLLOW = "social_follow"  # Follow/subscribe on a social platform
     SURVEY = "survey"         # Complete a survey
     REFERRAL = "referral"     # Invite/refer new members
@@ -76,6 +77,7 @@ class Task(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         nullable=False,
     )
     impact_point_reward: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    reward_mode: Mapped[str] = mapped_column(String(16), default="legacy_rule", nullable=False)
     verification_required: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     attachments: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
@@ -122,7 +124,8 @@ class TaskAssignment(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
 class TaskSubmission(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "task_submissions"
-    __table_args__ = (Index("ix_task_submissions_assignment_submitted", "assignment_id", "submitted_at"),)
+    __table_args__ = (Index("ix_task_submissions_assignment_submitted", "assignment_id", "submitted_at"),
+                      Index("uq_task_submission_request", "idempotency_key", unique=True))
 
     assignment_id: Mapped[Any] = mapped_column(
         GUID(), ForeignKey("task_assignments.id", ondelete="CASCADE"), nullable=False
@@ -131,3 +134,6 @@ class TaskSubmission(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     evidence_url: Mapped[str | None] = mapped_column(String(2048))
     submitted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     evidence_attachments: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    answers: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    assessment_result: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    idempotency_key: Mapped[str | None] = mapped_column(String(160))

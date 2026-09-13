@@ -113,10 +113,16 @@ def login(
     attempt_key = f"{host}:{str(payload.email).lower()}"
     login_attempt_limiter.check(attempt_key)
     user = db.scalar(select(User).options(selectinload(User.profile)).where(User.email == str(payload.email)))
-    if user is None or not user.is_active or not verify_password(payload.password, user.password_hash):
+    if user is None or not verify_password(payload.password, user.password_hash):
         login_attempt_limiter.record_failure(attempt_key)
         emit("authentication_failure", reason="invalid_credentials")
         raise HTTPException(status_code=401, detail="Invalid email or password")
+    if not user.is_active:
+        login_attempt_limiter.record_failure(attempt_key)
+        emit("authentication_failure", reason="account_suspended")
+        # Existing moderation reasons have no public/internal classification.
+        # Never disclose those notes through the sign-in response.
+        raise HTTPException(status_code=403, detail="Your account is suspended. Contact platform support for assistance.")
     login_attempt_limiter.record_success(attempt_key)
     response = issue_tokens(db, user)
     db.commit()

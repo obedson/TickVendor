@@ -5,7 +5,8 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from src.models import ImpactTransaction, ImpactTransactionStatus, PointRule
+from src.models import ImpactTransaction, ImpactTransactionStatus
+from src.services.point_policy import applicable_rule, ceiling
 
 
 def award_points(
@@ -18,28 +19,28 @@ def award_points(
     ))
     if existing:
         return existing
-    rule = db.scalar(select(PointRule).where(
-        PointRule.source_type == source_type, PointRule.is_active.is_(True),
-        (PointRule.community_id == community_id) | PointRule.community_id.is_(None),
-    ).order_by(PointRule.community_id.desc()))
+    rule = applicable_rule(db, community_id, source_type)
     if rule is None and points_override is None:
         raise HTTPException(status_code=409, detail="No active point rule configured")
+    amount = points_override if points_override is not None else rule.points
+    maximum = ceiling(db, source_type)
+    if maximum is not None:
+        amount = min(amount, maximum)
     transaction = ImpactTransaction(
         idempotency_key=idempotency_key, user_id=user_id, community_id=community_id,
-        points=points_override if points_override is not None else rule.points,
+        points=amount,
         source_type=source_type, source_id=source_id,
         event_id=event_id, task_id=task_id, reason=reason,
         status=ImpactTransactionStatus.POSTED,
     )
-    db.add(transaction)
     try:
+        # A savepoint preserves the caller transaction after an idempotency race.
+        with db.begin_nested():
+            db.add(transaction)
+            db.flush()
         if commit:
             db.commit()
-        else:
-            db.flush()
     except IntegrityError:
-        if commit:
-            db.rollback()
         existing = db.scalar(select(ImpactTransaction).where(
             ImpactTransaction.idempotency_key == idempotency_key,
         ))

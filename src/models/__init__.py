@@ -22,7 +22,13 @@ from src.models.community import (
     MembershipRole,
     MembershipStatus,
 )
-from src.models.configuration import ContributionBand, EventCategory, NotificationRule, PointRule
+from src.models.configuration import (
+    ContributionBand,
+    EventCategory,
+    NotificationRule,
+    PointCeiling,
+    PointRule,
+)
 from src.models.contribution import (
     Activity,
     ActivityStatus,
@@ -123,6 +129,7 @@ __all__ = [
     "PeerConfirmationDecision",
     "PersonalArchive",
     "PlatformRole",
+    "PointCeiling",
     "PointRule",
     "Profile",
     "ProfileVisibility",

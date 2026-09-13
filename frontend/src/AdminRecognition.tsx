@@ -1,3 +1,4 @@
+import { useRevealFocus } from './RevealFocus';
 import { useEffect, useRef, useState } from 'react';
 import { apiJson, getLiveToken } from './api';
 import './management.css';
@@ -24,6 +25,8 @@ export function AdminRecognition({ token, communityId }: { token: string; commun
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  useRevealFocus(editor, '.editor-panel');
+  useRevealFocus(error, '.management-screen [role="alert"]');
   const [message, setMessage] = useState('');
   const nameRef = useRef<HTMLInputElement>(null);
   const createRef = useRef<HTMLButtonElement>(null);

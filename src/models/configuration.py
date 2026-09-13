@@ -3,7 +3,18 @@
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import Boolean, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    ForeignKey,
+    Index,
+    Integer,
+    Numeric,
+    String,
+    Text,
+    UniqueConstraint,
+    text,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.database import Base
@@ -23,6 +34,9 @@ class PointRule(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "point_rules"
     __table_args__ = (
         UniqueConstraint("community_id", "source_type", name="uq_point_rule_community_source"),
+        Index("uq_active_global_point_rule", "source_type", unique=True,
+              sqlite_where=text("community_id IS NULL AND is_active = 1"),
+              postgresql_where=text("community_id IS NULL AND is_active = true")),
     )
 
     community_id: Mapped[Any | None] = mapped_column(
@@ -32,6 +46,13 @@ class PointRule(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     points: Mapped[int] = mapped_column(Integer, nullable=False)
     max_awards_per_user: Mapped[int | None] = mapped_column(Integer)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
+
+class PointCeiling(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    __tablename__ = "point_ceilings"
+    __table_args__ = (CheckConstraint("maximum_points >= 0", name="ck_point_ceiling_nonnegative"),)
+    source_type: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    maximum_points: Mapped[int] = mapped_column(Integer, nullable=False)
 
 
 class ContributionBand(UUIDPrimaryKeyMixin, TimestampMixin, Base):

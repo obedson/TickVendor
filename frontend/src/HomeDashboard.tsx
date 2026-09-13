@@ -33,17 +33,23 @@ export function HomeDashboard({
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
 
+  const [retry, setRetry] = useState(0);
   useEffect(() => {
-    setLoading(true);
-    Promise.all([
-      apiJson<HomeData>('profiles/me', {}, token),
-      apiJson<Ticket[]>('tickets/me', {}, token),
-      apiJson<Task[]>('task-assignments/me/details', {}, token),
-    ])
-      .then(([p, t, a]) => { setProfile(p); setTickets(t); setTasks(a); })
-      .catch(cause => setError(cause instanceof ApiError ? cause.message : 'Unable to load your dashboard.'))
-      .finally(() => setLoading(false));
-  }, [token]);
+    let active = true; let timedOut = false;
+    const controller = new AbortController();
+    let timeout: number;
+    const deadline = new Promise<never>((_, reject) => { timeout = window.setTimeout(() => { timedOut = true; controller.abort(); reject(new Error('Dashboard timeout')); }, 20000); });
+    setLoading(true); setError('');
+    Promise.race([deadline, Promise.all([
+      apiJson<HomeData>('profiles/me', { signal: controller.signal }, token),
+      apiJson<Ticket[]>('tickets/me', { signal: controller.signal }, token),
+      apiJson<Task[]>('task-assignments/me/details', { signal: controller.signal }, token),
+    ])])
+      .then(([p, t, a]) => { if (active) { setProfile(p); setTickets(t); setTasks(a); } })
+      .catch(cause => active && setError(timedOut ? 'The dashboard request took too long. Please retry.' : cause instanceof ApiError ? cause.message : 'Unable to load your dashboard.'))
+      .finally(() => { window.clearTimeout(timeout); if (active) setLoading(false); });
+    return () => { active = false; controller.abort(); window.clearTimeout(timeout); };
+  }, [token, retry]);
 
   if (loading) {
     return (
@@ -63,7 +69,7 @@ export function HomeDashboard({
         <div className="home-hero panel">
           <h1 id="home-title">Make your presence count.</h1>
         </div>
-        <p role="alert" className="error">{error}</p>
+        <p role="alert" className="error">{error}</p><button onClick={() => setRetry(value => value + 1)}>Retry dashboard</button>
       </div>
     );
   }

@@ -7,7 +7,15 @@ from sqlalchemy.orm import sessionmaker
 import src.models  # noqa: F401
 from src.database import Base, get_db
 from src.main import create_app
-from src.models import Membership, MembershipRole, Organization, PointRule, Profile, User
+from src.models import (
+    Membership,
+    MembershipRole,
+    Organization,
+    PointCeiling,
+    PointRule,
+    Profile,
+    User,
+)
 from src.security import create_access_token, hash_password
 
 
@@ -32,6 +40,8 @@ def headers(uid): return {"Authorization": f"Bearer {create_access_token(uid, 'p
 
 def test_admin_can_upsert_point_rule_and_adjust_points(tmp_path):
     engine, client, (admin, member, community), sessions = setup(tmp_path)
+    with sessions() as db:
+        db.add(PointCeiling(source_type="task", maximum_points=12)); db.commit()
     response = client.put(f"/api/v1/admin/communities/{community}/point-rules", headers=headers(admin), json={"source_type": "task", "points": 12, "max_awards_per_user": 3})
     assert response.status_code == 200 and response.json()["points"] == 12
     adjustment = client.post(f"/api/v1/admin/communities/{community}/point-adjustments", headers=headers(admin), json={"target_user_id": str(member), "amount": 7, "reason": "Correction"})
