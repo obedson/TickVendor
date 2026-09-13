@@ -33,7 +33,7 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     )
 
     email: Mapped[str] = mapped_column(String(320), nullable=False, unique=True, index=True)
-    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
     role: Mapped[PlatformRole] = mapped_column(
         Enum(PlatformRole, native_enum=False, length=32),
         default=PlatformRole.PARTICIPANT,

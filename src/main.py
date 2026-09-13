@@ -22,6 +22,7 @@ from src.api.communities import router as communities_router
 from src.api.community_management import router as community_management_router
 from src.api.contribution_configuration import router as contribution_configuration_router
 from src.api.events import router as events_router
+from src.api.google_auth import router as google_auth_router
 from src.api.governance import router as governance_router
 from src.api.leaderboard_configuration import router as leaderboard_configuration_router
 from src.api.leaderboards import router as leaderboards_router
@@ -53,6 +54,7 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     application.include_router(auth_router, prefix=settings.api_v1_prefix)
+    application.include_router(google_auth_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_configuration_router, prefix=settings.api_v1_prefix)
     application.include_router(audit_router, prefix=settings.api_v1_prefix)
@@ -100,7 +102,9 @@ def create_app() -> FastAPI:
             response.headers["X-Request-ID"] = request_id
             response.headers["X-Content-Type-Options"] = "nosniff"
             response.headers["X-Frame-Options"] = "DENY"
-            response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+            response.headers["Referrer-Policy"] = "no-referrer" if request.url.path.startswith(settings.api_v1_prefix + "/auth/") else "strict-origin-when-cross-origin"
+            if request.url.path.startswith(settings.api_v1_prefix + "/auth/"):
+                response.headers["Cache-Control"] = "no-store"
             response.headers["Permissions-Policy"] = "geolocation=(self), camera=(self)"
             return response
         finally:
@@ -116,7 +120,7 @@ def create_app() -> FastAPI:
                 "error": {
                     "code": "validation_error",
                     "message": "The request contains invalid data.",
-                    "details": jsonable_encoder(exc.errors()),
+                    "details": jsonable_encoder([{k: v for k, v in item.items() if k not in {"input", "ctx"}} for item in exc.errors()]) if _request.url.path.startswith(settings.api_v1_prefix + "/auth/") else jsonable_encoder(exc.errors()),
                 }
             },
         )

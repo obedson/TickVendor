@@ -30,6 +30,11 @@ class Settings(BaseSettings):
     secret_key: SecretStr = SecretStr("tickvendor-development-only-secret")
     access_token_expire_minutes: int = Field(default=30, ge=5, le=1440)
     refresh_token_expire_days: int = Field(default=7, ge=1, le=90)
+    google_auth_enabled: bool = False
+    google_client_id: str | None = None
+    google_client_secret: SecretStr | None = None
+    google_redirect_uri: str | None = None
+
     bcrypt_rounds: int = Field(default=12, ge=12, le=16)
 
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"

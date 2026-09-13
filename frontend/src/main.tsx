@@ -37,6 +37,9 @@ import { EventCover } from './EventCover';
 import { SponsoredPlacement } from './SponsoredPlacement';
 import { EventSupport } from './EventSupport';
 import { ManagedEventSelector } from './ManagedEventSelector';
+import { PasswordInput } from './PasswordInput';
+import { GoogleButton, GoogleReturn, PasswordRecovery } from './AuthRecovery';
+import { useRevealFocus } from './RevealFocus';
 import { archiveItem, usePersonalArchive } from './PersonalHistory';
 
 interface BeforeInstallPromptEvent extends Event { prompt: () => Promise<void>; userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }> }
@@ -56,8 +59,9 @@ function Auth({ onLogin }: { onLogin: (session: Session) => void }) {
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
+  useRevealFocus(error || message, '#auth-result');
 
-  const switchMode = (next: typeof mode) => { setMode(next); setError(''); setMessage(''); };
+  const switchMode = (next: typeof mode) => { setMode(next); setPassword(''); setError(''); setMessage(''); };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -105,19 +109,16 @@ function Auth({ onLogin }: { onLogin: (session: Session) => void }) {
         <h1 id="auth-title">{titles[mode]}</h1>
         <p>{subtitles[mode]}</p>
 
-        {message && <p role="status" className="success-msg">{message}</p>}
-        {error && <p role="alert" className="error">{error}</p>}
+        {message && <p id="auth-result" role="status" className="success-msg">{message}</p>}
+        {error && <p id="auth-result" role="alert" className="error">{error}</p>}
 
-        <form onSubmit={submit} noValidate>
+        <form onSubmit={submit}>
           <label>
             <span className="label-text">Email address</span>
             <input required type="email" autoComplete="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" />
           </label>
           {mode !== 'resend' && (
-            <label>
-              <span className="label-text">Password</span>
-              <input required minLength={12} type="password" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} value={password} onChange={e => setPassword(e.target.value)} placeholder={mode === 'login' ? '••••••••••••' : 'At least 12 characters'} />
-            </label>
+            <PasswordInput key={mode} required minLength={mode === 'login' ? 1 : 12} maxLength={72} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} value={password} onChange={e => setPassword(e.target.value)} aria-describedby={error ? 'auth-result' : undefined} placeholder={mode === 'login' ? 'Your password' : 'At least 12 characters'} />
           )}
           {mode === 'register' && (
             <div className="form-row">
@@ -138,11 +139,14 @@ function Auth({ onLogin }: { onLogin: (session: Session) => void }) {
           </div>
         </form>
 
+        {mode !== 'resend' && <GoogleButton />}
+
         <div className="auth-footer">
           {mode === 'login' && (
             <>
               <button className="link" onClick={() => switchMode('register')}>Don't have an account? Create one</button>
               <button className="link" onClick={() => switchMode('resend')}>Resend verification email</button>
+              <a href="/forgot-password">Forgot password?</a>
             </>
           )}
           {mode === 'register' && (
@@ -593,6 +597,9 @@ function App() {
   }, [selectedEvent?.id, session?.access_token]);
 
   // Auth gate
+  if (location.pathname === '/forgot-password') return <PasswordRecovery />;
+  if (location.pathname === '/reset-password') return <PasswordRecovery reset />;
+  if (location.pathname === '/auth/google/return') return <GoogleReturn onLogin={data => { persistSession(data); setSession(data); }} />;
   if (!session) {
     const verificationToken = new URLSearchParams(location.search).get('token');
     if (location.pathname === '/verify-email' && verificationToken) return <Verification token={verificationToken} />;

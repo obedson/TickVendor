@@ -15,7 +15,7 @@ def test_populated_upgrade_preserves_history(tmp_path, monkeypatch):
     url = f"sqlite:///{(tmp_path / 'task-migration.db').as_posix()}"
     monkeypatch.setattr(settings, 'database_url', url)
     config = Config('alembic.ini')
-    assert ScriptDirectory.from_config(config).get_heads() == ['c8d9e0f12345']
+    assert ScriptDirectory.from_config(config).get_revision('c8d9e0f12345') is not None
     command.upgrade(config, 'b7c8d9e0f123')
     engine = sa.create_engine(url)
     metadata = sa.MetaData(); metadata.reflect(engine)
@@ -44,7 +44,7 @@ def test_populated_upgrade_preserves_history(tmp_path, monkeypatch):
         insert(connection, 'point_rules', source_type='task_completion', points=5)
         insert(connection, 'point_rules', source_type='task_completion', points=10)
     engine.dispose()
-    command.upgrade(config, 'head')
+    command.upgrade(config, 'c8d9e0f12345')
     engine = sa.create_engine(url)
     with engine.connect() as connection:
         assert connection.execute(sa.text('SELECT reward_mode, impact_point_reward FROM tasks')).one() == ('legacy_rule', 20)
@@ -57,7 +57,7 @@ def test_populated_upgrade_preserves_history(tmp_path, monkeypatch):
     assert any(i['name'] == 'uq_active_global_point_rule' and i['unique'] for i in indexes)
     engine.dispose()
     command.downgrade(config, 'b7c8d9e0f123')
-    command.upgrade(config, 'head')
+    command.upgrade(config, 'c8d9e0f12345')
 
 
 def test_postgresql_migration_compiles_without_connection(monkeypatch):

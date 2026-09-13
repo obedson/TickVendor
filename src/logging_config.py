@@ -18,7 +18,7 @@ SENSITIVE_KEYS = {
     "refresh_token",
     "secret",
     "secret_key",
-    "token",
+    "token", "id_token", "access_token", "new_password", "client_secret", "code", "grant", "verifier",
 }
 
 
@@ -38,6 +38,9 @@ class SensitiveDataFilter(logging.Filter):
             record.msg = redact(deepcopy(record.msg))
         if isinstance(record.args, dict):
             record.args = redact(deepcopy(record.args))
+        # Redact query strings in uvicorn/httpx access messages for auth routes.
+        if isinstance(record.args, tuple):
+            record.args = tuple(v.split("?")[0] + "?[REDACTED]" if isinstance(v, str) and "/auth/" in v and "?" in v else v for v in record.args)
         record.request_id = request_id_context.get()
         return True
 
@@ -65,3 +68,4 @@ def configure_logging(level: str) -> None:
     root.handlers.clear()
     root.addHandler(handler)
     root.setLevel(level)
+    logging.getLogger("uvicorn.access").addFilter(SensitiveDataFilter())

@@ -44,6 +44,7 @@ from src.models.event import (
     LocationType,
     Venue,
 )
+from src.models.external_identity import ExternalIdentity, GoogleAuthFlow
 from src.models.impact import ImpactTransaction, ImpactTransactionStatus
 from src.models.milestone import Milestone, MilestoneAward, MilestoneRequirement
 from src.models.notification import AuditLog, Leaderboard, Notification
@@ -103,6 +104,8 @@ __all__ = [
     "EventStaff",
     "EventStaffRole",
     "EventStatus",
+    "ExternalIdentity",
+    "GoogleAuthFlow",
     "ImpactTransaction",
     "ImpactTransactionStatus",
     "Leaderboard",

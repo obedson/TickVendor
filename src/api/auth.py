@@ -34,7 +34,8 @@ from src.security import (
     hash_token,
     verify_password,
 )
-from src.security_middleware import login_attempt_limiter
+from src.security_middleware import auth_rate_limit, login_attempt_limiter
+from src.services.notification import audit
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.api_v1_prefix}/auth/login")
@@ -112,7 +113,7 @@ def login(
     host = request.client.host if request.client else "unknown"
     attempt_key = f"{host}:{str(payload.email).lower()}"
     login_attempt_limiter.check(attempt_key)
-    user = db.scalar(select(User).options(selectinload(User.profile)).where(User.email == str(payload.email)))
+    user = db.scalar(select(User).options(selectinload(User.profile)).where(User.email == str(payload.email)).with_for_update())
     if user is None or not verify_password(payload.password, user.password_hash):
         login_attempt_limiter.record_failure(attempt_key)
         emit("authentication_failure", reason="invalid_credentials")
@@ -176,9 +177,14 @@ def refresh(payload: RefreshRequest, db: Annotated[Session, Depends(get_db)]) ->
     ))
     if session is None:
         raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
-    user = db.scalar(select(User).options(selectinload(User.profile)).where(User.id == session.user_id))
+    user = db.scalar(select(User).options(selectinload(User.profile)).where(User.id == session.user_id).with_for_update())
     if user is None or not user.is_active:
         raise HTTPException(status_code=401, detail="User is unavailable")
+    claimed = db.execute(update(AuthSession).where(AuthSession.id == session.id,
+        AuthSession.revoked_at.is_(None), AuthSession.expires_at > datetime.now(UTC)
+    ).values(revoked_at=datetime.now(UTC)).execution_options(synchronize_session=False))
+    if claimed.rowcount != 1:
+        raise HTTPException(401, "Invalid or expired refresh token")
     response = issue_tokens(db, user)
     db.flush()
     replacement = db.scalar(select(AuthSession).where(AuthSession.token_hash == hash_token(response.refresh_token)))
@@ -197,21 +203,30 @@ def logout(payload: RefreshRequest, db: Annotated[Session, Depends(get_db)]) -> 
     return Response(status_code=204)
 
 
-@router.post("/password-reset/request", status_code=202)
+@router.post("/password-reset/request", status_code=202, dependencies=[Depends(auth_rate_limit)])
 def request_password_reset(
     payload: PasswordResetRequest,
     db: Annotated[Session, Depends(get_db)],
     email_sender: Annotated[EmailSender, Depends(get_email_sender)],
 ) -> dict[str, str]:
-    user = db.scalar(select(User).where(User.email == str(payload.email).lower()))
+    user = db.scalar(select(User).where(User.email == str(payload.email).lower()).with_for_update())
     if user is not None and user.is_active:
+        recent = db.scalar(select(AuthToken.id).where(
+            AuthToken.user_id == user.id, AuthToken.purpose == AuthTokenPurpose.PASSWORD_RESET,
+            AuthToken.created_at > datetime.now(UTC) - timedelta(minutes=1)))
+        if recent:
+            return {"message": "If an account exists for that email, we'll send password reset instructions."}
         token = create_one_time_token(db, user, AuthTokenPurpose.PASSWORD_RESET, hours=1)
-        db.commit()
-        email_sender.send_token(user.email, "Reset your TickVendor password", token)
-    return {"message": "If the account exists, reset instructions were sent."}
+        try:
+            email_sender.send_token(user.email, "Reset your TickVendor password", token)
+            db.commit()
+        except Exception:  # noqa: BLE001 -- keep delivery/provider failures enumeration-safe
+            db.rollback()
+            emit("password_reset_delivery_failed")
+    return {"message": "If an account exists for that email, we'll send password reset instructions."}
 
 
-@router.post("/password-reset/confirm", status_code=204)
+@router.post("/password-reset/confirm", status_code=204, dependencies=[Depends(auth_rate_limit)])
 def confirm_password_reset(
     payload: PasswordResetConfirmRequest, db: Annotated[Session, Depends(get_db)]
 ) -> Response:
@@ -221,13 +236,24 @@ def confirm_password_reset(
         AuthToken.consumed_at.is_(None), AuthToken.expires_at > datetime.now(UTC),
     ))
     if token is None:
-        raise HTTPException(status_code=400, detail="Invalid or expired reset token")
-    user = db.get(User, token.user_id)
+        raise HTTPException(status_code=400, detail="This password reset link is invalid or has expired.")
+    user = db.scalar(select(User).where(User.id == token.user_id).with_for_update())
+    now = datetime.now(UTC)
+    claimed = db.execute(update(AuthToken).where(AuthToken.id == token.id,
+        AuthToken.consumed_at.is_(None), AuthToken.expires_at > now
+    ).values(consumed_at=now).execution_options(synchronize_session=False))
+    if claimed.rowcount != 1:
+        raise HTTPException(400, "This password reset link is invalid or has expired.")
     user.password_hash = hash_password(payload.new_password)
-    token.consumed_at = datetime.now(UTC)
+    # Consume every outstanding reset link, without touching verification tokens.
+    db.execute(update(AuthToken).where(AuthToken.user_id == user.id,
+        AuthToken.purpose == AuthTokenPurpose.PASSWORD_RESET,
+        AuthToken.consumed_at.is_(None)).values(consumed_at=now))
     db.execute(update(AuthSession).where(
         AuthSession.user_id == user.id, AuthSession.revoked_at.is_(None)
     ).values(revoked_at=datetime.now(UTC)))
+    audit(db, actor_id=user.id, action="auth.password_reset_completed", target_type="user", target_id=user.id,
+          metadata={"refresh_sessions_revoked": True}, commit=False)
     db.commit()
     return Response(status_code=204)
 

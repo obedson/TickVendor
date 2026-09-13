@@ -1,0 +1,8 @@
+.password-field { min-width: 0; margin-bottom: 1rem; }
+.password-control { display: grid; grid-template-columns: minmax(0, 1fr) 4.5rem; gap: .5rem; align-items: center; }
+.password-control input { width: 100%; min-width: 0; margin: 0; }
+.password-control button { min-height: 44px; padding-inline: .25rem; }
+.auth .google-auth { margin-top: 1rem; display: grid; gap: .75rem; }
+.auth .google-auth button { width: 100%; }
+.auth .auth-divider { text-align: center; color: var(--tv-muted); }
+.auth [role="alert"] { overflow-wrap: anywhere; }

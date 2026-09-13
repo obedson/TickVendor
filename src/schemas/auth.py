@@ -1,11 +1,22 @@
 """Authentication request and response schemas."""
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+from typing import Annotated
+
+from pydantic import AfterValidator, BaseModel, ConfigDict, EmailStr, Field, field_validator
+
+
+def password_bytes(value: str) -> str:
+    if len(value.encode("utf-8")) > 72:
+        raise ValueError("Password must not exceed 72 UTF-8 bytes")
+    return value
+
+
+PasswordValue = Annotated[str, Field(min_length=12, max_length=72), AfterValidator(password_bytes)]
 
 
 class RegisterRequest(BaseModel):
     email: EmailStr
-    password: str = Field(min_length=12, max_length=72)
+    password: PasswordValue
     username: str = Field(min_length=3, max_length=50, pattern=r"^[A-Za-z0-9_-]+$")
     display_name: str = Field(min_length=1, max_length=120)
 
@@ -69,4 +80,4 @@ class VerificationResendRequest(BaseModel):
 
 
 class PasswordResetConfirmRequest(TokenRequest):
-    new_password: str = Field(min_length=12, max_length=72)
+    new_password: PasswordValue

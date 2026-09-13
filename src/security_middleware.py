@@ -72,6 +72,14 @@ class LoginAttemptLimiter:
 
 rate_limiter = RedisRateLimiter(settings.redis_url) if settings.distributed_rate_limit_enabled and settings.redis_url else RateLimiter()
 login_attempt_limiter = LoginAttemptLimiter()
+auth_rate_limiter = (RedisRateLimiter(settings.redis_url, limit=10, window_seconds=60)
+                     if settings.distributed_rate_limit_enabled and settings.redis_url
+                     else RateLimiter(limit=10, window_seconds=60))
+
+
+def auth_rate_limit(request: Request) -> None:
+    """Reuse the deployed limiter implementation for recovery/provider endpoints."""
+    auth_rate_limiter.check("auth:" + request_key(request))
 
 
 def request_key(request: Request) -> str:
