@@ -1,6 +1,7 @@
 """Organization-scoped activity and volunteer opportunity API tests."""
 
 from datetime import UTC, datetime, timedelta
+from uuid import uuid4
 
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -101,4 +102,29 @@ def test_public_opportunity_is_discoverable_without_membership(tmp_path):
     assert discovered.status_code == 200
     assert [item["id"] for item in discovered.json()] == [opportunity_id]
     assert client.post(f"/api/v1/activity-opportunities/{opportunity_id}/join", headers=headers(outsider)).status_code == 201
+    engine.dispose()
+
+
+def test_opportunity_detail_matches_discovery_visibility(tmp_path):
+    engine, client, (admin, member, outsider, _other_admin, community, _other_community) = setup(tmp_path)
+    created = client.post(
+        f"/api/v1/communities/{community}/activity-opportunities",
+        headers=headers(admin), json={**payload("Public cleanup"), "members_only": False},
+    )
+    opportunity_id = created.json()["id"]
+    # A draft is not discoverable, not even for its creator; managers use the community listing.
+    assert client.get(f"/api/v1/activity-opportunities/{opportunity_id}", headers=headers(admin)).status_code == 404
+    assert client.post(f"/api/v1/activity-opportunities/{opportunity_id}/publish", headers=headers(admin)).status_code == 200
+    detail = client.get(f"/api/v1/activity-opportunities/{opportunity_id}", headers=headers(outsider))
+    assert detail.status_code == 200, detail.text
+    listed = client.get("/api/v1/activity-opportunities", headers=headers(outsider)).json()
+    assert detail.json() == next(item for item in listed if item["id"] == opportunity_id)
+    member_only_id = client.post(
+        f"/api/v1/communities/{community}/activity-opportunities",
+        headers=headers(admin), json=payload("Members only cleanup"),
+    ).json()["id"]
+    assert client.post(f"/api/v1/activity-opportunities/{member_only_id}/publish", headers=headers(admin)).status_code == 200
+    assert client.get(f"/api/v1/activity-opportunities/{member_only_id}", headers=headers(member)).status_code == 200
+    assert client.get(f"/api/v1/activity-opportunities/{member_only_id}", headers=headers(outsider)).status_code == 404
+    assert client.get(f"/api/v1/activity-opportunities/{uuid4()}", headers=headers(outsider)).status_code == 404
     engine.dispose()

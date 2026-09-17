@@ -10,7 +10,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from src.api.auth import get_current_user
-from src.authorization import require_community_role
+from src.authorization import ROLE_RANK, require_community_role
 from src.database import get_db
 from src.models import (
     Community,
@@ -77,14 +77,29 @@ def _community(data):
             "membership_access": data.membership_access.value}
 
 
-def _member(db, membership, viewer):
+def _member_payload(membership, profile, viewer, email=None):
+    """Shape one membership. `email` is supplied only for community organizers/administrators."""
+    visible = profile is not None and (profile.visibility != ProfileVisibility.PRIVATE or membership.user_id == viewer.id)
+    data = {"id": str(membership.id), "user_id": str(membership.user_id), "role": membership.role.value,
+            "status": membership.status.value}
+    if visible:
+        data.update({"username": profile.username, "display_name": profile.display_name,
+                     "photo_url": profile.photo_url, "joined_at": membership.joined_at,
+                     "created_at": membership.created_at})
+    if email is not None:
+        data["email"] = email
+    return data
+
+
+def _member(db, membership, viewer, email=None):
     profile = db.scalar(select(Profile).where(Profile.user_id == membership.user_id))
-    if profile is None or profile.visibility == ProfileVisibility.PRIVATE and membership.user_id != viewer.id:
-        return {"id": str(membership.id), "user_id": str(membership.user_id), "role": membership.role.value,
-                "status": membership.status.value}
-    return {"id": str(membership.id), "user_id": str(membership.user_id), "role": membership.role.value,
-            "status": membership.status.value, "username": profile.username, "display_name": profile.display_name,
-            "photo_url": profile.photo_url, "joined_at": membership.joined_at, "created_at": membership.created_at}
+    return _member_payload(membership, profile, viewer, email)
+
+
+def _managed_member(db, membership, viewer):
+    """Response for the administrator-gated single-membership endpoints, which may show the email."""
+    target = db.get(User, membership.user_id)
+    return _member(db, membership, viewer, target.email if target else None)
 
 
 @router.get("/me", include_in_schema=True)
@@ -106,7 +121,8 @@ def organizer_events(db: Annotated[Session, Depends(get_db)], user: Annotated[Us
              "status": event.status.value, "starts_at": event.starts_at, "ends_at": event.ends_at,
              "category": event.category,
              "cover_image_url": cover_delivery_url(event.cover_image_url, event.community_id, event.id),
-             "venue": {"name": event.venue.name, "city": event.venue.city} if event.venue else None}
+             "online_url": event.online_url,
+             "venue": {"name": event.venue.name, "address": event.venue.address, "city": event.venue.city, "region": event.venue.region, "lga": event.venue.lga, "country_code": event.venue.country_code, "latitude": event.venue.latitude, "longitude": event.venue.longitude} if event.venue else None}
             for event in rows]
 
 
@@ -149,16 +165,24 @@ def update_community(community_id: UUID, payload: CommunityUpdate, db: Annotated
 
 @router.get("/{community_id}/members")
 def list_members(community_id: UUID, db: Annotated[Session, Depends(get_db)], user: Annotated[User, Depends(get_current_user)]):
-    require_community_role(db, community_id, user)
-    memberships = db.scalars(select(Membership).where(Membership.community_id == community_id,
-                                                       Membership.status != MembershipStatus.LEFT).order_by(Membership.created_at)).all()
-    return {"members": [_member(db, item, user) for item in memberships]}
+    viewer = require_community_role(db, community_id, user)
+    # Organizers/administrators already receive member emails from assignment-candidate resolution and
+    # invite by email, and need them to tell similar display names apart. Ordinary members never do.
+    privileged = ROLE_RANK[viewer.role] >= ROLE_RANK[MembershipRole.ORGANIZER]
+    rows = db.execute(select(Membership, Profile, User.email)
+                      .join(User, User.id == Membership.user_id)
+                      .outerjoin(Profile, Profile.user_id == Membership.user_id)
+                      .where(Membership.community_id == community_id,
+                             Membership.status != MembershipStatus.LEFT)
+                      .order_by(Membership.created_at)).all()
+    return {"members": [_member_payload(item, profile, user, email if privileged else None)
+                        for item, profile, email in rows]}
 
 
 @router.post("/{community_id}/members", status_code=status.HTTP_201_CREATED)
 def add_member(community_id: UUID, payload: MemberAdd, db: Annotated[Session, Depends(get_db)], user: Annotated[User, Depends(get_current_user)]):
     membership = governance.invite(db, community_id, user, payload.user_id, payload.role)
-    return _member(db, membership, user)
+    return _managed_member(db, membership, user)
 
 
 @router.post("/{community_id}/members/invite", status_code=status.HTTP_201_CREATED)
@@ -190,13 +214,13 @@ def invite_member_by_identifier(
     if target_user is None:
         raise HTTPException(status_code=404, detail="User not found")
     membership = governance.invite(db, community_id, user, target_user.id, payload.role)
-    return _member(db, membership, user)
+    return _managed_member(db, membership, user)
 
 
 @router.patch("/{community_id}/members/{membership_id}/role")
 def change_role(community_id: UUID, membership_id: UUID, payload: MemberRole, db: Annotated[Session, Depends(get_db)], user: Annotated[User, Depends(get_current_user)]):
     membership = governance.manage_membership(db, community_id, membership_id, user, "role_changed", payload.reason, payload.role)
-    return _member(db, membership, user)
+    return _managed_member(db, membership, user)
 
 
 @router.patch("/{community_id}/members/{membership_id}/status")
@@ -205,7 +229,7 @@ def change_status(community_id: UUID, membership_id: UUID, payload: MemberStatus
     if action is None:
         raise HTTPException(422, "Use the explicit invitation/join/leave lifecycle")
     membership = governance.manage_membership(db, community_id, membership_id, user, action, payload.reason)
-    return _member(db, membership, user)
+    return _managed_member(db, membership, user)
 
 
 class MembershipAction(BaseModel):
@@ -235,4 +259,4 @@ def review_membership(community_id: UUID, membership_id: UUID, action: str, payl
                       db: Annotated[Session, Depends(get_db)], user: Annotated[User, Depends(get_current_user)]):
     if action not in {"approved", "rejected"}:
         raise HTTPException(422, "Choose approved or rejected")
-    return _member(db, governance.manage_membership(db, community_id, membership_id, user, action, payload.reason), user)
+    return _managed_member(db, governance.manage_membership(db, community_id, membership_id, user, action, payload.reason), user)

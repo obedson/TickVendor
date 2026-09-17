@@ -1,3 +1,6 @@
+import { useDraftState } from './formRecovery';
+import { GovernanceConfirm } from './GovernanceConfirm';
+import { NigeriaLocation } from './NigeriaLocation';
 import { useRevealFocus } from './RevealFocus';
 import { useEffect, useState } from 'react';
 import './management.css';
@@ -23,11 +26,14 @@ type Event = {
     address: string;
     city?: string | null;
     region?: string | null;
+    lga?: string | null; country_code?: string; latitude?: number | null; longitude?: number | null;
   } | null;
 };
 type Community = { id: string; community?: { name: string }; name?: string };
 type TicketType = { id: string; name: string; price: string; currency: string; quantity: number; visibility: string; availability: number };
 type EventCategory = { id: string; slug: string; name: string; is_active: boolean };
+
+function localInput(value: string) { const date = new Date(value); return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16); }
 
 const emptyForm = {
   title: '',
@@ -39,7 +45,7 @@ const emptyForm = {
   venue_name: '',
   venue_address: '',
   venue_city: '',
-  venue_region: '',
+  venue_region: '', venue_lga: '', venue_latitude: '', venue_longitude: '',
 };
 
 const STATUS_COLORS: Record<string, string> = {
@@ -55,8 +61,11 @@ export function OrganizerEvents({ token, communityId }: { token: string; communi
   const [events, setEvents] = useState<Event[]>([]);
   const [communities, setCommunities] = useState<Community[]>([]);
   const [categories, setCategories] = useState<EventCategory[]>([]);
-  const [form, setForm] = useState(emptyForm);
   const [editing, setEditing] = useState<Event | null>(null);
+  const [formSeed, setFormSeed] = useState(emptyForm);
+  const draft = useDraftState(communityId ? `community:${communityId}:event:${editing?.id || 'new'}` : '', formSeed);
+  const form = draft.value; const setForm = draft.set;
+  const [discardDraft, setDiscardDraft] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [types, setTypes] = useState<TicketType[]>([]);
   const [ticketForm, setTicketForm] = useState(emptyTicketForm);
@@ -104,6 +113,8 @@ export function OrganizerEvents({ token, communityId }: { token: string; communi
     loadCategories();
   }, [token, communityId]);
 
+  useEffect(() => { if (draft.ready && !form.category && categories.length) setForm(value => ({ ...value, category: categories[0].slug })); }, [draft.ready, categories]);
+
   const create = async (e: React.FormEvent) => {
     e.preventDefault();
     const community = communities.find(item => item.id === communityId);
@@ -129,13 +140,14 @@ export function OrganizerEvents({ token, communityId }: { token: string; communi
                   address: form.venue_address,
                   ...(form.venue_city ? { city: form.venue_city } : {}),
                   ...(form.venue_region ? { region: form.venue_region } : {}),
-                  country_code: 'NG',
+                  country_code: 'NG', lga: form.venue_lga || null,
+                  latitude: form.venue_latitude === '' ? null : Number(form.venue_latitude), longitude: form.venue_longitude === '' ? null : Number(form.venue_longitude),
                 },
               }),
         }),
       }, liveToken());
       setMessage(`Event "${data.title}" created.`);
-      setForm(emptyForm);
+      await draft.clear();
       setShowForm(false);
       await load();
     } catch (cause) {
@@ -152,6 +164,7 @@ export function OrganizerEvents({ token, communityId }: { token: string; communi
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          ...(editing.venue && { venue: { name: form.venue_name, address: form.venue_address, city: form.venue_city || null, region: form.venue_region || null, lga: form.venue_lga || null, country_code: editing.venue.country_code || 'NG', latitude: form.venue_latitude === '' ? null : Number(form.venue_latitude), longitude: form.venue_longitude === '' ? null : Number(form.venue_longitude) } }),
           title: form.title,
           description: form.description,
           starts_at: new Date(form.starts_at).toISOString(),
@@ -159,7 +172,8 @@ export function OrganizerEvents({ token, communityId }: { token: string; communi
         }),
       }, liveToken());
       setMessage(`Event "${data.title}" updated.`);
-      setEditing(null);
+      await draft.clear();
+      setEditing(null); setFormSeed(emptyForm);
       setShowForm(false);
       await load();
     } catch (cause) {
@@ -213,23 +227,23 @@ export function OrganizerEvents({ token, communityId }: { token: string; communi
 
   const beginEdit = (event: Event) => {
     setEditing(event);
-setForm({
+setFormSeed({
   title: event.title,
   description: event.description,
   category: event.category,
-  starts_at: event.starts_at.slice(0, 16),
-  ends_at: event.ends_at.slice(0, 16),
+  starts_at: localInput(event.starts_at),
+  ends_at: localInput(event.ends_at),
   online_url: event.online_url ?? '',
   venue_name: event.venue?.name ?? '',
   venue_address: event.venue?.address ?? '',
   venue_city: event.venue?.city ?? '',
-  venue_region: event.venue?.region ?? '',
+  venue_region: event.venue?.region ?? '', venue_lga: event.venue?.lga ?? '', venue_latitude: String(event.venue?.latitude ?? ''), venue_longitude: String(event.venue?.longitude ?? ''),
 });
     setShowForm(true);
     setConfigEvent(null);
   };
 
-  const cancelForm = () => { setEditing(null); setShowForm(false); setForm(emptyForm); setError(''); };
+  const cancelForm = () => { setEditing(null); setFormSeed(emptyForm); setShowForm(false); setError(''); };
 
   return (
     <div className="management-screen">
@@ -241,7 +255,7 @@ setForm({
         </div>
         <div className="page-header-actions">
           {!showForm && (
-            <button className="accent" onClick={() => { setShowForm(true); setEditing(null); setForm(emptyForm); }}>
+            <button className="accent" onClick={() => { setShowForm(true); setEditing(null); setFormSeed(emptyForm); }}>
               + Create event
             </button>
           )}
@@ -255,6 +269,7 @@ setForm({
       {showForm && (
         <div className="panel" style={{ marginBottom: '1.5rem' }}>
           <h2 style={{ fontSize: '1.1rem', marginBottom: '1.25rem' }}>{editing ? `Edit: ${editing.title}` : 'Create new event'}</h2>
+          <p role="status">{draft.ready ? 'Draft saved privately on this browser; closing keeps it.' : 'Recovering draft…'}</p>{draft.error && <p role="alert">{draft.error}</p>}
           <form data-event-editor onSubmit={editing ? update : create}>
             <label>
               <span className="label-text">Event title</span>
@@ -301,19 +316,20 @@ setForm({
                 <input required type="datetime-local" value={form.ends_at} onChange={e => setForm({ ...form, ends_at: e.target.value })} />
               </label>
             </div>
-            {!editing && (
+            {(!editing || editing.venue) && (
   <>
     <label>
       <span className="label-text">Online URL (leave blank for in-person)</span>
       <input
         type="url"
+        disabled={!!editing}
         value={form.online_url}
         onChange={e => setForm({ ...form, online_url: e.target.value })}
         placeholder="https://meet.example.com/event"
       />
     </label>
 
-    {!form.online_url && (
+    {(editing?.venue || !form.online_url) && (
       <>
         <label>
           <span className="label-text">Venue name</span>
@@ -337,7 +353,7 @@ setForm({
 
         <div className="form-row">
           <label>
-            <span className="label-text">City</span>
+            <span className="label-text">City / Town</span>
             <input
               value={form.venue_city}
               onChange={e => setForm({ ...form, venue_city: e.target.value })}
@@ -345,29 +361,24 @@ setForm({
             />
           </label>
 
-          <label>
-            <span className="label-text">State / Region</span>
-            <input
-              value={form.venue_region}
-              onChange={e => setForm({ ...form, venue_region: e.target.value })}
-              placeholder="e.g. Enugu"
-            />
-          </label>
+<NigeriaLocation region={form.venue_region} lga={form.venue_lga} onChange={(region, lga) => setForm({ ...form, venue_region: region, venue_lga: lga })} />
+          {(['latitude', 'longitude'] as const).map(key => <label key={key}>Venue {key} (optional)<input type="number" step="any" min={key === 'latitude' ? -90 : -180} max={key === 'latitude' ? 90 : 180} value={form[`venue_${key}`]} onChange={e => setForm({ ...form, [`venue_${key}`]: e.target.value })} /></label>)}
         </div>
       </>
     )}
   </>
 )}
             <div className="form-actions">
-              <button type="submit" className="accent" disabled={saving || (!editing && (categoriesLoading || categories.length === 0))}>
+              <button type="submit" className="accent" disabled={saving || !draft.ready || (!editing && (categoriesLoading || categories.length === 0))}>
                 {saving ? 'Saving…' : editing ? 'Save changes' : 'Create event'}
               </button>
-              <button type="button" className="secondary" onClick={cancelForm}>Cancel</button>
+              <button type="button" className="secondary" onClick={cancelForm}>Close and keep draft</button><button type="button" disabled={saving} onClick={() => setDiscardDraft(true)}>Discard draft</button>
             </div>
           </form>
         </div>
       )}
 
+      {discardDraft && <GovernanceConfirm title="Discard event draft?" consequence="This removes the unfinished event form from this browser." requireReason={false} onClose={() => setDiscardDraft(false)} onConfirm={async () => { await draft.clear(); setDiscardDraft(false); cancelForm(); }} />}
       {loading && <p role="status" className="text-muted">Loading events…</p>}
       {!loading && !error && !events.length && (
         <EmptyState

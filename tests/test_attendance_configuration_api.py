@@ -26,6 +26,10 @@ def test_admin_can_update_attendance_configuration_and_member_is_denied(tmp_path
         with sessions() as db: yield db
     app.dependency_overrides[get_db] = override
     client = TestClient(app); admin, member, community, event = ids
+    with sessions() as db:
+        from src.models import Event, Venue
+        venue = Venue(name="Configured venue", address="Test venue", latitude=6.5, longitude=3.3)
+        db.add(venue); db.flush(); db.get(Event, event).venue_id = venue.id; db.commit()
     payload = {"qr_attendance_enabled": True, "peer_confirmation_enabled": True, "confirmations_required": 1, "organizer_verification_enabled": True,
                "geofence_enabled": True, "geofence_radius_meters": 250, "max_peer_confirmations": 3,
                "peer_selection_limit": 4, "required_verification_methods": ["qr", "peer"]}

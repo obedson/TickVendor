@@ -1,7 +1,9 @@
+import { BulkTaskAssignment } from './BulkTaskAssignment';
+import { EvidenceFiles } from './TaskEvidence';
 import { useEffect, useState } from 'react';
 import './management.css';
 import { useDraftState } from './formRecovery';
-import { useRevealFocus, TaskDialog } from './RevealFocus';
+import { useRevealFocus } from './RevealFocus';
 import { LearningBuilder, buildLearning, emptyLearning } from './LearningTask';
 import { GovernanceConfirm } from './GovernanceConfirm';
 import { EmptyState } from './AppShell';
@@ -16,6 +18,8 @@ type Submission = {
   evidence_text?: string;
   evidence_url?: string;
   evidence_attachments: string[];
+  attachment_ids?: string[];
+  location_evidence?: { verified?: boolean; distance_meters?: number };
   answers?: Record<string, unknown>;
   assessment_result?: Record<string, unknown>;
 };
@@ -34,8 +38,6 @@ type Task = {
   required_evidence_types: string[];
 };
 
-type Member = { id: string; user_id: string; username?: string; display_name?: string; status?: string };
-
 const TASK_TYPES = [
   { value: 'general', label: 'General' },
   { value: 'video', label: 'Video / YouTube' },
@@ -49,7 +51,7 @@ const TASK_TYPES = [
 const EVIDENCE_TYPES = [
   { value: 'text', label: 'Text description' },
   { value: 'url', label: 'URL link' },
-  { value: 'attachment', label: 'Attachment URL' },
+  { value: 'attachment', label: 'Uploaded file or attachment URL' },
 ];
 
 const emptyTaskForm = {
@@ -73,6 +75,7 @@ const emptyTaskForm = {
   min_referrals: '1',
   location: '',
   instructions: '',
+  gps_required: false, latitude: '', longitude: '', radius_meters: '100',
 };
 
 function buildTaskConfig(form: typeof emptyTaskForm): Record<string, unknown> {
@@ -81,7 +84,7 @@ function buildTaskConfig(form: typeof emptyTaskForm): Record<string, unknown> {
     case 'social_follow': return { ...(form.platform && { platform: form.platform }), ...(form.handle && { handle: form.handle }), ...(form.profile_url && { profile_url: form.profile_url }) };
     case 'survey': return { ...(form.survey_url && { survey_url: form.survey_url }), ...(form.survey_title && { survey_title: form.survey_title }) };
     case 'referral': return { ...(form.referral_target && { referral_target: form.referral_target }), ...(form.min_referrals && { min_referrals: Number(form.min_referrals) }) };
-    case 'physical': return { ...(form.location && { location: form.location }), ...(form.instructions && { instructions: form.instructions }) };
+    case 'physical': return { ...(form.gps_required && { geofence: { required: true, address: form.location, latitude: Number(form.latitude), longitude: Number(form.longitude), radius_meters: Number(form.radius_meters) } }), ...(form.location && { location: form.location }), ...(form.instructions && { instructions: form.instructions }) };
     default: return {};
   }
 }
@@ -92,7 +95,6 @@ export function OrganizerTaskQueue({ token, communityId }: { token: string; comm
   const [view, setView] = useState<OrganizerView>('queue');
   const [items, setItems] = useState<Submission[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [members, setMembers] = useState<Member[]>([]);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(true);
@@ -102,7 +104,6 @@ export function OrganizerTaskQueue({ token, communityId }: { token: string; comm
   const draft = useDraftState(communityId ? `community:${communityId}:task-create` : '', emptyTaskForm);
   const taskForm = draft.value; const setTaskForm = draft.set;
   const [discard, setDiscard] = useState(false);
-  const [memberQuery, setMemberQuery] = useState('');
   const [policy, setPolicy] = useState<{ community_points: number; platform_maximum: number | null; warning: string | null } | null>(null);
   useRevealFocus(view === 'create' ? view : '', '[data-task-editor]');
   useRevealFocus(expanded, `[data-task-reveal="${expanded}"]`);
@@ -111,7 +112,6 @@ export function OrganizerTaskQueue({ token, communityId }: { token: string; comm
   useEffect(() => { if (communityId) apiJson<any>(`communities/${communityId}/task-point-policy`, {}, token).then(setPolicy).catch(() => setPolicy(null)); }, [communityId, token, view]);
   const [savingTask, setSavingTask] = useState(false);
   const [assigningTask, setAssigningTask] = useState<Task | null>(null);
-  const [assigneeId, setAssigneeId] = useState('');
   const liveToken = () => getLiveToken() ?? token;
 
   const getCommunityId = async (): Promise<string> => {
@@ -136,12 +136,7 @@ export function OrganizerTaskQueue({ token, communityId }: { token: string; comm
     setLoading(true); setError('');
     try {
       const id = await getCommunityId();
-      const [t, m] = await Promise.all([
-        apiJson<Task[]>(`communities/${id}/tasks?management=true`, {}, liveToken()),
-        apiJson<{ members: Member[] }>(`communities/${id}/members`, {}, liveToken()),
-      ]);
-      setTasks(t);
-      setMembers(m.members.filter(item => item.status === 'active'));
+      setTasks(await apiJson<Task[]>(`communities/${id}/tasks?management=true`, {}, liveToken()));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Unable to load tasks');
     } finally { setLoading(false); }
@@ -195,22 +190,6 @@ export function OrganizerTaskQueue({ token, communityId }: { token: string; comm
     } catch (cause) {
       setError(cause instanceof ApiError ? cause.message : 'Unable to create task');
     } finally { setSavingTask(false); }
-  };
-
-  const assignTask = async () => {
-    if (!assigningTask || !assigneeId) return;
-    try {
-      await apiJson<unknown>(`tasks/${assigningTask.id}/assignments`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ assignee_id: assigneeId }),
-      }, liveToken());
-      setMessage('Task assigned successfully.');
-      setAssigningTask(null);
-      setAssigneeId('');
-    } catch (cause) {
-      setError(cause instanceof ApiError ? cause.message : 'Unable to assign task');
-    }
   };
 
   const toggleEvidenceType = (type: string) => {
@@ -298,6 +277,8 @@ export function OrganizerTaskQueue({ token, communityId }: { token: string; comm
                         <a href={item.evidence_url} target="_blank" rel="noopener noreferrer">View evidence link →</a>
                       </p>
                     )}
+                    <EvidenceFiles token={liveToken()} ids={item.attachment_ids || []} />
+                    {item.location_evidence?.verified && <p>GPS verified: {item.location_evidence.distance_meters} metres from task location.</p>}
                     {item.evidence_attachments?.length > 0 && (
                       <div style={{ marginTop: '.75rem' }}>
                         <strong style={{ fontSize: '.875rem' }}>Attachments:</strong>
@@ -361,7 +342,7 @@ export function OrganizerTaskQueue({ token, communityId }: { token: string; comm
                     </p>
                   </div>
                   <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap', flexShrink: 0 }}>
-                    <button className="secondary sm" onClick={() => { setAssigningTask(task); setAssigneeId(''); }}>
+                    <button className="secondary sm" onClick={() => setAssigningTask(task)}>
                       Assign
                     </button>
                   </div>
@@ -380,28 +361,7 @@ export function OrganizerTaskQueue({ token, communityId }: { token: string; comm
           </div>
 
           {/* Assign task modal */}
-          {assigningTask && (
-            <TaskDialog title="Assign task" onClose={() => setAssigningTask(null)}>
-              <div className="panel" style={{ width: 'min(100%, 32rem)' }} onClick={e => e.stopPropagation()}>
-                <h2 style={{ fontSize: '1.1rem', marginBottom: '1rem' }}>Assign: {assigningTask.title}</h2>
-                <label>
-                  <span className="label-text">Search members</span><input value={memberQuery} onChange={e => setMemberQuery(e.target.value)} /><span className="label-text">Select member</span>
-                  <select value={assigneeId} onChange={e => setAssigneeId(e.target.value)}>
-                    <option value="">Choose a member…</option>
-                    {members.filter(m => `${m.display_name || ''} ${m.username || ''} ${m.user_id}`.toLowerCase().includes(memberQuery.toLowerCase())).map(m => (
-                      <option key={m.user_id} value={m.user_id}>
-                        {m.display_name || `Private member (${m.user_id})`}{m.username ? ` (@${m.username})` : ''}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <div className="form-actions" style={{ marginTop: '1rem' }}>
-                  <button className="accent" disabled={!assigneeId} onClick={assignTask}>Assign task</button>
-                  <button className="secondary" onClick={() => setAssigningTask(null)}>Cancel</button>
-                </div>
-              </div>
-            </TaskDialog>
-          )}
+          {assigningTask && <BulkTaskAssignment token={liveToken()} task={assigningTask} onClose={() => setAssigningTask(null)} onDone={setMessage} />}
         </>
       )}
 
@@ -427,7 +387,7 @@ export function OrganizerTaskQueue({ token, communityId }: { token: string; comm
 
             <label>
               <span className="label-text">Task type</span>
-              <select value={taskForm.task_type} onChange={e => setTaskForm({ ...taskForm, task_type: e.target.value })}>
+              <select value={taskForm.task_type} onChange={e => setTaskForm({ ...taskForm, task_type: e.target.value, learning: { ...taskForm.learning, attempts: e.target.value === 'survey' ? 1 : 3 } })}>
                 {TASK_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
               </select>
             </label>
@@ -502,6 +462,7 @@ export function OrganizerTaskQueue({ token, communityId }: { token: string; comm
               </div>
             )}
 
+            {taskForm.task_type === 'physical' && <fieldset><legend>Task geofence</legend><label><input type="checkbox" checked={taskForm.gps_required} onChange={e => setTaskForm({ ...taskForm, gps_required: e.target.checked })} />Require fresh GPS at submission</label>{taskForm.gps_required && <>{(['latitude', 'longitude', 'radius_meters'] as const).map(key => <label key={key}>{key.replace('_', ' ')}<input type="number" required step={key === 'radius_meters' ? 1 : 'any'} min={key === 'latitude' ? -90 : key === 'longitude' ? -180 : 10} max={key === 'latitude' ? 90 : key === 'longitude' ? 180 : 10000} value={taskForm[key]} onChange={e => setTaskForm({ ...taskForm, [key]: e.target.value })} /></label>)}<p>GPS is required in addition to the selected evidence and organizer review. It is requested only on submission.</p></>}</fieldset>}
             <div className="form-row">
               <label>
                 <span className="label-text">Priority</span>

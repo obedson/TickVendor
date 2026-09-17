@@ -115,20 +115,31 @@ def create_event(db: Session, payload: EventCreate, user: User) -> Event:
     return db.scalar(select(Event).options(selectinload(Event.venue)).where(Event.id == event.id))
 
 
-def get_event_for_management(db: Session, event_id: UUID, user: User) -> Event:
-    event = db.scalar(select(Event).options(selectinload(Event.venue)).where(Event.id == event_id))
-    require_available(db, event)
-    if event is None:
-        raise HTTPException(status_code=404, detail="Event not found")
+def _authorize_event_management(db: Session, event: Event, user: User) -> None:
     if user.role != PlatformRole.SUPER_ADMIN:
         membership = require_community_role(db, event.community_id, user, MembershipRole.ORGANIZER)
         if membership.role != MembershipRole.ADMIN:
             require_resource_owner_or_super_admin(event.organizer_id, user)
+
+
+def get_event_for_management(db: Session, event_id: UUID, user: User, *, include_deleted: bool = False) -> Event:
+    """Load an event for the management endpoints.
+
+    A deleted event stays hidden as unavailable for callers who cannot manage it. ``include_deleted``
+    lets soft deletion distinguish an authorized repeat deletion (409) from a missing event (404)
+    without revealing that distinction to anyone else.
+    """
+    event = db.scalar(select(Event).options(selectinload(Event.venue)).where(Event.id == event_id))
+    if include_deleted and event is not None and event.deleted_at is not None:
+        _authorize_event_management(db, event, user)
+        return event
+    require_available(db, event)
+    _authorize_event_management(db, event, user)
     return event
 
 
 def soft_delete_event(db: Session, event_id: UUID, user: User) -> None:
-    event = get_event_for_management(db, event_id, user)
+    event = get_event_for_management(db, event_id, user, include_deleted=True)
     if event.deleted_at is not None:
         raise HTTPException(status_code=409, detail="Event is already deleted")
     event.deleted_at = datetime.now(UTC)
@@ -145,13 +156,21 @@ def update_event(db: Session, event_id: UUID, payload: EventUpdate, user: User) 
     values = payload.model_dump(exclude_unset=True)
     if "category" in values:
         values["category"] = validate_category(db, values["category"])
+    venue_values = values.pop("venue", None)
+    if venue_values is not None:
+        if event.venue is None:
+            raise HTTPException(422, "Only an existing physical venue can be edited here")
+        if event.geofence_enabled and (venue_values.get("latitude") is None or venue_values.get("longitude") is None):
+            raise HTTPException(422, "Enabled geofencing requires venue coordinates")
+        for field, value in venue_values.items():
+            setattr(event.venue, field, value)
     for field, value in values.items():
         setattr(event, field, str(value) if field == "cover_image_url" and value else value)
     if event.ends_at <= event.starts_at:
         raise HTTPException(status_code=422, detail="ends_at must be after starts_at")
     db.commit()
     audit(db, actor_id=user.id, community_id=event.community_id, action="event.updated",
-          target_type="event", target_id=event.id, metadata={"fields": sorted(values)})
+          target_type="event", target_id=event.id, metadata={"fields": sorted([*values, *(["venue"] if venue_values is not None else [])])})
     return event
 
 

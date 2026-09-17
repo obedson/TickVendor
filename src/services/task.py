@@ -51,10 +51,13 @@ def assign_task(db: Session, task: Task, assignee_id, assigner: User) -> TaskAss
     task = db.scalar(select(Task).where(Task.id == task.id).with_for_update())
     require_available(db, task)
     require_community_role(db, task.community_id, assigner, MembershipRole.ORGANIZER)
+    if not task.is_active:
+        raise HTTPException(409, "Task is inactive")
     member = db.scalar(select(Membership).where(
         Membership.community_id == task.community_id,
         Membership.user_id == assignee_id,
         Membership.status == MembershipStatus.ACTIVE,
+        Membership.user_id.in_(select(User.id).where(User.is_active.is_(True))),
     ))
     if member is None:
         raise HTTPException(status_code=404, detail="Task assignee not found in community")
@@ -97,7 +100,7 @@ def _validate_evidence(task: Task, evidence_text, evidence_url, evidence_attachm
         raise HTTPException(status_code=422, detail="This task requires at least one attachment as evidence.")
 
 
-def submit_task(db: Session, assignment: TaskAssignment, user: User, evidence_text=None, evidence_url=None, evidence_attachments=None, answers=None, idempotency_key=None):
+def submit_task(db: Session, assignment: TaskAssignment, user: User, evidence_text=None, evidence_url=None, evidence_attachments=None, answers=None, idempotency_key=None, attachment_ids=None, location=None):
     assignment = db.scalar(select(TaskAssignment).where(TaskAssignment.id == assignment.id).with_for_update().execution_options(populate_existing=True))
     require_available(db, db.get(Task, assignment.task_id))
     if assignment.assignee_id != user.id:
@@ -106,7 +109,7 @@ def submit_task(db: Session, assignment: TaskAssignment, user: User, evidence_te
     if idempotency_key:
         existing = db.scalar(select(TaskSubmission).where(TaskSubmission.idempotency_key == idempotency_key))
         if existing:
-            if existing.assignment_id != assignment.id or existing.answers != (answers or {}) or existing.evidence_text != evidence_text or existing.evidence_url != evidence_url or existing.evidence_attachments != (evidence_attachments or []):
+            if existing.assignment_id != assignment.id or existing.answers != (answers or {}) or existing.evidence_text != evidence_text or existing.evidence_url != evidence_url or existing.evidence_attachments != (evidence_attachments or []) or existing.attachment_ids != [str(v) for v in (attachment_ids or [])]:
                 raise HTTPException(409, "Submission request key conflict")
             if assignment.status == TaskAssignmentStatus.VERIFIED:
                 evaluate_recognition(db, assignment.assignee_id, db.get(Task, assignment.task_id).community_id)
@@ -114,7 +117,14 @@ def submit_task(db: Session, assignment: TaskAssignment, user: User, evidence_te
     if assignment.status not in {TaskAssignmentStatus.ASSIGNED, TaskAssignmentStatus.ACCEPTED, TaskAssignmentStatus.IN_PROGRESS, TaskAssignmentStatus.REJECTED}:
         raise HTTPException(status_code=409, detail="Task cannot be submitted in its current state")
     task = db.get(Task, assignment.task_id)
-    _validate_evidence(task, evidence_text, evidence_url, evidence_attachments)
+    from src.models.task_attachment import TaskAttachment
+    from src.services.task_location import verify_location
+    file_ids = list(dict.fromkeys(attachment_ids or []))
+    files = list(db.scalars(select(TaskAttachment).where(TaskAttachment.id.in_(file_ids), TaskAttachment.assignment_id == assignment.id, TaskAttachment.owner_id == user.id)))
+    if len(files) != len(file_ids):
+        raise HTTPException(422, "An attachment is not owned by this assignment")
+    location_result = verify_location(task, location)
+    _validate_evidence(task, evidence_text, evidence_url, [*(evidence_attachments or []), *file_ids])
     now = datetime.now(UTC)
     if task.due_at and now > as_utc(task.due_at):
         assignment.status = TaskAssignmentStatus.OVERDUE
@@ -127,6 +137,7 @@ def submit_task(db: Session, assignment: TaskAssignment, user: User, evidence_te
         evidence_url=evidence_url, submitted_at=now,
         evidence_attachments=[str(item) for item in (evidence_attachments or [])],
         answers=answers or {}, assessment_result=result, idempotency_key=idempotency_key,
+        attachment_ids=[str(v) for v in file_ids], location_evidence=location_result,
     )
     assignment.status = TaskAssignmentStatus.REJECTED if result.get('passed') is False else TaskAssignmentStatus.SUBMITTED if task.verification_required else TaskAssignmentStatus.VERIFIED
     assignment.completed_at = now

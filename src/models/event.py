@@ -53,6 +53,7 @@ class Venue(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     address: Mapped[str] = mapped_column(Text, nullable=False)
     city: Mapped[str | None] = mapped_column(String(120), index=True)
     region: Mapped[str | None] = mapped_column(String(120))
+    lga: Mapped[str | None] = mapped_column(String(120))
     country_code: Mapped[str] = mapped_column(String(2), default="NG", nullable=False)
     latitude: Mapped[Decimal | None] = mapped_column(Numeric(9, 6))
     longitude: Mapped[Decimal | None] = mapped_column(Numeric(9, 6))

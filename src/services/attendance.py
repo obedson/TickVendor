@@ -210,6 +210,10 @@ def check_in(db: Session, event: Event, user: User, payload: AttendanceCheckIn) 
                             status=AttendanceStatus.CHECKED_IN, checked_in_at=now)
     db.add(attendance); db.flush()
     if event.geofence_enabled:
+        if event.geofence_radius_meters is None:
+            # Legacy events could be saved with geofencing enabled but no radius; every comparison
+            # below is against that radius, so this would otherwise surface as a 500 at check-in.
+            raise HTTPException(status_code=409, detail="This event's geofence is not fully configured; ask the organizer to set a check-in radius")
         if payload.latitude is None or payload.longitude is None or event.venue is None:
             raise HTTPException(status_code=422, detail="Location is required for geofence verification")
         distance = haversine_meters(payload.latitude, payload.longitude, event.venue.latitude, event.venue.longitude)

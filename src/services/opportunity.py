@@ -75,25 +75,40 @@ def update_opportunity(db: Session, opportunity_id: UUID, user: User, **values) 
     return item
 
 
-def list_opportunities(db: Session, user: User, community_id: UUID | None = None, management: bool = False):
+def _discoverable(user: User):
+    """Visibility predicate shared by discovery listing and single-opportunity lookup."""
+    return select(ActivityOpportunity).outerjoin(
+        Membership,
+        (Membership.community_id == ActivityOpportunity.community_id)
+        & (Membership.user_id == user.id)
+        & (Membership.status == MembershipStatus.ACTIVE),
+    ).where(
+        ActivityOpportunity.status == OpportunityStatus.PUBLISHED,
+        visible_content(ActivityOpportunity),
+        ActivityOpportunity.deleted_at.is_(None),
+        ActivityOpportunity.ends_at >= datetime.now(UTC),
+        (ActivityOpportunity.members_only.is_(False) | (Membership.id.is_not(None))),
+    )
+
+
+def list_opportunities(db: Session, user: User, community_id: UUID | None = None, management: bool = False, offset: int = 0, limit: int = 100):
     if management:
         if community_id is None: raise HTTPException(status_code=422, detail="community_id is required")
         require_community_role(db, community_id, user, MembershipRole.ADMIN)
         query = select(ActivityOpportunity).where(ActivityOpportunity.community_id == community_id, ActivityOpportunity.deleted_at.is_(None))
     else:
-        query = select(ActivityOpportunity).outerjoin(
-            Membership,
-            (Membership.community_id == ActivityOpportunity.community_id)
-            & (Membership.user_id == user.id)
-            & (Membership.status == MembershipStatus.ACTIVE),
-        ).where(
-            ActivityOpportunity.status == OpportunityStatus.PUBLISHED,
-            visible_content(ActivityOpportunity),
-            ActivityOpportunity.deleted_at.is_(None),
-            ActivityOpportunity.ends_at >= datetime.now(UTC),
-            (ActivityOpportunity.members_only.is_(False) | (Membership.id.is_not(None))),
-        )
-    return list(db.scalars(query.order_by(ActivityOpportunity.starts_at, ActivityOpportunity.id).limit(100)))
+        query = _discoverable(user)
+    if community_id is not None:
+        query = query.where(ActivityOpportunity.community_id == community_id)
+    return list(db.scalars(query.order_by(ActivityOpportunity.starts_at, ActivityOpportunity.id).offset(offset).limit(limit)))
+
+
+def get_opportunity(db: Session, opportunity_id: UUID, user: User) -> ActivityOpportunity:
+    """One opportunity, under exactly the discovery visibility used by the listing endpoint."""
+    item = db.scalar(_discoverable(user).where(ActivityOpportunity.id == opportunity_id))
+    if item is None:
+        raise HTTPException(status_code=404, detail="Opportunity not found")
+    return item
 
 
 def join_opportunity(db: Session, opportunity_id: UUID, user: User) -> OpportunityRegistration:

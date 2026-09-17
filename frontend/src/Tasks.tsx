@@ -1,4 +1,7 @@
-import { useEffect, useState } from 'react';
+import { SponsoredPlacement } from './SponsoredPlacement';
+import { TaskDetail } from './TaskDetail';
+import { EvidenceUpload, GeolocationError, taskPosition, type EvidenceFile, type TaskPosition } from './TaskEvidence';
+import { useEffect, useRef, useState } from 'react';
 import { apiJson, ApiError, getLiveToken } from './api';
 import { useDraftState } from './formRecovery';
 import { TaskDialog, useRevealFocus } from './RevealFocus';
@@ -18,6 +21,8 @@ type TaskConfig = LearningConfig & {
   min_referrals?: number;
   location?: string;
   instructions?: string;
+  // Decimals are serialized as strings by the backend's JSON model dump.
+  geofence?: { required: boolean; address?: string; latitude?: string | number | null; longitude?: string | number | null; radius_meters?: number | null };
 };
 
 type Task = {
@@ -50,12 +55,14 @@ const STATUS_COLORS: Record<string, string> = {
   rejected: 'chip-red',
 };
 
-export function Tasks({ token, communityId }: { token: string; communityId?: string }) {
+export function Tasks({ token, communityId, initialTaskId }: { token: string; communityId?: string; initialTaskId?: string }) {
   const archive = usePersonalArchive(token, 'task');
   const [tasks, setTasks] = useState<Task[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [detailTask, setDetailTask] = useState<Task | null>(null);
+  const [uploading, setUploading] = useState(false);
   const [selected, setSelected] = useState<Task | null>(null);
-  const draft = useDraftState(selected ? `community:${selected.community_id}:task:${selected.id}:evidence` : '', { evidence: '', url: '', attachments: [''], answers: {} as Record<string, any>, requestKey: '' });
+  const draft = useDraftState(selected ? `community:${selected.community_id}:task:${selected.id}:evidence` : '', { evidence: '', url: '', attachments: [''], answers: {} as Record<string, any>, requestKey: '', files: [] as EvidenceFile[] });
   const evidence = draft.value.evidence; const evidenceUrl = draft.value.url; const evidenceAttachments = draft.value.attachments;
   const setEvidence = (evidence: string) => draft.set(value => ({ ...value, evidence, requestKey: '' }));
   const setEvidenceUrl = (url: string) => draft.set(value => ({ ...value, url, requestKey: '' }));
@@ -77,11 +84,11 @@ export function Tasks({ token, communityId }: { token: string; communityId?: str
     setNoCommunity(false);
     try {
       const communities = communityId ? [{ id: communityId }] : await apiJson<{ id: string }[]>('communities/me', {}, liveToken());
-      const id = communityId || communities.find((item: any) => item.membership?.status === 'active' && item.community?.is_active !== false)?.id;
-      if (!id) { setNoCommunity(true); setTasks([]); setAssignments([]); return; }
+      const ids = communityId ? [communityId] : communities.filter((item: any) => item.membership?.status === 'active' && item.community?.is_active !== false).map(item => item.id);
+      if (!ids.length) { setNoCommunity(true); setTasks([]); setAssignments([]); return; }
       const [a, t] = await Promise.all([
         apiJson<Assignment[]>('task-assignments/me', {}, liveToken()),
-        apiJson<Task[]>(`communities/${id}/tasks`, {}, liveToken()),
+        Promise.all(ids.map(id => apiJson<Task[]>(`communities/${id}/tasks`, {}, liveToken()))).then(rows => rows.flat()),
       ]);
       setAssignments(a);
       setTasks(t);
@@ -95,9 +102,20 @@ export function Tasks({ token, communityId }: { token: string; communityId?: str
 
   useEffect(() => { load(); }, [token, communityId]);
 
+  // Open a promoted/deep-linked task once. `tasks` is a new array after every load(),
+  // so keying the effect on it alone would reopen the dialog after each refresh.
+  const openedTaskId = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (!initialTaskId || openedTaskId.current === initialTaskId) return;
+    const task = tasks.find(item => item.id === initialTaskId);
+    if (!task) return;
+    openedTaskId.current = initialTaskId;
+    setDetailTask(task);
+  }, [initialTaskId, tasks]);
+
   const validateUrl = (url: string): boolean => {
     if (!url) return true;
-    try { new URL(url); return true; } catch { return false; }
+    try { return ['http:', 'https:'].includes(new URL(url).protocol); } catch { return false; }
   };
 
   const submit = async () => {
@@ -117,8 +135,8 @@ export function Tasks({ token, communityId }: { token: string; communityId?: str
       setError('Please enter a valid URL (e.g. https://example.com).'); return;
     }
     const validAttachments = evidenceAttachments.filter(a => a.trim());
-    if (required.includes('attachment') && validAttachments.length === 0) {
-      setError('Please provide at least one attachment URL.'); return;
+    if (required.includes('attachment') && validAttachments.length === 0 && !(draft.value.files || []).length) {
+      setError('Please upload a file or provide an attachment URL.'); return;
     }
     for (const att of validAttachments) {
       if (!validateUrl(att)) { setError(`Invalid attachment URL: ${att}`); return; }
@@ -126,6 +144,18 @@ export function Tasks({ token, communityId }: { token: string; communityId?: str
 
     setBusy(true);
     setError('');
+    // §47/§62: a GPS failure must state what actually failed, not collapse into a generic submit error.
+    let location: TaskPosition | undefined;
+    if (selected.task_config?.geofence?.required) {
+      try {
+        location = await taskPosition();
+      } catch (e) {
+        setError(e instanceof GeolocationError ? `${e.message} Your draft is kept; you can retry, or ask the organizer to verify this task manually.`
+          : 'Unable to verify your location. Please try again, or ask the organizer to verify this task manually.');
+        setBusy(false);
+        return;
+      }
+    }
     try {
       const requestKey = draft.value.requestKey || crypto.randomUUID();
       draft.set(value => ({ ...value, requestKey }));
@@ -134,6 +164,8 @@ export function Tasks({ token, communityId }: { token: string; communityId?: str
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          attachment_ids: (draft.value.files || []).map(file => file.id),
+          location,
           answers: draft.value.answers,
           idempotency_key: requestKey,
           evidence_text: evidence.trim() || null,
@@ -158,8 +190,8 @@ export function Tasks({ token, communityId }: { token: string; communityId?: str
     const assignment = assignments.find(a => a.task_id === task.id);
     if (assignment && archive.ids.has(assignment.id)) return false;
     const status = assignment?.status || 'available';
-    if (filter === 'active') return !['verified', 'rejected'].includes(status);
-    if (filter === 'completed') return ['verified', 'rejected'].includes(status);
+    if (filter === 'active') return status !== 'verified';
+    if (filter === 'completed') return status === 'verified';
     return true;
   });
 
@@ -173,6 +205,7 @@ export function Tasks({ token, communityId }: { token: string; communityId?: str
         </div>
       </div>
 
+      <SponsoredPlacement surface="tasks" />
       <PersonalHistory token={token} kind="task" title="Completed, history and archived assignments" />
       {archive.error && <p role="alert" className="error">{archive.error}</p>}
       {loading && <p role="status" className="text-muted">Loading tasks…</p>}
@@ -212,7 +245,7 @@ export function Tasks({ token, communityId }: { token: string; communityId?: str
             {filteredTasks.map(task => {
               const assignment = assignments.find(a => a.task_id === task.id);
               const status = assignment?.status || 'available';
-              const canSubmit = assignment && !['submitted', 'verified', 'rejected'].includes(status);
+              const canSubmit = assignment && ['assigned', 'accepted', 'in_progress', 'rejected'].includes(status);
 
               const taskTypeLabel: Record<string, string> = {
                 video: '▶ Video', social_follow: '♡ Social', survey: '📋 Survey',
@@ -223,7 +256,7 @@ export function Tasks({ token, communityId }: { token: string; communityId?: str
               return (
                 <article className="card" key={task.id} style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '.5rem' }}>
-                    <h3 style={{ margin: 0, fontSize: '1rem' }}>{task.title}</h3>
+                    <h3 style={{ margin: 0, fontSize: '1rem' }}><button className="link" onClick={() => setDetailTask(task)}>{task.title}</button></h3>
                     <span className={`chip ${PRIORITY_COLORS[task.priority] || 'chip-default'}`}>{task.priority}</span>
                   </div>
                   <p style={{ color: 'var(--tv-muted)', fontSize: '.875rem', flex: 1, margin: 0 }}>
@@ -290,6 +323,7 @@ export function Tasks({ token, communityId }: { token: string; communityId?: str
         </>
       )}
 
+      {detailTask && <TaskDetail token={liveToken()} taskId={detailTask.id} onClose={() => setDetailTask(null)} onChanged={load} onSubmit={() => { setSelected(detailTask); setDetailTask(null); setError(''); }} />}
       {/* Evidence submission modal */}
       {selected && (() => {
         const required = selected.required_evidence_types || ['text'];
@@ -297,12 +331,20 @@ export function Tasks({ token, communityId }: { token: string; communityId?: str
         const needsText = required.includes('text');
         const needsUrl = required.includes('url');
         const needsAttachment = required.includes('attachment');
-        const canSubmit = !busy && draft.ready &&
+        const assignment = assignments.find(a => a.task_id === selected.id);
+        const canSubmit = !!assignment && !busy && !uploading && draft.ready &&
           (!needsText || evidence.trim()) &&
           (!needsUrl || evidenceUrl.trim()) &&
-          (!needsAttachment || evidenceAttachments.some(a => a.trim()));
+          (!needsAttachment || evidenceAttachments.some(a => a.trim()) || (draft.value.files || []).length > 0);
+        // Closing mid-upload orphans in-flight files: the draft scope changes with `selected`,
+        // so uploads that land afterwards can no longer record their attachment IDs.
+        const closeDialog = () => {
+          if (busy) return;
+          if (uploading) { setError('A file is still uploading. Wait for it to finish before closing, or the upload will not be attached to this submission.'); return; }
+          setSelected(null); setError('');
+        };
         return (
-          <TaskDialog title="Submit task evidence" onClose={() => { if (!busy) { setSelected(null); setError(''); } }}>
+          <TaskDialog title="Submit task evidence" onClose={closeDialog}>
             <div
               className="panel"
               style={{ width: 'min(100%, 40rem)', maxHeight: '90vh', overflow: 'auto' }}
@@ -394,6 +436,10 @@ export function Tasks({ token, communityId }: { token: string; communityId?: str
                 {urlError && <span role="alert" style={{ color: 'var(--tv-error)', fontSize: '.8rem' }}>{urlError}</span>}
               </label>
 
+              {assignment
+                ? <EvidenceUpload token={liveToken()} assignmentId={assignment.id} files={draft.value.files || []} onChange={files => draft.set(value => ({ ...value, files, requestKey: '' }))} onBusy={setUploading} />
+                : <p role="alert" className="error">This task is not assigned to you yet, so private file uploads are unavailable. Refresh your tasks or ask the organizer to assign it.</p>}
+              {config.geofence?.required && <p>GPS is required. Submitting requests a fresh position; no check-in is accepted without valid location evidence.</p>}
               {/* Attachment URLs */}
               <div style={{ marginTop: '1rem' }}>
                 <span className="label-text">
@@ -443,8 +489,8 @@ export function Tasks({ token, communityId }: { token: string; communityId?: str
                 >
                   {busy ? 'Submitting…' : 'Submit task'}
                 </button>
-                <button className="secondary" onClick={() => { setSelected(null); setError(''); }}>Close and keep draft</button>
-                <button className="secondary" disabled={busy} onClick={() => setDiscardDraft(true)}>Discard draft</button>
+                <button className="secondary" disabled={busy || uploading} onClick={closeDialog}>Close and keep draft</button>
+                <button className="secondary" disabled={busy || uploading} onClick={() => setDiscardDraft(true)}>Discard draft</button>
               </div>
             </div>
           </TaskDialog>

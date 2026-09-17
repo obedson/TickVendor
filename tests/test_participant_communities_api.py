@@ -14,7 +14,7 @@ from src.security import create_access_token
 from tests.test_database import create_event_context
 
 
-def test_member_can_list_active_communities_without_leaking_other_tenants(tmp_path):
+def test_member_lists_all_own_memberships_without_leaking_other_tenants(tmp_path):
     engine = create_engine(f"sqlite:///{tmp_path / 'my-communities.db'}", connect_args={"check_same_thread": False})
     Base.metadata.create_all(engine)
     sessions = sessionmaker(bind=engine, expire_on_commit=False)
@@ -26,15 +26,21 @@ def test_member_can_list_active_communities_without_leaking_other_tenants(tmp_pa
         db.add(other_user); db.flush()
         organization = Organization(owner_id=other_user.id, name="Other Org", slug="other-org")
         db.add(organization); db.flush()
-        other_community = Community(organization_id=organization.id, name="Other Community", slug="other-community")
-        db.add(other_community); db.flush()
-        db.add(Event(community_id=other_community.id, organizer_id=other_user.id, title="Other Event", slug="other-event",
-                     description="Other", category="other", starts_at=datetime.now(UTC), ends_at=datetime.now(UTC),
+        invited_community = Community(organization_id=organization.id, name="Invited Community", slug="invited-community", is_public=False)
+        suspended_community = Community(organization_id=organization.id, name="Suspended Community", slug="suspended-community")
+        foreign_community = Community(organization_id=organization.id, name="Foreign Community", slug="foreign-community", is_public=False)
+        db.add_all([invited_community, suspended_community, foreign_community]); db.flush()
+        db.add(Event(community_id=foreign_community.id, organizer_id=other_user.id, title="Foreign Event", slug="foreign-event",
+                     description="Foreign", category="other", starts_at=datetime.now(UTC), ends_at=datetime.now(UTC),
                      location_type="online"))
         db.add(Membership(community_id=community.id, user_id=user.id, role=MembershipRole.MEMBER, status=MembershipStatus.ACTIVE))
-        db.add(Membership(community_id=other_community.id, user_id=user.id, role=MembershipRole.MEMBER, status=MembershipStatus.INVITED))
+        db.add(Membership(community_id=invited_community.id, user_id=user.id, role=MembershipRole.MEMBER, status=MembershipStatus.INVITED))
+        db.add(Membership(community_id=suspended_community.id, user_id=user.id, role=MembershipRole.MEMBER, status=MembershipStatus.SUSPENDED))
+        db.add(Membership(community_id=foreign_community.id, user_id=other_user.id, role=MembershipRole.ADMIN, status=MembershipStatus.ACTIVE))
         db.commit()
         user_id = user.id
+        own_ids = {str(community.id), str(invited_community.id), str(suspended_community.id)}
+        foreign_id = str(foreign_community.id)
     app = create_app()
     def override():
         with sessions() as db:
@@ -46,6 +52,16 @@ def test_member_can_list_active_communities_without_leaking_other_tenants(tmp_pa
     )
     assert response.status_code == 200
     body = response.json()
-    assert [item["id"] for item in body] == [str(community.id)]
-    assert body[0]["membership"]["role"] == "member"
+    # `/communities/me` lists every membership state for the caller: active communities,
+    # invitations, and suspended or past records the participant journey needs.
+    assert {item["id"] for item in body} == own_ids
+    assert foreign_id not in {item["id"] for item in body}
+    statuses = {item["id"]: item["membership"]["status"] for item in body}
+    assert statuses[str(community.id)] == "active"
+    assert statuses[str(invited_community.id)] == "invited"
+    assert statuses[str(suspended_community.id)] == "suspended"
+    created = [item["membership"]["created_at"] for item in body]
+    assert created == sorted(created)
+    active = next(item for item in body if item["id"] == str(community.id))
+    assert active["membership"]["role"] == "member"
     engine.dispose()

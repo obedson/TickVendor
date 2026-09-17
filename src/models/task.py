@@ -134,6 +134,8 @@ class TaskSubmission(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     evidence_url: Mapped[str | None] = mapped_column(String(2048))
     submitted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     evidence_attachments: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    attachment_ids: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    location_evidence: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
     answers: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
     assessment_result: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
     idempotency_key: Mapped[str | None] = mapped_column(String(160))

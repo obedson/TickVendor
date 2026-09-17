@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field, HttpUrl, field_validator
 
 from src.models import TaskPriority, TaskType
 from src.services.task_assessment import validate_config
+from src.services.task_location import LocationEvidence
 
 # Per-type config keys that are allowed for each task kind.
 _TASK_TYPE_CONFIG_KEYS: dict[str, set[str]] = {
@@ -17,7 +18,7 @@ _TASK_TYPE_CONFIG_KEYS: dict[str, set[str]] = {
     TaskType.SOCIAL_FOLLOW: {"platform", "handle", "profile_url"},
     TaskType.SURVEY: {"survey_url", "survey_title", "assessment"},
     TaskType.REFERRAL: {"referral_target", "min_referrals"},
-    TaskType.PHYSICAL: {"location", "instructions"},
+    TaskType.PHYSICAL: {"location", "instructions", "geofence"},
 }
 
 
@@ -58,7 +59,21 @@ class AssignmentInput(BaseModel):
     assignee_id: UUID
 
 
+class BulkResolveInput(BaseModel):
+    emails: str | None = Field(default=None, max_length=100000)
+    search: str = Field(default="", max_length=200)
+    all_members: bool = False
+
+
+class BulkAssignInput(BaseModel):
+    selected_ids: list[UUID] = Field(default_factory=list, max_length=1000)
+    all_members: bool = False
+    selection_version: str | None = Field(default=None, max_length=64)
+
+
 class SubmissionInput(BaseModel):
+    attachment_ids: list[UUID] = Field(default_factory=list, max_length=10)
+    location: LocationEvidence | None = None
     answers: dict[str, Any] = Field(default_factory=dict, max_length=30)
     idempotency_key: str | None = Field(default=None, min_length=16, max_length=160)
     evidence_text: str | None = Field(default=None, max_length=10000)

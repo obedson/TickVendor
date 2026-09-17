@@ -22,9 +22,16 @@ class VenueInput(BaseModel):
     address: str = Field(min_length=1, max_length=1000)
     city: str | None = Field(default=None, max_length=120)
     region: str | None = Field(default=None, max_length=120)
+    lga: str | None = Field(default=None, max_length=120)
     country_code: str = Field(default="NG", min_length=2, max_length=2)
     latitude: Decimal | None = Field(default=None, ge=-90, le=90)
     longitude: Decimal | None = Field(default=None, ge=-180, le=180)
+
+    @model_validator(mode="after")
+    def structured_location(self):
+        from src.geography import validate_nigeria_location
+        validate_nigeria_location(self.region, self.lga, self.country_code)
+        return self
 
 
 class EventCreate(BaseModel):
@@ -67,12 +74,17 @@ class EventCreate(BaseModel):
             self.venue is None or self.venue.latitude is None or self.venue.longitude is None
         ):
             raise ValueError("geofencing requires venue coordinates")
+        # Server-side check-in compares distance/accuracy against the radius, so a NULL radius
+        # would raise at enforcement time. PATCH /attendance-config already refuses this; creation must too.
+        if self.geofence_enabled and self.geofence_radius_meters is None:
+            raise ValueError("geofence radius is required when enabling geofence")
         if self.check_in_opens_at and self.check_in_closes_at and self.check_in_closes_at <= self.check_in_opens_at:
             raise ValueError("check_in_closes_at must be after check_in_opens_at")
         return self
 
 
 class EventUpdate(BaseModel):
+    venue: VenueInput | None = None
     title: str | None = Field(default=None, min_length=3, max_length=200)
     description: str | None = Field(default=None, min_length=10, max_length=10000)
     cover_image_url: HttpUrl | None = None
@@ -91,6 +103,7 @@ class VenueResponse(BaseModel):
     address: str
     city: str | None
     region: str | None
+    lga: str | None = None
     country_code: str
     latitude: Decimal | None
     longitude: Decimal | None

@@ -3,7 +3,7 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -19,6 +19,7 @@ from src.schemas.opportunity import (
 from src.services.opportunity import (
     complete_opportunity,
     create_opportunity,
+    get_opportunity,
     get_participant_registration,
     join_opportunity,
     list_opportunities,
@@ -31,13 +32,18 @@ router = APIRouter(tags=["activity opportunities"])
 
 
 @router.get("/activity-opportunities", response_model=list[OpportunityResponse])
-def discover(db: Annotated[Session, Depends(get_db)], user: Annotated[User, Depends(get_current_user)]):
-    return list_opportunities(db, user)
+def discover(db: Annotated[Session, Depends(get_db)], user: Annotated[User, Depends(get_current_user)], community_id: UUID | None = None, offset: int = Query(default=0, ge=0), limit: int = Query(default=100, ge=1, le=100)):
+    return list_opportunities(db, user, community_id, offset=offset, limit=limit)
 
 
 @router.get("/communities/{community_id}/activity-opportunities", response_model=list[OpportunityResponse])
 def manage_list(community_id: UUID, db: Annotated[Session, Depends(get_db)], user: Annotated[User, Depends(get_current_user)]):
     return list_opportunities(db, user, community_id, management=True)
+
+
+@router.get("/activity-opportunities/{opportunity_id}", response_model=OpportunityResponse)
+def detail(opportunity_id: UUID, db: Annotated[Session, Depends(get_db)], user: Annotated[User, Depends(get_current_user)]):
+    return get_opportunity(db, opportunity_id, user)
 
 
 @router.post("/communities/{community_id}/activity-opportunities", response_model=OpportunityResponse, status_code=201)

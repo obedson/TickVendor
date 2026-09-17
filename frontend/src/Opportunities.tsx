@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { SponsoredPlacement } from './SponsoredPlacement';
 import { apiJson, ApiError } from './api';
 import { EmptyState } from './AppShell';
@@ -39,7 +39,8 @@ const REG_STATUS_MAP: Record<string, { label: string; color: string }> = {
   rejected: { label: 'Not approved', color: 'chip-red' },
 };
 
-export function Opportunities({ token }: { token: string }) {
+export function Opportunities({ token, communityId, initialId }: { token: string; communityId?: string; initialId?: string }) {
+  const [offset, setOffset] = useState(0); const [retry, setRetry] = useState(0);
   const [items, setItems] = useState<Opportunity[]>([]);
   const [selected, setSelected] = useState<Opportunity | null>(null);
   const [registration, setRegistration] = useState<Registration | null>(null);
@@ -50,11 +51,12 @@ export function Opportunities({ token }: { token: string }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    apiJson<Opportunity[]>('activity-opportunities', {}, token)
-      .then(setItems)
+    setLoading(true); setError('');
+    apiJson<Opportunity[]>(`activity-opportunities?limit=50&offset=${offset}${communityId ? '&community_id=' + communityId : ''}`, {}, token)
+      .then(rows => setItems(communityId ? rows.filter(row => row.community_id === communityId) : rows))
       .catch(cause => setError(cause instanceof ApiError ? cause.message : 'Unable to load opportunities.'))
       .finally(() => setLoading(false));
-  }, [token]);
+  }, [token, communityId, offset, retry]);
 
   useEffect(() => {
     setMessage('');
@@ -67,6 +69,20 @@ export function Opportunities({ token }: { token: string }) {
       .catch(cause => setError(cause instanceof ApiError ? cause.message : 'Unable to load registration.'))
       .finally(() => setRegistrationLoading(false));
   }, [selected, token]);
+
+  // Open a promoted/deep-linked opportunity once. `items` is a new array after every page load,
+  // so the ref guard keeps a promoted item beyond the first page from re-triggering the fallback.
+  const openedOpportunityId = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (!initialId || openedOpportunityId.current === initialId) return;
+    const match = items.find(item => item.id === initialId);
+    if (match) { openedOpportunityId.current = initialId; setSelected(match); return; }
+    if (loading) return;
+    openedOpportunityId.current = initialId;
+    apiJson<Opportunity>(`activity-opportunities/${initialId}`, {}, token)
+      .then(setSelected)
+      .catch(cause => setError(cause instanceof ApiError ? cause.message : 'Unable to open the promoted opportunity.'));
+  }, [initialId, items, loading, token]);
 
   const join = async () => {
     if (!selected || actionBusy) return;
@@ -173,19 +189,20 @@ export function Opportunities({ token }: { token: string }) {
         </div>
       </div>
 
+      <SponsoredPlacement surface="opportunities" />
       <PersonalHistory token={token} kind="opportunity" title="My registrations, history and archived participation" />
       {loading && <p role="status" className="text-muted">Loading opportunities…</p>}
       {error && <p role="alert" className="error">{error}</p>}
       {!loading && !error && !items.length && (
         <EmptyState
           title="No opportunities available"
-          description="There are no open community opportunities right now. Check back soon."
+          description="No published, unexpired opportunities match your access on this page. Closed, expired, suspended and member-restricted records may be excluded."
         />
       )}
 
+      <button disabled={loading} onClick={() => setRetry(v => v + 1)}>Refresh opportunities</button>
       <div className="grid">
-        {items.map((item, index) => (
-          <Fragment key={item.id}>
+        {items.map(item => (
           <article className="card" key={item.id} style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
             <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
               <span className={`chip ${DIMENSION_COLORS[item.dimension] || 'chip-default'}`}>{item.dimension}</span>
@@ -209,10 +226,8 @@ export function Opportunities({ token }: { token: string }) {
               View opportunity
             </button>
           </article>
-          {index === 2 && items.length > 3 && <div className="result-placement"><SponsoredPlacement surface="opportunities" /></div>}
-          </Fragment>
         ))}
-      </div>
+      </div><div className="form-actions"><button disabled={!offset || loading} onClick={() => setOffset(Math.max(0, offset - 50))}>Previous opportunities</button><button disabled={items.length < 50 || loading} onClick={() => setOffset(offset + 50)}>Next opportunities</button></div>
     </div>
   );
 }

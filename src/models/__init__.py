@@ -58,6 +58,7 @@ from src.models.organization import Organization
 from src.models.payment import Payment, PaymentStatus
 from src.models.personal_archive import PersonalArchive
 from src.models.preference import NotificationPreference
+from src.models.promotion import Promotion
 from src.models.rank import Rank, RankProgression, RankRequirement
 from src.models.scheduled_notification import ScheduledNotification, ScheduledNotificationStatus
 from src.models.task import (
@@ -68,6 +69,7 @@ from src.models.task import (
     TaskSubmission,
     TaskType,
 )
+from src.models.task_attachment import TaskAttachment
 from src.models.ticket import (
     Order,
     OrderStatus,
@@ -136,6 +138,7 @@ __all__ = [
     "PointRule",
     "Profile",
     "ProfileVisibility",
+    "Promotion",
     "Rank",
     "RankProgression",
     "RankRequirement",
@@ -144,6 +147,7 @@ __all__ = [
     "Task",
     "TaskAssignment",
     "TaskAssignmentStatus",
+    "TaskAttachment",
     "TaskPriority",
     "TaskSubmission",
     "TaskType",

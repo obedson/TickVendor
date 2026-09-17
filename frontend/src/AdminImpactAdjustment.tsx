@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import './management.css';
 import { apiJson, ApiError, getLiveToken } from './api';
 
-type Member = { user_id: string; display_name?: string; username?: string; status: string };
+type Member = { user_id: string; display_name?: string; username?: string; email?: string; status: string };
 
 export function AdminImpactAdjustment({ token, communityId }: { token: string; communityId?: string }) {
   const [community, setCommunity] = useState(communityId);
@@ -59,7 +59,7 @@ export function AdminImpactAdjustment({ token, communityId }: { token: string; c
           <select required value={target} onChange={e => setTarget(e.target.value)}>
             <option value="">Select a member</option>
             {members.filter(m => m.status === 'active').map(m => (
-              <option key={m.user_id} value={m.user_id}>{m.display_name || m.username || 'Private member'}</option>
+              <option key={m.user_id} value={m.user_id}>{[m.display_name || m.username || 'Private member', m.email].filter(Boolean).join(' — ')}</option>
             ))}
           </select>
         </label>

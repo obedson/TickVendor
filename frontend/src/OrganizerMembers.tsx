@@ -10,6 +10,7 @@ type Member = {
   user_id: string;
   username?: string;
   display_name?: string;
+  email?: string;
   role: string;
   status: string;
   joined_at?: string;
@@ -101,7 +102,7 @@ export function OrganizerMembers({ token, communityId }: { token: string; commun
   const filtered = members.filter(m => {
     if (!search) return true;
     const q = search.toLowerCase();
-    return (m.display_name || '').toLowerCase().includes(q) || (m.username || '').toLowerCase().includes(q);
+    return (m.display_name || '').toLowerCase().includes(q) || (m.username || '').toLowerCase().includes(q) || (m.email || '').toLowerCase().includes(q);
   });
 
   return (
@@ -120,8 +121,8 @@ export function OrganizerMembers({ token, communityId }: { token: string; commun
               type="search"
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="Search members…"
-              aria-label="Search members"
+              placeholder="Search name, username or email…"
+              aria-label="Search members by name, username or email"
               className="filter-control"
             />
           </div>
@@ -206,6 +207,8 @@ export function OrganizerMembers({ token, communityId }: { token: string; commun
                       <div>
                         <strong style={{ fontSize: '.875rem' }}>{member.display_name || 'Private member'}</strong>
                         {member.username && <p style={{ margin: 0, fontSize: '.75rem', color: 'var(--tv-muted)' }}>@{member.username}</p>}
+                        {/* Only returned to organizers/administrators of this community; two similar display names are otherwise indistinguishable. */}
+                        {member.email && <p style={{ margin: 0, fontSize: '.75rem', color: 'var(--tv-muted)', overflowWrap: 'anywhere' }}>{member.email}</p>}
                       </div>
                     </div>
                   </td>

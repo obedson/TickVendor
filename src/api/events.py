@@ -51,6 +51,12 @@ def local_cover(key: str, expires: int, signature: str):
     return FileResponse(path, headers={"Cache-Control": "private, no-store"})
 
 
+@router.get("/locations/nigeria")
+def nigeria_locations():
+    from src.geography import nigeria_locations as locations
+    return locations()
+
+
 @router.get("/categories")
 def list_event_categories(
     db: Annotated[Session, Depends(get_db)],

@@ -3,7 +3,7 @@ from copy import deepcopy
 from typing import Literal
 
 from fastapi import HTTPException
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, TypeAdapter, model_validator
 
 
 class Question(BaseModel):
@@ -49,6 +49,16 @@ class Checkpoints(BaseModel):
 
 def validate_config(kind, config):
     result = deepcopy(config)
+    for key in ("video_url", "survey_url", "profile_url"):
+        if result.get(key):
+            result[key] = str(TypeAdapter(HttpUrl).validate_python(result[key]))
+    if "geofence" in result:
+        from src.services.task_location import PhysicalLocation
+        if kind != "physical":
+            raise ValueError("GPS configuration is only supported for physical tasks")
+        result["geofence"] = PhysicalLocation.model_validate(result["geofence"]).model_dump(mode="json")
+    if kind == "survey" and "assessment" in result:
+        result["assessment"].setdefault("max_attempts", 1)
     if kind == "quiz" and "assessment" not in result:
         raise ValueError("Quiz questions are required")
     if "assessment" in result:

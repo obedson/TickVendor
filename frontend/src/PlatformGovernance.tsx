@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { apiJson, getLiveToken } from './api';
 import { GovernanceConfirm } from './GovernanceConfirm';
 import './management.css';
+import { PromotionManager } from './PromotionManager';
 import { PlatformPointCeilings } from './PlatformPointCeilings';
 import { useRevealFocus } from './RevealFocus';
 
@@ -76,9 +77,10 @@ export function PlatformGovernance({ token, userRole, categories }: { token: str
   const changeSection = (next: string) => { setSection(next); setSelected(null); setItems([]); setOffset(0); setQ(''); setError(''); setMessage(''); setStatus(''); setSuspended(''); setHistoryTarget(''); setAfter(''); setBefore(''); setCommunity(''); setCreator(''); };
   if (userRole !== 'super_admin') return <p role="alert">Super Admin access required.</p>;
   return <section className="management-screen"><div className="page-header"><div><p className="eyebrow">Platform</p><h1>Platform Administration</h1></div></div>
-    <nav className="section-tabs" aria-label="Platform administration sections">{[['overview', 'Overview'], ['users', 'Users'], ['communities', 'Communities'], ['content', 'Content Moderation'], ['ceilings', 'Point Ceilings'], ['categories', 'Categories'], ['history', 'Moderation History']].map(([id, label]) => <button key={id} aria-pressed={section === id} className="secondary" onClick={() => changeSection(id)}>{label}</button>)}</nav>
+    <nav className="section-tabs" aria-label="Platform administration sections">{[['overview', 'Overview'], ['users', 'Users'], ['communities', 'Communities'], ['content', 'Content Moderation'], ['promotions', 'Promotions'], ['ceilings', 'Point Ceilings'], ['categories', 'Categories'], ['history', 'Moderation History']].map(([id, label]) => <button key={id} aria-pressed={section === id} className="secondary" onClick={() => changeSection(id)}>{label}</button>)}</nav>
     {error && <p className="error" role="alert">{error}</p>}{message && <p role="status">{message}</p>}
     {section === 'overview' && <div className="panel"><h2>Governance and oversight</h2><p>Assign community administrators, manage membership authority and apply reversible policy suspensions. Every governance change records a reason and history. Financial and participation evidence is retained.</p></div>}
+    {section === 'promotions' && <PromotionManager token={token} />}
     {section === 'ceilings' && <PlatformPointCeilings token={token} />}
     {section === 'categories' && categories}
     {['users', 'communities', 'content'].includes(section) && <>

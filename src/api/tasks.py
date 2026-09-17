@@ -22,6 +22,8 @@ from src.models import (
 )
 from src.schemas.task import (
     AssignmentInput,
+    BulkAssignInput,
+    BulkResolveInput,
     SubmissionInput,
     TaskAssignmentResponse,
     TaskCreateInput,
@@ -53,6 +55,7 @@ def verification_queue(community_id: UUID, db: Annotated[Session, Depends(get_db
     return [{"assignment_id": str(assignment.id), "task_id": str(task.id), "task_title": task.title,
              "assignee_id": str(assignment.assignee_id), "submitted_at": submission.submitted_at,
              "evidence_text": submission.evidence_text, "evidence_url": submission.evidence_url,
+             "attachment_ids": submission.attachment_ids, "location_evidence": submission.location_evidence,
              "evidence_attachments": submission.evidence_attachments, "answers": submission.answers,
              "assessment_result": submission.assessment_result,
              "assignee_name": (f"Private member ({assignment.assignee_id})" if profile.visibility == ProfileVisibility.PRIVATE else f"{profile.display_name} (@{profile.username})") if profile else "Community member"} for assignment, task, submission, profile in rows]
@@ -69,7 +72,7 @@ def list_tasks(community_id: UUID, db: Annotated[Session, Depends(get_db)],
     from src.services.availability import visible_content
     query = query.where(visible_content(Task))
     if status_filter:
-        query = query.where(Task.id.in_(select(TaskAssignment.task_id).where(TaskAssignment.status == status_filter)))
+        query = query.where(Task.id.in_(select(TaskAssignment.task_id).where(TaskAssignment.status == status_filter, *([] if management else [TaskAssignment.assignee_id == user.id]))))
     policy = task_policy(db, community_id)
     return [
         {
@@ -106,9 +109,11 @@ def my_assignments(db: Annotated[Session, Depends(get_db)], user: Annotated[User
 
 
 @router.get("/task-assignments/me/details")
-def my_assignment_details(db: Annotated[Session, Depends(get_db)], user: Annotated[User, Depends(get_current_user)]):
+def my_assignment_details(db: Annotated[Session, Depends(get_db)], user: Annotated[User, Depends(get_current_user)], summary_only: bool = False):
     rows = db.execute(select(TaskAssignment, Task).join(Task, Task.id == TaskAssignment.task_id)
                       .where(TaskAssignment.assignee_id == user.id).order_by(TaskAssignment.created_at)).all()
+    if summary_only:
+        return [{"id": str(assignment.id), "task_id": str(task.id), "title": task.title, "due_at": task.due_at, "status": assignment.status.value} for assignment, task in rows]
     policies = {task.community_id: None for _, task in rows}
     for community_id in policies:
         policies[community_id] = task_policy(db, community_id)
@@ -160,7 +165,7 @@ def submit(assignment_id: UUID, payload: SubmissionInput,
     if assignment is None: raise HTTPException(status_code=404, detail="Assignment not found")
     submission = submit_task(db, assignment, user, payload.evidence_text,
                              str(payload.evidence_url) if payload.evidence_url else None,
-                             [str(url) for url in payload.evidence_attachments], payload.answers, payload.idempotency_key)
+                             [str(url) for url in payload.evidence_attachments], payload.answers, payload.idempotency_key, payload.attachment_ids, payload.location.model_dump() if payload.location else None)
     return {"id": str(submission.id), "assessment_result": submission.assessment_result, "status": assignment.status.value}
 
 
@@ -186,3 +191,38 @@ def attempts(assignment_id: UUID, db: Annotated[Session, Depends(get_db)], user:
         raise HTTPException(404, "Assignment not found")
     return [{"id": str(row.id), "result": row.assessment_result, "submitted_at": row.submitted_at}
             for row in db.scalars(select(TaskSubmission).where(TaskSubmission.assignment_id == assignment_id).order_by(TaskSubmission.submitted_at))]
+
+
+@router.post("/tasks/{task_id}/assignment-candidates")
+def assignment_candidates(task_id: UUID, payload: BulkResolveInput, db: Annotated[Session, Depends(get_db)], user: Annotated[User, Depends(get_current_user)]):
+    from src.services.task_bulk import resolve
+    task = db.get(Task, task_id)
+    if task is None:
+        raise HTTPException(404, "Task not found")
+    return resolve(db, task, user, **payload.model_dump())
+
+
+@router.post("/tasks/{task_id}/assignments/bulk")
+def bulk_assign(task_id: UUID, payload: BulkAssignInput, db: Annotated[Session, Depends(get_db)], user: Annotated[User, Depends(get_current_user)]):
+    from src.services.task_bulk import assign_bulk
+    task = db.get(Task, task_id)
+    if task is None:
+        raise HTTPException(404, "Task not found")
+    return assign_bulk(db, task, user, **payload.model_dump())
+
+
+@router.get("/tasks/{task_id}")
+def task_detail(task_id: UUID, db: Annotated[Session, Depends(get_db)], user: Annotated[User, Depends(get_current_user)]):
+    from src.services.availability import require_available
+    task = require_available(db, db.get(Task, task_id))
+    require_community_role(db, task.community_id, user)
+    assignment = db.scalar(select(TaskAssignment).where(TaskAssignment.task_id == task.id, TaskAssignment.assignee_id == user.id))
+    submissions = list(db.scalars(select(TaskSubmission).where(TaskSubmission.assignment_id == assignment.id).order_by(TaskSubmission.submitted_at.desc()).limit(20))) if assignment else []
+    return {"id": str(task.id), "community_id": str(task.community_id), "title": task.title, "description": task.description,
+            "task_type": task.task_type, "task_config": participant_config(task.task_config), "due_at": task.due_at,
+            "priority": task.priority, "verification_required": task.verification_required, "required_evidence_types": task.required_evidence_types,
+            "impact_point_reward": effective_task_points(db, task), "attachments": task.attachments,
+            "assignment": {"id": str(assignment.id), "status": assignment.status.value, "rejection_reason": assignment.rejection_reason} if assignment else None,
+            "history": [{"id": str(row.id), "submitted_at": row.submitted_at, "result": row.assessment_result,
+                         "evidence_text": row.evidence_text, "evidence_url": row.evidence_url, "evidence_attachments": row.evidence_attachments,
+                         "attachment_ids": row.attachment_ids, "location_evidence": row.location_evidence} for row in submissions]}

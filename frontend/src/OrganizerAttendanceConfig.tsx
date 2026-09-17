@@ -3,6 +3,8 @@ import './management.css';
 import { apiJson, ApiError, getLiveToken } from './api';
 
 type Config = {
+  latitude: string | number | null;
+  longitude: string | number | null;
   qr_attendance_enabled: boolean;
   geofence_enabled: boolean;
   organizer_verification_enabled: boolean;
@@ -15,6 +17,7 @@ type Config = {
 };
 
 const initial: Config = {
+  latitude: null, longitude: null,
   qr_attendance_enabled: true,
   geofence_enabled: false,
   organizer_verification_enabled: true,
@@ -70,7 +73,7 @@ export function OrganizerAttendanceConfig({ token, communityId, eventId }: { tok
       await apiJson<Config>(`communities/${communityId}/events/${eventId}/attendance-config`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(config),
+        body: JSON.stringify({ ...config, latitude: config.latitude === '' ? null : config.latitude, longitude: config.longitude === '' ? null : config.longitude }),
       }, getLiveToken() ?? token);
       setMessage('Attendance configuration saved.');
     } catch (cause) {
@@ -104,6 +107,7 @@ export function OrganizerAttendanceConfig({ token, communityId, eventId }: { tok
         <CheckRow label="Peer confirmation" field="peer_confirmation_enabled" description="Allow participants to confirm each other's attendance." />
       </div>
 
+      {config.geofence_enabled && <fieldset><legend>Attendance location</legend><p>Use the actual venue coordinates. Addresses are not automatically geocoded.</p><div className="form-row"><label>Latitude<input type="number" required min={-90} max={90} step="any" value={config.latitude ?? ''} onChange={e => setConfig({ ...config, latitude: e.target.value })} /></label><label>Longitude<input type="number" required min={-180} max={180} step="any" value={config.longitude ?? ''} onChange={e => setConfig({ ...config, longitude: e.target.value })} /></label></div></fieldset>}
       <fieldset style={{ marginBottom: '1rem' }}>
         <legend>Required to qualify for attendance</legend>
         <p className="text-muted text-sm" style={{ marginBottom: '.5rem' }}>

@@ -43,7 +43,7 @@ export function HomeDashboard({
     Promise.race([deadline, Promise.all([
       apiJson<HomeData>('profiles/me', { signal: controller.signal }, token),
       apiJson<Ticket[]>('tickets/me', { signal: controller.signal }, token),
-      apiJson<Task[]>('task-assignments/me/details', { signal: controller.signal }, token),
+      apiJson<Task[]>('task-assignments/me/details?summary_only=true', { signal: controller.signal }, token),
     ])])
       .then(([p, t, a]) => { if (active) { setProfile(p); setTickets(t); setTasks(a); } })
       .catch(cause => active && setError(timedOut ? 'The dashboard request took too long. Please retry.' : cause instanceof ApiError ? cause.message : 'Unable to load your dashboard.'))
@@ -76,7 +76,7 @@ export function HomeDashboard({
 
   if (!profile) return null;
 
-  const activeTasks = tasks.filter(task => !['verified', 'rejected'].includes(task.status));
+  const activeTasks = tasks.filter(task => !['verified', 'overdue'].includes(task.status));
   const upcomingTickets = tickets.filter(t => t.status === 'active');
   const nextRankPct = profile.next_rank
     ? Math.max(0, Math.min(100, 100 - Math.round((profile.next_rank.points_remaining / ((profile.impact_points ?? 0) + profile.next_rank.points_remaining)) * 100)))

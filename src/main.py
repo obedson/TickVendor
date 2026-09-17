@@ -33,7 +33,9 @@ from src.api.payments import router as payments_router
 from src.api.personal_archive import router as personal_archive_router
 from src.api.point_ceilings import router as point_ceilings_router
 from src.api.profiles import router as profiles_router
+from src.api.promotions import router as promotions_router
 from src.api.search import router as search_router
+from src.api.task_evidence import router as task_evidence_router
 from src.api.tasks import router as tasks_router
 from src.api.ticket_catalog import router as ticket_catalog_router
 from src.api.tickets import router as tickets_router
@@ -79,6 +81,8 @@ def create_app() -> FastAPI:
     application.include_router(search_router, prefix=settings.api_v1_prefix)
     application.include_router(tickets_router, prefix=settings.api_v1_prefix)
     application.include_router(ticket_catalog_router, prefix=settings.api_v1_prefix)
+    application.include_router(promotions_router, prefix=settings.api_v1_prefix)
+    application.include_router(task_evidence_router, prefix=settings.api_v1_prefix)
     application.include_router(tasks_router, prefix=settings.api_v1_prefix)
 
     @application.middleware("http")

@@ -262,7 +262,7 @@ function TicketQr({ ticket }: { ticket: OfflineTicket }) {
 /* ── Events discovery view ───────────────────────────────── */
 function EventsView({
   events, loading, error, query, setQuery, selected, setSelected,
-  types, typesError, purchase, purchaseError, purchasingTypeId, acquire, onRetry,
+  types, typesError, purchase, purchaseError, purchasingTypeId, acquire, onRetry, offset, setOffset,
 }: {
   events: EventItem[]; loading: boolean; error: string; query: string;
   setQuery: (q: string) => void; selected: EventItem | null;
@@ -270,6 +270,7 @@ function EventsView({
   typesError: string; purchase: string; purchaseError: string; purchasingTypeId: string;
   acquire: (t: TicketType) => void;
   onRetry: () => void;
+  offset: number; setOffset: (value: number) => void;
 }) {
   if (selected) {
     return (
@@ -385,11 +386,12 @@ function EventsView({
       {!loading && !error && !events.length && (
         <EmptyState
           title={query ? 'No events match your search' : 'No events available'}
-          description={query ? 'Try a different search term or clear your search to see all events.' : 'There are no published events right now. Check back soon.'}
+          description={query ? 'Try a different search term or clear your search to see all events.' : 'No published upcoming or ongoing events match this page. Past, cancelled and suspended events are excluded.'}
           action={query ? 'Clear search' : undefined}
           onAction={query ? () => setQuery('') : undefined}
         />
       )}
+      <div className="form-actions"><button disabled={!offset || loading} onClick={() => setOffset(Math.max(0, offset - 20))}>Previous events</button><button disabled={events.length < 20 || loading} onClick={() => setOffset(offset + 20)}>Next events</button></div>
       <SponsoredPlacement surface="discover" />
       <div className="grid">
         {events.map(event => (
@@ -481,6 +483,7 @@ function App() {
   const [events, setEvents] = useState<EventItem[]>([]);
   const [tickets, setTickets] = useState<OfflineTicket[]>([]);
   const [query, setQuery] = useState('');
+  const [eventOffset, setEventOffset] = useState(0);
   const [eventsError, setEventsError] = useState('');
   const [eventsLoading, setEventsLoading] = useState(false);
   const [view, setView] = useState<
@@ -492,6 +495,8 @@ function App() {
     'admin-recognition' | 'admin-notifications' | 'admin-analytics' | 'admin-audit' |
     'platform-admin'
   >('home');
+  const [promotedTaskId, setPromotedTaskId] = useState<string | undefined>();
+  const [promotedOpportunityId, setPromotedOpportunityId] = useState<string | undefined>();
   const [selectedEvent, setSelectedEvent] = useState<EventItem | null>(null);
   const [types, setTypes] = useState<TicketType[]>([]);
   const [typesError, setTypesError] = useState('');
@@ -500,6 +505,13 @@ function App() {
   const [purchasingTypeId, setPurchasingTypeId] = useState('');
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [workspace, setWorkspace] = useState<'participant' | 'management' | 'platform'>('participant');
+  useEffect(() => { const open = (event: Event) => { const item = (event as CustomEvent).detail; if (!['community', 'event', 'opportunity', 'task'].includes(item?.content_type)) return;
+    setWorkspace('participant');
+    if (item.content_type === 'event') { setView('events'); if (item.content_id) apiJson<EventItem>(`events/${item.content_id}`).then(setSelectedEvent).catch(e => setEventsError(e.message)); }
+    else if (item.content_type === 'task') { setPromotedTaskId(item.content_id); setView('tasks'); }
+    else if (item.content_type === 'opportunity') { setPromotedOpportunityId(item.content_id); setView('opportunities'); }
+    else setView('communities');
+  }; window.addEventListener('tickvendor-open-content', open); return () => window.removeEventListener('tickvendor-open-content', open); }, []);
   const [managedCommunities, setManagedCommunities] = useState<WorkspaceCommunity[]>([]);
   const [selectedCommunityId, setSelectedCommunityId] = useState('');
   const [membershipRevision, setMembershipRevision] = useState(0);
@@ -570,12 +582,12 @@ function App() {
   const loadEvents = useCallback(() => {
     if (!session) return;
     setEventsLoading(true); setEventsError('');
-    fetchWithRetry(`${API}/events?search=${encodeURIComponent(query)}`)
+    fetchWithRetry(`${API}/events?search=${encodeURIComponent(query)}&limit=20&offset=${eventOffset}`)
       .then(r => { if (!r.ok) throw Error('Unable to load events'); return r.json(); })
       .then(setEvents)
       .catch((e: Error) => setEventsError(e.message))
       .finally(() => setEventsLoading(false));
-  }, [session?.access_token, query]);
+  }, [session?.access_token, query, eventOffset]);
 
   useEffect(() => { loadEvents(); }, [loadEvents]);
 
@@ -707,7 +719,7 @@ function App() {
           {view === 'events' && (
             <EventsView
               events={events} loading={eventsLoading} error={eventsError}
-              query={query} setQuery={setQuery}
+              query={query} setQuery={value => { setQuery(value); setEventOffset(0); }} offset={eventOffset} setOffset={setEventOffset}
               selected={selectedEvent} setSelected={setSelectedEvent}
               types={types} typesError={typesError}
               purchase={purchase} purchaseError={purchaseError}
@@ -716,12 +728,12 @@ function App() {
             />
           )}
           {view === 'tickets' && <TicketsView tickets={tickets} token={session.access_token} />}
-          {view === 'opportunities' && <Opportunities token={session.access_token} />}
+          {view === 'opportunities' && <Opportunities initialId={promotedOpportunityId} token={session.access_token} />}
           {view === 'attendance' && <Attendance token={session.access_token} tickets={tickets} />}
-          {view === 'tasks' && <Tasks token={session.access_token} />}
+          {view === 'tasks' && <Tasks initialTaskId={promotedTaskId} token={session.access_token} />}
           {view === 'recognition' && <Recognition token={session.access_token} />}
           {view === 'profile' && <ProfileEditor token={session.access_token} />}
-          {view === 'communities' && <Communities token={session.access_token} />}
+          {view === 'communities' && <Communities isSuperAdmin={isSuperAdmin} token={session.access_token} />}
           {view === 'notifications' && <Notifications token={session.access_token} />}
           {view === 'organizer-dashboard' && <OrganizerDashboard token={session.access_token} />}
           {view === 'organizer-events' && <OrganizerEvents token={session.access_token} communityId={selectedCommunityId} />}

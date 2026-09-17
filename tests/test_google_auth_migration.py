@@ -53,8 +53,8 @@ def test_populated_auth_upgrade(tmp_path, monkeypatch):
     with engine.connect() as connection:
         before = {name: connection.execute(sa.text(f'SELECT * FROM {name}')).all() for name in names}
     config = Config('alembic.ini')
-    assert ScriptDirectory.from_config(config).get_heads() == ['d9e0f1a23456']
-    command.upgrade(config, 'head')
+    assert ScriptDirectory.from_config(config).get_revision('d9e0f1a23456') is not None
+    command.upgrade(config, 'd9e0f1a23456')
     with engine.connect() as connection:
         for name in names:
             assert connection.execute(sa.text(f'SELECT * FROM {name}')).all() == before[name]

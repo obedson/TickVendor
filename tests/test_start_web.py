@@ -4,6 +4,9 @@ import subprocess
 import sys
 from pathlib import Path
 
+from alembic.config import Config
+from alembic.script import ScriptDirectory
+
 
 def test_start_web_runs_alembic_before_uvicorn():
     source = Path("scripts/start_web.py").read_text()
@@ -13,6 +16,8 @@ def test_start_web_runs_alembic_before_uvicorn():
 
 
 def test_blank_database_migrates_to_current_head(tmp_path):
+    heads = ScriptDirectory.from_config(Config("alembic.ini")).get_heads()
+    assert len(heads) == 1, f"expected a single migration head, found {heads}"
     database = tmp_path / "blank.db"
     environment = {**os.environ, "DATABASE_URL": f"sqlite:///{database}"}
     result = subprocess.run(
@@ -24,4 +29,4 @@ def test_blank_database_migrates_to_current_head(tmp_path):
         [sys.executable, "-m", "alembic", "current"],
         env=environment, capture_output=True, text=True, check=True,
     )
-    assert "f1a2b3c4d5e6 (head)" in current.stdout + current.stderr
+    assert f"{heads[0]} (head)" in current.stdout + current.stderr
