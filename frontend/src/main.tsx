@@ -53,6 +53,10 @@ type TicketType = {
   id: string; name: string; description?: string | null; price: string; currency: string;
   availability: number; max_per_user: number; max_per_order: number;
   sold?: number; visibility?: string; sales_start?: string | null; sales_end?: string | null;
+  // The caller's own checkout that is still holding tickets of this type. It is why the count above
+  // is lower than expected, and it is the one reservation they can give up from here — a provider
+  // that is closed without paying returns the browser nowhere and reports nothing.
+  pending_reservation?: { order_id: string; quantity: number; expires_at?: string | null } | null;
 };
 
 const API = API_BASE;
@@ -276,18 +280,37 @@ function TicketQr({ ticket }: { ticket: OfflineTicket }) {
 }
 
 /* ── One purchasable ticket type ─────────────────────────── */
+const isFreeType = (type: TicketType) => Number(type.price) === 0;
+
 /**
- * Each ticket type owns its own quantity, so the ceiling can honour the organizer's own
- * configuration rather than a single hard-coded 1: never more than `max_per_order` in one order,
- * never more than `max_per_user` in total, and never more than what is actually left.
+ * How many of this ticket type one order may hold.
+ *
+ * The organizer's per-order ceiling is the purchase limit and the remaining inventory is the only
+ * other bound. `max_per_user` is deliberately absent: it is not a purchase cap — it limits how many
+ * tickets one attendee may personally redeem, which the server enforces at check-in — and treating
+ * it as a buying limit clamped every paid type whose per-attendee limit was the default of 1 down to
+ * a single ticket per order.
+ *
+ * A free type is fixed at one whatever is stored, because zero price says nothing is being sold and
+ * the server refuses more than one in any case. A missing `max_per_order` (an older API) falls back
+ * to one rather than guessing a larger number the server would then have to refuse.
  */
-function TicketTypeOption({ type, disabled, busy, onAcquire }: {
-  type: TicketType; disabled: boolean; busy: boolean; onAcquire: (type: TicketType, quantity: number) => void;
+function perOrderCeiling(type: TicketType) {
+  const configured = type.max_per_order ?? 1;
+  return Math.max(1, Math.min(isFreeType(type) ? 1 : configured, type.availability));
+}
+
+function TicketTypeOption({ type, disabled, busy, onAcquire, onRelease }: {
+  type: TicketType; disabled: boolean; busy: boolean;
+  onAcquire: (type: TicketType, quantity: number) => void;
+  onRelease: (orderId: string) => void;
 }) {
   const soldOut = type.availability <= 0;
-  const ceiling = Math.max(1, Math.min(type.max_per_order ?? 1, type.max_per_user ?? 1, type.availability));
+  const ceiling = perOrderCeiling(type);
   const [quantity, setQuantity] = useState(1);
   const [problem, setProblem] = useState('');
+  const [releasing, setReleasing] = useState(false);
+  const reservation = type.pending_reservation;
 
   // Inventory can shrink while this page is open; keep the choice inside what is still allowed.
   const chosen = Math.min(quantity, ceiling);
@@ -295,8 +318,7 @@ function TicketTypeOption({ type, disabled, busy, onAcquire }: {
   const submit = () => {
     if (!Number.isInteger(chosen) || chosen < 1) { setProblem('Choose at least one ticket.'); return; }
     if (chosen > type.availability) { setProblem(`Only ${type.availability} left for this ticket type.`); return; }
-    if (chosen > (type.max_per_order ?? 1)) { setProblem(`This ticket type allows at most ${type.max_per_order} per order.`); return; }
-    if (chosen > (type.max_per_user ?? 1)) { setProblem(`You may hold at most ${type.max_per_user} of this ticket type.`); return; }
+    if (chosen > ceiling) { setProblem(`This ticket type allows at most ${ceiling} per order.`); return; }
     setProblem('');
     onAcquire(type, chosen);
   };
@@ -334,12 +356,38 @@ function TicketTypeOption({ type, disabled, busy, onAcquire }: {
       <p className="text-sm text-muted" style={{ margin: '.5rem 0 0' }}>
         {soldOut
           ? 'This ticket type has no tickets left.'
-          : `Maximum ${ceiling} per order${ceiling < (type.max_per_order ?? 1) ? ` (limited by what is left${ceiling < (type.max_per_user ?? 1) ? ' and by your limit' : ''})` : ''}.`}
+          : isFreeType(type)
+            ? 'Free tickets are one per order, so the quantity is fixed at 1.'
+            : `Maximum ${ceiling} per order${ceiling < (type.max_per_order ?? 1) ? ' (limited by what is left)' : ''}.`}
       </p>
       {!soldOut && Number(type.price) > 0 && chosen > 1 && (
         <p className="text-sm" style={{ margin: '.25rem 0 0' }}>Total: {type.currency} {total.toLocaleString()}</p>
       )}
       {problem && <p role="alert" className="error" style={{ margin: '.5rem 0 0' }}>{problem}</p>}
+      {/* A checkout cancelled at the provider comes back here with no reference and no callback, so
+          the reservation it left behind is released from this page instead: the buyer names the
+          order their own browser created. The server refuses it outright if the charge settled. */}
+      {reservation && (
+        <div className="text-sm" style={{ marginTop: '.75rem', padding: '.6rem .75rem', border: '1.5px solid var(--tv-border)', borderRadius: 'var(--tv-radius-md)' }}>
+          <p style={{ margin: 0 }}>
+            You have a pending purchase of {reservation.quantity} ticket{reservation.quantity === 1 ? '' : 's'} for this
+            ticket type{reservation.expires_at ? `, held until ${new Date(reservation.expires_at).toLocaleTimeString()}` : ''}.
+            Those tickets stay off sale until it is paid for or released.
+          </p>
+          <div className="form-actions" style={{ marginTop: '.5rem' }}>
+            <button
+              className="secondary sm"
+              disabled={releasing}
+              onClick={async () => {
+                setReleasing(true);
+                try { await onRelease(reservation.order_id); } finally { setReleasing(false); }
+              }}
+            >
+              {releasing ? 'Cancelling…' : 'Cancel pending purchase'}
+            </button>
+          </div>
+        </div>
+      )}
       <div className="form-actions" style={{ marginTop: '.75rem' }}>
         <button
           className="accent sm"
@@ -357,7 +405,7 @@ function TicketTypeOption({ type, disabled, busy, onAcquire }: {
 function EventsView({
   events, loading, error, query, setQuery, selected, setSelected,
   types, typesError, purchase, purchaseError, purchasingTypeId, acquire, onRetry, offset, setOffset,
-  issued, onOpenTicket, canBuy, onSignIn,
+  issued, onOpenTicket, canBuy, onSignIn, onReleaseReservation, releaseStatus,
 }: {
   events: EventItem[]; loading: boolean; error: string; query: string;
   setQuery: (q: string) => void; selected: EventItem | null;
@@ -370,6 +418,8 @@ function EventsView({
   onOpenTicket: (ticketId: string) => void;
   canBuy: boolean;
   onSignIn: () => void;
+  onReleaseReservation: (orderId: string) => void;
+  releaseStatus: string;
 }) {
   if (selected) {
     return (
@@ -419,6 +469,7 @@ function EventsView({
               {typesError && <p role="alert" className="error">{typesError}</p>}
               {!typesError && !types.length && <p role="status" className="text-muted text-sm">Loading ticket options…</p>}
               {purchase && <p role="status" className="success-msg" style={{ marginBottom: '1rem' }}>{purchase}</p>}
+              {releaseStatus && <p role="status" className="success-msg" style={{ marginBottom: '1rem' }}>{releaseStatus}</p>}
               {purchaseError && <p role="alert" className="error" style={{ marginBottom: '1rem' }}>{purchaseError}</p>}
 
               {/* The individual tickets this order issued, not just a confirmation count. */}
@@ -460,6 +511,7 @@ function EventsView({
                     disabled={!canBuy || Boolean(purchasingTypeId) || Boolean(purchase)}
                     busy={purchasingTypeId === type.id}
                     onAcquire={acquire}
+                    onRelease={onReleaseReservation}
                   />
                 ))}
               </div>
@@ -717,6 +769,8 @@ function App() {
   const [purchase, setPurchase] = useState('');
   const [purchaseError, setPurchaseError] = useState('');
   const [purchasingTypeId, setPurchasingTypeId] = useState('');
+  /** What releasing a pending reservation did, reported without disabling the buy buttons below. */
+  const [releaseStatus, setReleaseStatus] = useState('');
   /** The tickets this session's most recent order actually issued, shown in place after buying. */
   const [issued, setIssued] = useState<OfflineTicket[]>([]);
   /** One ticket opened across views, so a purchase can hand straight over to it. */
@@ -832,8 +886,7 @@ function App() {
   // readable without an account, so a guest inspecting a public event's prices is not blocked.
   useEffect(() => {
     if (!selectedEvent) return;
-    setTypes([]); setTypesError('');
-    setIssued([]);
+    setTypes([]); setTypesError(''); setIssued([]); setReleaseStatus('');
     apiJson<TicketType[]>(`events/${selectedEvent.id}/ticket-types`, {}, getLiveToken() ?? session?.access_token)
       .then(setTypes)
       .catch((e: Error) => setTypesError(e.message));
@@ -885,6 +938,8 @@ function App() {
           onOpenTicket={() => {}}
           canBuy={false}
           onSignIn={() => setShowAuth(true)}
+          onReleaseReservation={() => {}}
+          releaseStatus=""
         />
       </PublicShell>
     );
@@ -921,6 +976,7 @@ function App() {
     if (!session) return;
     setPurchase('');
     setPurchaseError('');
+    setReleaseStatus('');
     setIssued([]);
     setPurchasingTypeId(type.id);
     try {
@@ -973,6 +1029,41 @@ function App() {
     }
   };
 
+  // A checkout the buyer closed at the provider holds its tickets until the reservation times out,
+  // and the provider reports nothing about it: Paystack is given a callback URL it only returns to
+  // once a charge succeeds, so a cancelled checkout calls nothing and returns nowhere. The party
+  // that does know is the buyer, so the release is driven from here, by the order id their own
+  // browser created. The server asks the provider before releasing and refuses outright if the
+  // charge settled, so this can never give away a ticket that was paid for.
+  const releaseReservation = async (orderId: string) => {
+    if (!session || !selectedEvent) return;
+    setPurchaseError('');
+    setReleaseStatus('');
+    try {
+      const result = await apiJson<{ released: boolean }>(
+        'payments/cancel',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ order_id: orderId }),
+        },
+        getLiveToken() ?? session.access_token,
+      );
+      setReleaseStatus(result.released
+        ? 'Pending purchase cancelled. Those tickets are back on sale.'
+        : 'That reservation is no longer pending, so nothing needed releasing.');
+    } catch (err) {
+      setPurchaseError(err instanceof ApiError
+        ? err.message
+        : 'The pending purchase could not be cancelled. It is released automatically if it expires.');
+    }
+    // Either way the listing is what is now out of date: it is what showed the reservation and the
+    // reduced availability behind it.
+    apiJson<TicketType[]>(`events/${selectedEvent.id}/ticket-types`, {}, getLiveToken() ?? session.access_token)
+      .then(setTypes)
+      .catch(() => {});
+  };
+
   const navigateTo = (next: typeof view) => {
     setView(next);
     // Reset event selection when leaving events view
@@ -1019,6 +1110,8 @@ function App() {
               onOpenTicket={ticketId => { setOpenTicketId(ticketId); navigateTo('tickets'); }}
               canBuy
               onSignIn={() => {}}
+              onReleaseReservation={releaseReservation}
+              releaseStatus={releaseStatus}
             />
           )}
           {view === 'tickets' && (

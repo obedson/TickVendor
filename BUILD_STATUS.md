@@ -944,3 +944,29 @@ Local verification completed:
 - git diff --check: no whitespace errors
 
 Still requires deployed/staging verification for browser/device-dependent and external flows, including geolocation, Web Share/clipboard, live transfer links, staff scanning hardware, real PostgreSQL deployment, and end-to-end redemption/check-in behaviour.
+
+## Ticket purchase limits and pending-payment reservation correction
+
+Local verification completed for the ticket-purchase correction set:
+
+- free ticket types are constrained to one ticket per order
+- paid ticket quantity uses max_per_order and remaining inventory rather than max_per_user
+- explicit buyer cancellation can release a pending paid-ticket reservation
+- abandoned paid reservations retain timeout expiry as fallback
+- payment/order/ticket finalization paths use a consistent Payment ? Order ? Ticket lock order
+- pending reservation state is exposed to the authenticated purchaser for recovery
+
+Verification completed:
+
+- focused lock/payment/quantity tests: 28 passed
+- broader ticket regression suite: 78 passed
+- Python compileall: passed
+- Ruff on changed backend/test files: passed
+- frontend production build: passed
+- frontend lint: passed
+- payment-return contract test: passed
+- disposable SQLite migration to c1d2e3f4a5b6: passed
+- alembic check: no new upgrade operations detected
+- git diff --check: no whitespace errors
+
+Staging verification remains required for the real Paystack hosted-checkout cancellation/abandonment path, pending-purchase recovery UI, paid multi-ticket quantity flow, and free-ticket organizer configuration.

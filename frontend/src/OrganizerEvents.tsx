@@ -64,6 +64,17 @@ const STATUS_COLORS: Record<string, string> = {
 const emptyTicketForm = { name: '', description: '', price: '0', currency: 'NGN', quantity: '100', max_per_user: '1', max_per_order: '4', visibility: 'public', sales_start: '', sales_end: '' };
 
 /**
+ * A free ticket type admits one ticket per order, so the ceiling is fixed rather than maintained.
+ *
+ * The rule is the backend's own: a price of zero means nothing is being sold, and one buyer has no
+ * legitimate reason to sweep the whole allocation in a single checkout. An empty price is not yet a
+ * free ticket — the organizer is still typing — so it does not count as one.
+ */
+function isFreePrice(price: string) {
+  return price.trim() !== '' && Number(price) === 0;
+}
+
+/**
  * A ticket type's maintainable fields, minus `event_id`: a type never moves between events.
  *
  * `locked` omits price and currency rather than resending them. The backend reads a field that is
@@ -81,7 +92,9 @@ function ticketTypePayload(form: typeof emptyTicketForm, locked = false) {
     ...(locked ? {} : { price: Number(form.price), currency: form.currency }),
     quantity: Number(form.quantity),
     max_per_user: Number(form.max_per_user),
-    max_per_order: Number(form.max_per_order),
+    // Sent as the backend will store it, so the request says what it means even though the backend
+    // normalizes the same way: a free type's ceiling is one.
+    max_per_order: isFreePrice(form.price) ? 1 : Number(form.max_per_order),
     visibility: form.visibility,
     sales_start: starts ? starts.toISOString() : null,
     sales_end: ends ? ends.toISOString() : null,
@@ -101,6 +114,7 @@ function TicketTypeFields({ form, setForm, lockPrice = false }: {
   setForm: (next: typeof emptyTicketForm) => void;
   lockPrice?: boolean;
 }) {
+  const free = isFreePrice(form.price);
   return (
     <>
       <div className="form-row">
@@ -129,7 +143,7 @@ function TicketTypeFields({ form, setForm, lockPrice = false }: {
         </label>
         <label>
           <span className="label-text">Max per order</span>
-          <input required type="number" min="1" max="100" value={form.max_per_order} onChange={e => setForm({ ...form, max_per_order: e.target.value })} />
+          <input required type="number" min="1" max="100" value={free ? '1' : form.max_per_order} disabled={free} onChange={e => setForm({ ...form, max_per_order: e.target.value })} />
         </label>
         <label>
           <span className="label-text">Visibility</span>
@@ -140,6 +154,7 @@ function TicketTypeFields({ form, setForm, lockPrice = false }: {
           </select>
         </label>
       </div>
+      {free && <p className="text-sm text-muted">A free ticket type allows one ticket per order, so this is fixed at 1.</p>}
       <div className="form-row">
         <label>
           <span className="label-text">Sales open (optional)</span>

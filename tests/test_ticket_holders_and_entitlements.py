@@ -3,6 +3,9 @@
 Every rule in this module is enforced by the server: purchase is limited per order, admission
 is limited per attendee, transfers are single-use, and redemption credentials are issued only
 after eligibility is proven from persisted state and server time.
+
+A free ticket type admits one ticket per order, so the fixtures that acquire several tickets at once
+buy a paid type and settle it — a reservation only becomes an admission once the charge is verified.
 """
 
 from datetime import UTC, datetime, timedelta
@@ -30,6 +33,7 @@ from src.models import (
     Notification,
     Order,
     Organization,
+    Payment,
     PointRule,
     Profile,
     Ticket,
@@ -41,6 +45,7 @@ from src.models import (
     Venue,
     VerificationMethod,
 )
+from src.payments.providers import PaymentVerification
 from src.schemas.attendance import AttendanceCheckIn
 from src.schemas.ticket import (
     EntitlementCreate,
@@ -56,6 +61,7 @@ from src.services.entitlement import (
     update_entitlement,
     validate_redemption,
 )
+from src.services.payment import apply_successful_payment
 from src.services.ticket import (
     cancel_single_ticket,
     create_order,
@@ -128,6 +134,35 @@ OUTSIDE = AttendanceCheckIn(latitude=Decimal("6.500000"), longitude=Decimal("7.6
                            accuracy_meters=Decimal(12))
 
 
+class SettlingProvider:
+    """A provider that reports the charge it is asked about as settled.
+
+    The fixtures below buy several tickets at once, and a free ticket type admits only one per order,
+    so those orders are sales. Their tickets stay reservations until a verified charge activates
+    them, which is what this stands in for.
+    """
+
+    name = "test"
+
+    def __init__(self, amount: Decimal, currency: str = "NGN"):
+        self.amount, self.currency = amount, currency
+
+    def verify(self, provider_reference):
+        return PaymentVerification(provider_reference, self.amount, self.currency, "success")
+
+
+def settle(db: Session, order: Order, *, key="holder-payment-key-000001"):
+    """Pay a pending order the way a verified provider charge does."""
+    provider = SettlingProvider(order.total_amount, order.currency)
+    payment = Payment(
+        order_id=order.id, provider=provider.name, provider_reference=order.reference,
+        idempotency_key=key, amount=order.total_amount, currency=order.currency,
+    )
+    db.add(payment)
+    db.commit()
+    return apply_successful_payment(db, payment, provider)
+
+
 def issue(db, event, buyer, price=Decimal(0), quantity=1, max_per_user=1, max_per_order=4,
           key="order-key-0000001"):
     ticket_type = create_ticket_type(db, event.id, TicketTypeCreate(
@@ -147,12 +182,15 @@ def test_buyer_may_acquire_multiple_tickets_but_only_one_is_their_admission(tmp_
     engine = make_db(tmp_path, "multi.db")
     with Session(engine, expire_on_commit=False) as db:
         organizer, buyer, _friend, _outsider, _community, event = setup(db, geofence=False)
+        # Five tickets in one order is a sale, and the tickets only become admissions once the
+        # charge behind them is verified.
         ticket_type = create_ticket_type(db, event.id, TicketTypeCreate(
-            name="Free", price=Decimal(0), quantity=10, max_per_user=1, max_per_order=10,
+            name="Regular", price=Decimal("1000.00"), quantity=10, max_per_user=1, max_per_order=10,
         ), organizer)
         order = create_order(db, event.id, OrderCreate(
             ticket_type_id=ticket_type.id, quantity=5, idempotency_key="multi-order-key-1",
         ), buyer)
+        settle(db, order, key="multi-payment-key-000001")
         tickets = db.query(Ticket).filter_by(order_id=order.id).order_by(Ticket.created_at).all()
         assert len(tickets) == 5
         assert len({ticket.public_id for ticket in tickets}) == 5
@@ -176,8 +214,10 @@ def test_per_order_limit_is_organizer_configured(tmp_path):
     engine = make_db(tmp_path, "per-order.db")
     with Session(engine, expire_on_commit=False) as db:
         organizer, buyer, _friend, _outsider, _community, event = setup(db, geofence=False)
+        # Paid, because a free type's ceiling is one whatever an organizer configures: this is the
+        # number an organizer sets, honoured exactly.
         ticket_type = create_ticket_type(db, event.id, TicketTypeCreate(
-            name="Free", price=Decimal(0), quantity=50, max_per_user=1, max_per_order=3,
+            name="Regular", price=Decimal("1000.00"), quantity=50, max_per_user=1, max_per_order=3,
         ), organizer)
         with pytest.raises(HTTPException) as exc:
             create_order(db, event.id, OrderCreate(
@@ -196,9 +236,10 @@ def test_per_order_limit_is_organizer_configured(tmp_path):
 def test_inventory_decrements_across_orders(tmp_path):
     engine = make_db(tmp_path, "inventory.db")
     with Session(engine, expire_on_commit=False) as db:
-        organizer, buyer, friend, _outsider, _community, event = setup(db, geofence=False)
+        organizer, buyer, friend, outsider, _community, event = setup(db, geofence=False)
+        # A paid type, because only a sale can put more than one ticket in a single order.
         ticket_type = create_ticket_type(db, event.id, TicketTypeCreate(
-            name="Free", price=Decimal(0), quantity=3, max_per_user=1, max_per_order=3,
+            name="Regular", price=Decimal("1000.00"), quantity=3, max_per_user=1, max_per_order=3,
         ), organizer)
         create_order(db, event.id, OrderCreate(
             ticket_type_id=ticket_type.id, quantity=2, idempotency_key="inv-key-1111111111",
@@ -206,10 +247,13 @@ def test_inventory_decrements_across_orders(tmp_path):
         create_order(db, event.id, OrderCreate(
             ticket_type_id=ticket_type.id, quantity=1, idempotency_key="inv-key-2222222222",
         ), friend)
+        # A fresh buyer takes the last ticket from an empty shelf. The first buyer asking again
+        # would be handed their own pending reservation instead — a different rule, tested where
+        # reservations are.
         with pytest.raises(HTTPException) as exc:
             create_order(db, event.id, OrderCreate(
                 ticket_type_id=ticket_type.id, quantity=1, idempotency_key="inv-key-3333333333",
-            ), buyer)
+            ), outsider)
         assert exc.value.status_code == 409
 
     engine.dispose()
@@ -576,11 +620,12 @@ def test_attendance_and_impact_belong_to_the_holder_not_the_purchaser(tmp_path):
         db.add(PointRule(source_type="attendance", points=30))
         db.commit()
         ticket_type = create_ticket_type(db, event.id, TicketTypeCreate(
-            name="Free", price=Decimal(0), quantity=4, max_per_user=1, max_per_order=4,
+            name="Regular", price=Decimal("1000.00"), quantity=4, max_per_user=1, max_per_order=4,
         ), organizer)
         order = create_order(db, event.id, OrderCreate(
             ticket_type_id=ticket_type.id, quantity=4, idempotency_key="attribution-key-1",
         ), buyer)
+        settle(db, order, key="attribution-payment-key-01")
         tickets = db.query(Ticket).filter_by(order_id=order.id).order_by(Ticket.created_at).all()
         buyer_ticket = next(t for t in tickets if t.assignment_state == TicketAssignmentState.CLAIMED)
         shared = next(t for t in tickets if t.assignment_state == TicketAssignmentState.UNASSIGNED)

@@ -9,9 +9,20 @@ from sqlalchemy.orm import Session
 
 from src.api.auth import get_optional_user
 from src.database import get_db
-from src.models import Event, Ticket, TicketStatus, TicketType, TicketVisibility, User
+from src.models import (
+    Event,
+    Order,
+    OrderStatus,
+    Payment,
+    Ticket,
+    TicketStatus,
+    TicketType,
+    TicketVisibility,
+    User,
+)
 from src.services.availability import require_available
 from src.services.event import event_audience_filter
+from src.services.payment import RELEASABLE_PAYMENT_STATUSES
 from src.services.ticket import CAPACITY_HOLDING_TICKET_STATUSES, expire_pending_orders
 from src.services.ticket_attendance import require_event_staff
 
@@ -59,6 +70,38 @@ def list_event_ticket_types(
     if not _maintains_event(db, event, user):
         conditions.append(TicketType.visibility == TicketVisibility.PUBLIC)
     rows = db.scalars(select(TicketType).where(*conditions).order_by(TicketType.created_at)).all()
+    # A reservation the caller is still holding is part of what this listing has to say: it is why
+    # the number below is lower than they expect, and it is theirs to give up. Only the caller's
+    # own — inventory is public information, but whose checkout is open is not — and only one whose
+    # checkout can still be released, so the release this listing offers can never be refused.
+    reservations: dict[UUID, dict] = {}
+    if user is not None:
+        held = db.execute(
+            select(Ticket.ticket_type_id, Order.id, Order.expires_at, func.count(Ticket.id))
+            .join(Order, Order.id == Ticket.order_id)
+            .where(
+                Order.user_id == user.id,
+                Order.event_id == event_id,
+                Order.status == OrderStatus.PENDING,
+                Ticket.status == TicketStatus.PENDING_PAYMENT,
+            )
+            # `created_at` is grouped rather than only ordered by: PostgreSQL requires every ordered
+            # expression to be grouped or aggregated, and the newest reservation per type is chosen
+            # in Python below, where the first row for a type wins.
+            .group_by(Ticket.ticket_type_id, Order.id, Order.expires_at, Order.created_at)
+            .order_by(Order.created_at.desc())
+        ).all()
+        releasable = set(db.scalars(select(Payment.order_id).where(
+            Payment.order_id.in_([order_id for _, order_id, _, _ in held]),
+            Payment.status.in_(RELEASABLE_PAYMENT_STATUSES),
+        ))) if held else set()
+        for ticket_type_id, order_id, expires_at, quantity in held:
+            if order_id in releasable:
+                reservations.setdefault(ticket_type_id, {
+                    "order_id": str(order_id),
+                    "quantity": quantity,
+                    "expires_at": expires_at.isoformat() if expires_at else None,
+                })
     return [{"id": str(item.id), "event_id": str(item.event_id), "name": item.name, "description": item.description,
              "price": str(item.price), "currency": item.currency, "quantity": item.quantity,
              "sold": db.scalar(select(func.count()).select_from(Ticket).where(Ticket.ticket_type_id == item.id,
@@ -72,4 +115,5 @@ def list_event_ticket_types(
              # rather than left for the client to guess at.
              "max_per_order": item.max_per_order,
              "sales_start": item.sales_start.isoformat() if item.sales_start else None,
-             "sales_end": item.sales_end.isoformat() if item.sales_end else None} for item in rows]
+             "sales_end": item.sales_end.isoformat() if item.sales_end else None,
+             "pending_reservation": reservations.get(item.id)} for item in rows]

@@ -41,6 +41,19 @@ CAPACITY_HOLDING_TICKET_STATUSES = {
     TicketStatus.USED,
 }
 
+# A free ticket type is not being sold, so one buyer has nothing legitimate to gain by sweeping the
+# whole allocation in a single checkout: its per-order ceiling is one, always. That is a property
+# of the price rather than a preference an organizer sets, so it is applied here rather than only
+# validated at the edge — the maintenance form fixes the field, and a client that still posts a
+# larger number (the shipped form default was 4) must not be able to store a ceiling that the
+# purchase behind it would then have to refuse.
+FREE_TICKET_MAX_PER_ORDER = 1
+
+
+def per_order_ceiling(price, max_per_order: int) -> int:
+    """How many tickets one order may hold, given the price the buyer pays for each."""
+    return FREE_TICKET_MAX_PER_ORDER if price == 0 else max_per_order
+
 
 def expire_pending_orders(
     db: Session,
@@ -49,9 +62,15 @@ def expire_pending_orders(
     event_id: UUID | None = None,
     user_id: UUID | None = None,
 ) -> int:
-    """Release expired paid-ticket reservations safely and idempotently."""
+    """Release expired paid-ticket reservations safely and idempotently.
+
+    Locks payment before order before ticket, the order every reservation finalization takes (see
+    the lock-order note in `src.services.payment`). Candidates are found unlocked and each is then
+    re-read under its own lock, because a charge that confirmed while this sweep was queued has
+    already turned its reservation into a sale, and that order is not this sweep's to release.
+    """
     now = now or datetime.now(UTC)
-    query = select(Order).where(
+    query = select(Order.id).where(
         Order.status == OrderStatus.PENDING,
         Order.expires_at.is_not(None),
         Order.expires_at <= now,
@@ -60,20 +79,29 @@ def expire_pending_orders(
         query = query.where(Order.event_id == event_id)
     if user_id is not None:
         query = query.where(Order.user_id == user_id)
-    orders = list(db.scalars(query.with_for_update()))
-    if not orders:
+    candidates = list(db.scalars(query))
+    if not candidates:
         return 0
-    for order in orders:
-        order.status = OrderStatus.EXPIRED
-        for ticket in db.scalars(select(Ticket).where(Ticket.order_id == order.id).with_for_update()):
-            if ticket.status in {TicketStatus.RESERVED, TicketStatus.PENDING_PAYMENT}:
-                ticket.status = TicketStatus.EXPIRED
+    expired = 0
+    for order_id in candidates:
         for payment in db.scalars(select(Payment).where(
-            Payment.order_id == order.id,
+            Payment.order_id == order_id,
             Payment.status == PaymentStatus.PENDING,
         ).with_for_update()):
             payment.status = PaymentStatus.CANCELLED
             payment.failure_reason = "Ticket reservation expired before payment confirmation"
+        order = db.scalar(
+            select(Order)
+            .where(Order.id == order_id, Order.status == OrderStatus.PENDING)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+        if order is None:
+            continue
+        order.status = OrderStatus.EXPIRED
+        for ticket in db.scalars(select(Ticket).where(Ticket.order_id == order.id).with_for_update()):
+            if ticket.status in {TicketStatus.RESERVED, TicketStatus.PENDING_PAYMENT}:
+                ticket.status = TicketStatus.EXPIRED
         event = db.get(Event, order.event_id)
         audit(
             db,
@@ -85,9 +113,10 @@ def expire_pending_orders(
             metadata={"reason": "payment_reservation_timeout"},
             commit=False,
         )
+        expired += 1
     db.commit()
-    emit("ticket_reservations_expired", count=len(orders))
-    return len(orders)
+    emit("ticket_reservations_expired", count=expired)
+    return expired
 
 
 def release_pending_order(
@@ -97,8 +126,22 @@ def release_pending_order(
     reason: str,
     actor_id: UUID | None = None,
 ) -> None:
-    """Cancel a pending reservation when checkout cannot be initialized."""
-    if order.status != OrderStatus.PENDING:
+    """Cancel a pending reservation when checkout cannot be initialized.
+
+    Locks payment before order before ticket, the same order the finalizing paths take, and re-reads
+    the order under that lock: the caller hands over an order it read before locking, and by the
+    time this runs the row may already have been confirmed. No payment status is changed here — a
+    checkout the buyer abandoned is released by `cancel_pending_checkout` — but the lock is taken in
+    the same order so this path can never be the second half of a deadlock with one that does.
+    """
+    db.scalars(select(Payment).where(Payment.order_id == order.id).with_for_update()).all()
+    order = db.scalar(
+        select(Order)
+        .where(Order.id == order.id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    if order is None or order.status != OrderStatus.PENDING:
         return
     order.status = OrderStatus.CANCELLED
     for ticket in db.scalars(select(Ticket).where(Ticket.order_id == order.id).with_for_update()):
@@ -134,7 +177,11 @@ def create_ticket_type(db: Session, event_id: UUID, payload: TicketTypeCreate, u
     manage_event(db, event_id, user)
     if payload.sales_start and payload.sales_end and payload.sales_end <= payload.sales_start:
         raise HTTPException(status_code=422, detail="sales_end must be after sales_start")
-    model = TicketType(event_id=event_id, **payload.model_dump())
+    values = payload.model_dump()
+    # Normalized before the row exists, so a free type can never be stored with a ceiling larger
+    # than the one purchase would honour.
+    values["max_per_order"] = per_order_ceiling(payload.price, payload.max_per_order)
+    model = TicketType(event_id=event_id, **values)
     db.add(model)
     db.commit()
     return model
@@ -172,6 +219,21 @@ def update_ticket_type(
                if key in EDITABLE_TICKET_TYPE_FIELDS}
     if not changes:
         return ticket_type
+
+    # Resolved against the price the type will have once this edit lands, not only the one it has
+    # now: a paid type that becomes free in this same payload must carry the free ceiling with it,
+    # and a free type stays at one however the request words it. Assigned rather than rejected so
+    # an older client posting the shipped default of 4 is corrected instead of refused.
+    #
+    # Compared against the value this edit would otherwise write, not against the value already
+    # stored. A free type is normally stored at one already, so a stored-value comparison finds
+    # nothing to correct and lets the payload's larger number through to the assignment below.
+    ceiling = per_order_ceiling(
+        changes.get("price", ticket_type.price),
+        changes.get("max_per_order", ticket_type.max_per_order),
+    )
+    if changes.get("max_per_order", ticket_type.max_per_order) != ceiling:
+        changes["max_per_order"] = ceiling
 
     issued = db.scalar(select(func.count()).select_from(Ticket).where(
         Ticket.ticket_type_id == ticket_type.id,
@@ -255,11 +317,15 @@ def create_order(db: Session, event_id: UUID, payload: OrderCreate, user: User) 
     if issued + payload.quantity > ticket_type.quantity:
         raise HTTPException(status_code=409, detail="Insufficient ticket inventory")
     # Purchase is limited per order, never per person: one buyer may legitimately acquire many
-    # tickets. How many one attendee may personally redeem is enforced at check-in instead.
-    if payload.quantity > ticket_type.max_per_order:
+    # tickets. How many one attendee may personally redeem is enforced at check-in instead. The
+    # ceiling is resolved through the free-ticket rule rather than read raw, because this is the
+    # last point that can refuse it: `max_per_order` defaults to 4 on the model itself, so a type
+    # written outside this service would otherwise sell four free tickets in a single order.
+    ceiling = per_order_ceiling(ticket_type.price, ticket_type.max_per_order)
+    if payload.quantity > ceiling:
         raise HTTPException(
             status_code=409,
-            detail=f"This ticket type allows at most {ticket_type.max_per_order} tickets per order",
+            detail=f"This ticket type allows at most {ceiling} tickets per order",
         )
     is_free = ticket_type.price == 0
     order = Order(

@@ -4,6 +4,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from src.api.auth import get_current_user
@@ -14,12 +15,18 @@ from src.monitoring import emit
 from src.payments.live_providers import FlutterwaveProvider, PaystackProvider, StripeProvider
 from src.payments.providers import PaymentProvider, TestPaymentProvider
 from src.schemas.payment import (
+    PaymentCancelRequest,
     PaymentInitializeRequest,
     PaymentInitializeResponse,
     PaymentReferenceVerifyRequest,
     PaymentVerifyRequest,
 )
-from src.services.payment import apply_successful_payment, initialize_payment, reconcile_payment
+from src.services.payment import (
+    apply_successful_payment,
+    cancel_pending_checkout,
+    initialize_payment,
+    reconcile_payment,
+)
 from src.services.ticket import refund_order
 
 router = APIRouter(prefix="/payments", tags=["payments"])
@@ -96,6 +103,51 @@ def verify_reference(
         "status": payment.status.value,
         "order_status": order.status.value,
         "provider_reference": payment.provider_reference,
+    }
+
+
+@router.post("/cancel")
+def cancel_checkout(
+    payload: PaymentCancelRequest,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
+    provider: Annotated[PaymentProvider, Depends(get_payment_provider)],
+):
+    """Release the reservation behind a checkout the buyer cancelled.
+
+    No provider callback drives this. Paystack is sent only a `callback_url`, and it appends a
+    reference to it only when a charge completes, so a checkout that is cancelled or simply closed
+    returns the browser nowhere and TickVendor is told nothing at all. What reaches this route is
+    therefore the buyer's own browser, naming the abandoned checkout by whichever handle it holds —
+    the payment id, the provider reference, or the order id it created itself. The provider is asked
+    what it thinks before anything is released, which is what keeps a click that races a successful
+    charge from cancelling a paid reservation; anything that cannot be confirmed is left alone for
+    `expire_pending_orders` to release on its own timeout.
+    """
+    if payload.payment_id is not None:
+        payment = db.get(Payment, payload.payment_id)
+    elif payload.order_id is not None:
+        payment = db.scalar(
+            select(Payment)
+            .where(Payment.order_id == payload.order_id)
+            .order_by(Payment.created_at.desc())
+        )
+    else:
+        payment = db.query(Payment).filter_by(
+            provider=provider.name,
+            provider_reference=payload.provider_reference,
+        ).one_or_none()
+    order = db.get(Order, payment.order_id) if payment is not None else None
+    if payment is None or order is None or order.user_id != user.id:
+        raise HTTPException(status_code=404, detail="Payment not found")
+    released = cancel_pending_checkout(db, payment, provider, user)
+    return {
+        "payment_id": str(payment.id),
+        "order_id": str(order.id),
+        "event_id": str(order.event_id),
+        "status": payment.status.value,
+        "order_status": order.status.value,
+        "released": released,
     }
 
 
