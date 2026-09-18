@@ -18,6 +18,22 @@ export function buildLearning(kind: string, data: BuilderData) {
   if (['quiz', 'survey'].includes(kind) && data.questions.length) return { assessment: { questions: data.questions.map((q, i) => ({ id: `q${i}`, prompt: q.prompt, kind: q.kind, choices: ['single','multiple'].includes(q.kind) ? q.choices.split('\n').filter(Boolean) : [], ...(kind === 'quiz' ? { correct: q.correct.split(',').map(v => Number(v.trim()) - 1) } : {}), required: q.required !== false })), passing_score: data.passing, max_attempts: data.attempts } };
   return {};
 }
+/** The inverse of {@link buildLearning}, so an existing task can be re-opened in the builder.
+ *
+ * Only the organizer editor reads a stored config this way; `participant_config` strips these
+ * keys before a participant ever sees them, so a correct answer number cannot leak back out
+ * through this function's caller.
+ */
+export function learningFromConfig(config: Record<string, any> | null | undefined): BuilderData {
+  const assessment = config?.assessment; const checkpoints = config?.checkpoints;
+  return {
+    questions: (assessment?.questions ?? []).map((q: any) => ({ prompt: q.prompt ?? '', kind: q.kind ?? 'single', choices: (q.choices ?? []).join('\n'), correct: (q.correct ?? []).map((index: number) => index + 1).join(', '), required: q.required !== false })),
+    checkpoints: (checkpoints?.items ?? []).map((item: any) => ({ position: item.position ?? '', prompt: item.prompt ?? '', expected: item.expected ?? '' })),
+    attempts: assessment?.max_attempts ?? checkpoints?.max_attempts ?? 3,
+    passing: assessment?.passing_score ?? 100,
+    minimum: checkpoints?.minimum_correct ?? 0,
+  };
+}
 export function LearningBuilder({ kind, data, onChange }: { kind: string; data: BuilderData; onChange: (value: BuilderData) => void }) {
   if (!['quiz','survey','video'].includes(kind)) return null;
   return <section className="panel"><h3>{kind === 'video' ? 'Attention checkpoints' : 'Questions'}</h3><p>{kind === 'video' ? 'Place the expected codes in your video. Codes can be shared and are not guaranteed watch verification. Leave empty for a normal video task.' : kind === 'quiz' ? 'Objective choice grading only. Correct choice numbers start at 1.' : 'Survey completion is never graded by opinion. Leave empty to retain an external survey link.'}</p>

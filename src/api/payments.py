@@ -156,6 +156,23 @@ def reconcile(
     return reconcile_payment(db, payment, provider, user)
 
 
+@router.post("/tickets/{ticket_id}/refund")
+def refund_ticket(
+    ticket_id: UUID, db: Annotated[Session, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
+    provider: Annotated[PaymentProvider, Depends(get_payment_provider)],
+):
+    """Refund one ticket of a multi-ticket order; sibling tickets are never affected."""
+    from src.models import Ticket
+    from src.services.ticket import refund_single_ticket
+
+    ticket = db.get(Ticket, ticket_id)
+    if ticket is None:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    updated, completed = refund_single_ticket(db, ticket, user, provider)
+    return {"ticket_id": str(updated.id), "status": updated.status.value, "completed": completed}
+
+
 @router.post("/webhooks/{provider_name}")
 async def webhook(
     provider_name: str,

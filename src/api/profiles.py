@@ -16,7 +16,6 @@ from src.models import (
     Badge,
     BadgeAward,
     Event,
-    EventStatus,
     ImpactTransaction,
     ImpactTransactionStatus,
     Membership,
@@ -31,7 +30,7 @@ from src.models import (
     User,
 )
 from src.security import decode_access_token
-from src.services.availability import visible_content
+from src.services.event import event_discovery_filters
 from src.services.recognition import (
     current_rank,
     next_rank,
@@ -65,13 +64,18 @@ class ProfileUpdateInput(BaseModel):
 
 
 @router.get("/organizers/{user_id}")
-def organizer_profile(user_id: UUID, db: Annotated[Session, Depends(get_db)]):
+def organizer_profile(
+    user_id: UUID,
+    db: Annotated[Session, Depends(get_db)],
+    viewer: Annotated[User | None, Depends(get_optional_user)],
+):
     user = db.get(User, user_id)
     if user is None or user.profile is None or user.profile.visibility == ProfileVisibility.PRIVATE:
         raise HTTPException(status_code=404, detail="Organizer not found")
+    # An organizer's public listing obeys the same discovery rule as every other event read, so a
+    # private community's events are not anonymously reachable through this route either.
     events = list(db.scalars(select(Event).where(
-        visible_content(Event), Event.deleted_at.is_(None),
-        Event.organizer_id == user_id, Event.status == EventStatus.PUBLISHED
+        *event_discovery_filters(viewer), Event.organizer_id == user_id,
     ).order_by(Event.starts_at)))
     if not events:
         raise HTTPException(status_code=404, detail="Organizer not found")

@@ -21,6 +21,7 @@ from src.models import (
     PaymentStatus,
     PlatformRole,
     Ticket,
+    TicketAssignmentState,
     TicketStatus,
     TicketType,
     TicketVisibility,
@@ -28,8 +29,8 @@ from src.models import (
 )
 from src.monitoring import emit
 from src.payments.providers import PaymentProvider
-from src.schemas.ticket import OrderCreate, TicketTypeCreate
-from src.services.event import as_utc
+from src.schemas.ticket import OrderCreate, TicketTypeCreate, TicketTypeUpdate
+from src.services.event import as_utc, event_audience_filter
 from src.services.notification import audit, notify
 
 CAPACITY_HOLDING_TICKET_STATUSES = {
@@ -139,9 +140,76 @@ def create_ticket_type(db: Session, event_id: UUID, payload: TicketTypeCreate, u
     return model
 
 
+# Fields an organizer may maintain after a ticket type exists. `event_id` is deliberately absent:
+# a ticket type never moves between events, and issued tickets reference it.
+EDITABLE_TICKET_TYPE_FIELDS = (
+    "name", "description", "price", "currency", "quantity", "sales_start", "sales_end",
+    "visibility", "max_per_user", "max_per_order",
+)
+
+# Price and currency are snapshotted on the order at purchase time, and a refund resolves the
+# ticket type's live price. Changing either after tickets exist would silently restate what a
+# buyer already paid, so those edits stop at the first issued ticket. New prices belong on a
+# new ticket type (Early Bird / Regular are separate types in the specification).
+_PRICE_LOCKED_FIELDS = ("price", "currency")
+
+
+def update_ticket_type(
+    db: Session, event_id: UUID, ticket_type_id: UUID, payload: TicketTypeUpdate, user: User
+) -> TicketType:
+    """Authorized maintenance of an existing ticket type.
+
+    Only forward-looking configuration changes: already issued tickets, orders, payments and
+    attendance are never rewritten, and inventory already committed cannot be withdrawn.
+    """
+    event = manage_event(db, event_id, user)
+    ticket_type = db.scalar(select(TicketType).where(
+        TicketType.id == ticket_type_id, TicketType.event_id == event.id
+    ).with_for_update())
+    if ticket_type is None:
+        raise HTTPException(status_code=404, detail="Ticket type not found")
+    changes = {key: value for key, value in payload.model_dump(exclude_unset=True).items()
+               if key in EDITABLE_TICKET_TYPE_FIELDS}
+    if not changes:
+        return ticket_type
+
+    issued = db.scalar(select(func.count()).select_from(Ticket).where(
+        Ticket.ticket_type_id == ticket_type.id,
+        Ticket.status.in_(CAPACITY_HOLDING_TICKET_STATUSES),
+    )) or 0
+    if any(key in changes for key in _PRICE_LOCKED_FIELDS) and issued:
+        raise HTTPException(
+            status_code=409,
+            detail="Price and currency cannot change once tickets have been issued; create a new ticket type instead",
+        )
+    if "quantity" in changes and changes["quantity"] < issued:
+        raise HTTPException(
+            status_code=409,
+            detail=f"{issued} tickets already hold this inventory; quantity cannot drop below that",
+        )
+
+    # Compare through `as_utc`: a stored window read back from SQLite is naive while a payload
+    # window is timezone-aware, and the two cannot be ordered directly.
+    merged_start = changes.get("sales_start", ticket_type.sales_start)
+    merged_end = changes.get("sales_end", ticket_type.sales_end)
+    if merged_start and merged_end and as_utc(merged_end) <= as_utc(merged_start):
+        raise HTTPException(status_code=422, detail="sales_end must be after sales_start")
+
+    for key, value in changes.items():
+        setattr(ticket_type, key, value)
+    audit(db, actor_id=user.id, community_id=event.community_id, action="ticket_type.updated",
+          target_type="ticket_type", target_id=ticket_type.id,
+          metadata={"event_id": str(event.id), "fields": sorted(changes)}, commit=False)
+    db.commit()
+    return ticket_type
+
+
 def create_order(db: Session, event_id: UUID, payload: OrderCreate, user: User) -> Order:
     from src.services.availability import require_available
-    require_available(db, db.get(Event, event_id))
+    # A private community's inventory is not purchasable by a non-member, and the check runs
+    # before the idempotency replay so a returning buyer of a still-visible event is unaffected.
+    event = db.scalar(select(Event).where(Event.id == event_id, event_audience_filter(user)))
+    require_available(db, event)
     expire_pending_orders(db, event_id=event_id)
     existing = db.scalar(select(Order).where(Order.idempotency_key == payload.idempotency_key))
     if existing:
@@ -152,7 +220,6 @@ def create_order(db: Session, event_id: UUID, payload: OrderCreate, user: User) 
                 or any(ticket.ticket_type_id != payload.ticket_type_id for ticket in existing_tickets)):
             raise HTTPException(status_code=409, detail="Idempotency key conflict")
         return existing
-    event = db.get(Event, event_id)
     ticket_type = db.scalar(select(TicketType).where(
         TicketType.id == payload.ticket_type_id
     ).with_for_update())
@@ -187,12 +254,13 @@ def create_order(db: Session, event_id: UUID, payload: OrderCreate, user: User) 
     )) or 0
     if issued + payload.quantity > ticket_type.quantity:
         raise HTTPException(status_code=409, detail="Insufficient ticket inventory")
-    owned = db.scalar(select(func.count()).select_from(Ticket).where(
-        Ticket.ticket_type_id == ticket_type.id, Ticket.attendee_id == user.id,
-        Ticket.status.notin_([TicketStatus.CANCELLED, TicketStatus.REFUNDED, TicketStatus.EXPIRED]),
-    )) or 0
-    if owned + payload.quantity > ticket_type.max_per_user:
-        raise HTTPException(status_code=409, detail="Maximum tickets per user exceeded")
+    # Purchase is limited per order, never per person: one buyer may legitimately acquire many
+    # tickets. How many one attendee may personally redeem is enforced at check-in instead.
+    if payload.quantity > ticket_type.max_per_order:
+        raise HTTPException(
+            status_code=409,
+            detail=f"This ticket type allows at most {ticket_type.max_per_order} tickets per order",
+        )
     is_free = ticket_type.price == 0
     order = Order(
         reference=f"TE-{uuid4().hex[:20].upper()}", idempotency_key=payload.idempotency_key,
@@ -203,12 +271,25 @@ def create_order(db: Session, event_id: UUID, payload: OrderCreate, user: User) 
     )
     db.add(order)
     db.flush()
-    for _ in range(payload.quantity):
-        db.add(Ticket(
+    issued: list[Ticket] = []
+    for index in range(payload.quantity):
+        ticket = Ticket(
             public_id=uuid4().hex[:24].upper(), qr_token=token_urlsafe(48), event_id=event_id,
-            ticket_type_id=ticket_type.id, attendee_id=user.id, order_id=order.id,
+            ticket_type_id=ticket_type.id, attendee_id=user.id, purchaser_id=user.id,
+            order_id=order.id,
+            # The buyer keeps the first ticket for themselves; further tickets stay unassigned
+            # until another attendee claims them, so one person can never redeem them all.
+            assignment_state=(
+                TicketAssignmentState.CLAIMED if index == 0 else TicketAssignmentState.UNASSIGNED
+            ),
             status=TicketStatus.ACTIVE if is_free else TicketStatus.PENDING_PAYMENT,
-        ))
+        )
+        db.add(ticket)
+        issued.append(ticket)
+    db.flush()
+    from src.services.entitlement import sync_ticket_entitlements
+    for ticket in issued:
+        sync_ticket_entitlements(db, ticket)
     try:
         db.commit()
     except IntegrityError as exc:
@@ -239,6 +320,12 @@ def validate_ticket(db: Session, event_id: UUID, qr_token: str, staff: User) -> 
         return "already_used", ticket
     if ticket.status != TicketStatus.ACTIVE:
         return "invalid_status", ticket
+    if ticket.assignment_state != TicketAssignmentState.CLAIMED:
+        return "unassigned", ticket
+    from src.services.ticket_attendance import redemption_limit_reached
+    if redemption_limit_reached(db, ticket, ticket.attendee_id):
+        # Server-enforced one-admission-per-attendee rule for the ticket type.
+        return "duplicate_admission", ticket
     attendance = None
     qr_added = False
     if event.qr_attendance_enabled:
@@ -276,6 +363,104 @@ def cancel_ticket(db: Session, ticket: Ticket, user: User) -> Ticket:
     audit(db, actor_id=user.id, community_id=event.community_id, action="ticket.cancelled",
           target_type="ticket", target_id=ticket.id)
     return ticket
+
+
+def _recompute_order_status(db: Session, order: Order) -> None:
+    """Aggregate ticket state into the order without inventing new payment transitions."""
+    statuses = set(db.scalars(select(Ticket.status).where(Ticket.order_id == order.id)))
+    if not statuses or not statuses.issubset(
+        {TicketStatus.CANCELLED, TicketStatus.REFUNDED, TicketStatus.EXPIRED}
+    ):
+        return
+    order.status = (
+        OrderStatus.REFUNDED if TicketStatus.REFUNDED in statuses else OrderStatus.CANCELLED
+    )
+
+
+def cancel_single_ticket(db: Session, ticket: Ticket, user: User) -> Ticket:
+    """Cancel one ticket of a multi-ticket order without touching its siblings."""
+    ticket = db.scalar(select(Ticket).where(Ticket.id == ticket.id).with_for_update())
+    if ticket is None:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    event = db.get(Event, ticket.event_id)
+    if ticket.attendee_id != user.id and user.role != PlatformRole.SUPER_ADMIN:
+        from src.services.ticket_attendance import require_event_staff
+        require_event_staff(db, event, user)
+    if ticket.status not in {TicketStatus.RESERVED, TicketStatus.PENDING_PAYMENT, TicketStatus.ACTIVE}:
+        raise HTTPException(status_code=409, detail="Ticket cannot be cancelled")
+    ticket.status = TicketStatus.CANCELLED
+    order = db.get(Order, ticket.order_id) if ticket.order_id else None
+    if order is not None:
+        _recompute_order_status(db, order)
+    audit(db, actor_id=user.id, community_id=event.community_id if event else None,
+          action="ticket.cancelled", target_type="ticket", target_id=ticket.id,
+          metadata={"order_id": str(order.id) if order else None}, commit=False)
+    db.commit()
+    return ticket
+
+
+def refund_single_ticket(
+    db: Session, ticket: Ticket, user: User, provider: PaymentProvider
+) -> tuple[Ticket, bool]:
+    """Refund one ticket of a multi-ticket order; sibling tickets are unaffected.
+
+    Returns ``(ticket, completed)``. ``completed`` is False while the provider reports a
+    pending refund; the ticket stays valid until the provider settles.
+    """
+    ticket = db.scalar(select(Ticket).where(Ticket.id == ticket.id).with_for_update())
+    if ticket is None:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    if ticket.attendee_id != user.id and user.role != PlatformRole.SUPER_ADMIN:
+        raise HTTPException(status_code=403, detail="Ticket ownership required")
+    if ticket.status == TicketStatus.REFUNDED:
+        raise HTTPException(status_code=409, detail="This ticket is already refunded")
+    if ticket.status not in {TicketStatus.ACTIVE, TicketStatus.PENDING_PAYMENT, TicketStatus.RESERVED}:
+        raise HTTPException(status_code=409, detail="Ticket cannot be refunded")
+    if ticket.used_at is not None:
+        raise HTTPException(status_code=409, detail="A checked-in ticket cannot be refunded automatically")
+    order = db.get(Order, ticket.order_id) if ticket.order_id else None
+    event = db.get(Event, ticket.event_id)
+    payment = None
+    if ticket.order_id is not None:
+        payment = db.scalar(select(Payment).where(
+            Payment.order_id == ticket.order_id, Payment.status == PaymentStatus.SUCCESSFUL,
+        ))
+    if payment is not None:
+        metadata = dict(payment.provider_metadata or {})
+        refunds = dict(metadata.get("ticket_refunds") or {})
+        key = str(ticket.id)
+        if key not in refunds:
+            try:
+                result = provider.refund(payment.provider_reference, ticket_type_price(db, ticket))
+            except Exception as exc:
+                emit("payment_refund_failure", provider=payment.provider,
+                     payment_id=str(payment.id), error_type=type(exc).__name__)
+                payment.failure_reason = f"Refund initiation failed: {type(exc).__name__}"
+                db.commit()
+                raise HTTPException(status_code=502, detail="Payment provider refund failed") from exc
+            refunds[key] = {
+                "reference": str(result.get("reference", payment.provider_reference)),
+                "status": str(result.get("status", "pending")),
+            }
+            metadata["ticket_refunds"] = refunds
+            metadata["refund_status"] = refunds[key]["status"]
+            payment.provider_metadata = metadata
+        if refunds.get(key, {}).get("status") != "success":
+            db.commit()
+            return ticket, False
+    ticket.status = TicketStatus.REFUNDED
+    if order is not None:
+        _recompute_order_status(db, order)
+    audit(db, actor_id=user.id, community_id=event.community_id if event else None,
+          action="ticket.refunded", target_type="ticket", target_id=ticket.id,
+          metadata={"order_id": str(order.id) if order else None}, commit=False)
+    db.commit()
+    return ticket, True
+
+
+def ticket_type_price(db: Session, ticket: Ticket):
+    ticket_type = db.get(TicketType, ticket.ticket_type_id)
+    return ticket_type.price if ticket_type else 0
 
 
 def refund_order(db: Session, order: Order, user: User, provider: PaymentProvider) -> Order:

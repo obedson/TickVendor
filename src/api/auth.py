@@ -39,6 +39,10 @@ from src.services.notification import audit
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.api_v1_prefix}/auth/login")
+# Public discovery endpoints stay reachable when no token is presented.
+optional_oauth2_scheme = OAuth2PasswordBearer(
+    tokenUrl=f"{settings.api_v1_prefix}/auth/login", auto_error=False
+)
 
 
 def serialize_user(user: User) -> UserResponse:
@@ -268,6 +272,28 @@ def get_current_user(
     user = db.scalar(select(User).options(selectinload(User.profile)).where(User.id == payload["sub"]))
     if user is None or not user.is_active:
         raise HTTPException(status_code=401, detail="User is unavailable")
+    return user
+
+
+def get_optional_user(
+    token: Annotated[str | None, Depends(optional_oauth2_scheme)],
+    db: Annotated[Session, Depends(get_db)],
+) -> User | None:
+    """Resolve the caller when they present a valid token, otherwise return ``None``.
+
+    Used by public discovery, where an absent, expired or revoked token must degrade to the
+    anonymous view rather than fail the request. It never widens access: it only distinguishes
+    "member of this community" from "anonymous", so the anonymous branch stays the narrowest.
+    """
+    if not token:
+        return None
+    try:
+        payload = decode_access_token(token)
+    except InvalidTokenError:
+        return None
+    user = db.scalar(select(User).where(User.id == payload["sub"]))
+    if user is None or not user.is_active:
+        return None
     return user
 
 

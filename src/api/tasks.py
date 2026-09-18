@@ -28,6 +28,7 @@ from src.schemas.task import (
     TaskAssignmentResponse,
     TaskCreateInput,
     TaskResponse,
+    TaskUpdateInput,
     VerificationInput,
 )
 from src.services.point_policy import effective_task_points, task_policy
@@ -36,6 +37,7 @@ from src.services.task import (
     create_task,
     submit_task,
     transition_assignment,
+    update_task,
     verify_task,
 )
 from src.services.task_assessment import participant_config
@@ -58,6 +60,16 @@ def verification_queue(community_id: UUID, db: Annotated[Session, Depends(get_db
              "attachment_ids": submission.attachment_ids, "location_evidence": submission.location_evidence,
              "evidence_attachments": submission.evidence_attachments, "answers": submission.answers,
              "assessment_result": submission.assessment_result,
+             "location_verification": {
+                 "required": bool((task.task_config or {}).get("geofence", {}).get("required")),
+                 "verified": bool((submission.location_evidence or {}).get("verified")),
+                 "distance_meters": (submission.location_evidence or {}).get("distance_meters"),
+                 "accuracy_meters": (submission.location_evidence or {}).get("accuracy_meters"),
+                 "verified_at": (submission.location_evidence or {}).get("verified_at"),
+                 "geofence_radius_meters": (task.task_config or {}).get("geofence", {}).get("radius_meters"),
+                 "venue_latitude": (task.task_config or {}).get("geofence", {}).get("latitude"),
+                 "venue_longitude": (task.task_config or {}).get("geofence", {}).get("longitude"),
+             },
              "assignee_name": (f"Private member ({assignment.assignee_id})" if profile.visibility == ProfileVisibility.PRIVATE else f"{profile.display_name} (@{profile.username})") if profile else "Community member"} for assignment, task, submission, profile in rows]
 
 
@@ -88,6 +100,16 @@ def list_tasks(community_id: UUID, db: Annotated[Session, Depends(get_db)],
         }
         for task in db.scalars(query.order_by(Task.due_at))
     ]
+
+
+@router.patch("/tasks/{task_id}")
+def update(task_id: UUID, payload: TaskUpdateInput,
+           db: Annotated[Session, Depends(get_db)], user: Annotated[User, Depends(get_current_user)]):
+    task = db.get(Task, task_id)
+    if task is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+    updated = update_task(db, task, payload.model_dump(exclude_unset=True), user)
+    return {"id": str(updated.id), "is_active": updated.is_active, "status": "updated"}
 
 
 @router.get("/task-assignments/me", response_model=list[TaskAssignmentResponse])
@@ -212,16 +234,22 @@ def bulk_assign(task_id: UUID, payload: BulkAssignInput, db: Annotated[Session, 
 
 
 @router.get("/tasks/{task_id}")
-def task_detail(task_id: UUID, db: Annotated[Session, Depends(get_db)], user: Annotated[User, Depends(get_current_user)]):
+def task_detail(task_id: UUID, db: Annotated[Session, Depends(get_db)], user: Annotated[User, Depends(get_current_user)],
+                management: bool = False):
     from src.services.availability import require_available
     task = require_available(db, db.get(Task, task_id))
     require_community_role(db, task.community_id, user)
+    if management:
+        # Organizer-only: full configuration, still never cached or shown to participants.
+        require_community_role(db, task.community_id, user, MembershipRole.ORGANIZER)
     assignment = db.scalar(select(TaskAssignment).where(TaskAssignment.task_id == task.id, TaskAssignment.assignee_id == user.id))
     submissions = list(db.scalars(select(TaskSubmission).where(TaskSubmission.assignment_id == assignment.id).order_by(TaskSubmission.submitted_at.desc()).limit(20))) if assignment else []
     return {"id": str(task.id), "community_id": str(task.community_id), "title": task.title, "description": task.description,
-            "task_type": task.task_type, "task_config": participant_config(task.task_config), "due_at": task.due_at,
+            "task_type": task.task_type,
+            "task_config": task.task_config if management else participant_config(task.task_config), "due_at": task.due_at,
             "priority": task.priority, "verification_required": task.verification_required, "required_evidence_types": task.required_evidence_types,
             "impact_point_reward": effective_task_points(db, task), "attachments": task.attachments,
+            "is_active": task.is_active,
             "assignment": {"id": str(assignment.id), "status": assignment.status.value, "rejection_reason": assignment.rejection_reason} if assignment else None,
             "history": [{"id": str(row.id), "submitted_at": row.submitted_at, "result": row.assessment_result,
                          "evidence_text": row.evidence_text, "evidence_url": row.evidence_url, "evidence_attachments": row.evidence_attachments,

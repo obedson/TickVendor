@@ -908,3 +908,39 @@ integrated product evidence. TickVendor is not specification-complete or product
 - External/manual verification remains required at 320/360/390/414/768/1024/1280px, Android/iOS/PWA cameras and accessibility, multi-community switching, private R2 delivery/expiry/CORS, failure/concurrent-replacement cleanup recovery, and preserved real free/paid attendance journeys. No new browser/device/staging results are claimed; no push/deploy/Render/secrets changes occurred.
 - Full 38-item reconciliation, file inventory, caveats and exact manual checklist: `docs/UI_UX_RECONCILIATION_2026_09_12.md`. No traceability completion counts changed and no overall project assessment was made.
 - Finalization handoff recheck preserved all 30 tracked modifications and nine intentional new files. Re-ran the 26 frontend/Recognition tests, seven focused backend media tests, build/TypeScript, ESLint, Ruff and whitespace checks successfully. No incomplete integration or accidental generated output was found; documentation was finalized in place before local commit.
+
+## Ticket holder / transfer / entitlement / self attendance reconciliation
+
+Current local candidate implements and locally verifies:
+
+- multi-ticket order issuance and purchaser/holder separation
+- secure ticket transfer and claim flow
+- attendee admission limits for free tickets
+- self check-in and self checkout
+- configurable ticket entitlements/perks
+- time/check-in/checkout/geofence-gated entitlement eligibility
+- short-lived QR / 4-character redemption credentials
+- staff entitlement validation
+- organizer ticket type updates including max-per-order
+- organizer entitlement management
+- anonymous/public event ticket discovery
+- task edit/configuration maintenance
+- participant physical-task geofence UX
+- frontend transfer/share/claim and individual ticket states
+
+Local verification completed:
+
+- backend focused tests: 50 passed
+- frontend production build: passed
+- frontend lint: passed
+- management layout tests: 26 passed
+- task-learning tests: 6 passed
+- auth-recovery tests: 8 passed
+- responsive layout policy: passed
+- offline ticket encryption: passed
+- Ruff on changed ticket catalog contract: passed
+- disposable blank SQLite migration to b3c4d5e6f7a8: passed
+- alembic check: no new upgrade operations detected
+- git diff --check: no whitespace errors
+
+Still requires deployed/staging verification for browser/device-dependent and external flows, including geolocation, Web Share/clipboard, live transfer links, staff scanning hardware, real PostgreSQL deployment, and end-to-end redemption/check-in behaviour.

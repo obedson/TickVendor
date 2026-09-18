@@ -47,6 +47,57 @@ def create_task(db: Session, community_id, creator: User, **values) -> Task:
     db.commit(); return task
 
 
+EDITABLE_TASK_FIELDS = (
+    "title", "description", "event_id", "due_at", "priority", "impact_point_reward",
+    "verification_required", "attachments", "task_config", "required_evidence_types",
+    "is_active",
+)
+
+
+def update_task(db: Session, task: Task, values: dict, editor: User) -> Task:
+    """Authorized maintenance of an existing task.
+
+    Only configuration is touched: assignments, submissions, assessment history and Impact
+    transactions are never rewritten, so historical evidence stays auditable.
+    """
+    task = db.scalar(select(Task).where(Task.id == task.id).with_for_update())
+    require_available(db, task)
+    require_community_role(db, task.community_id, editor, MembershipRole.ORGANIZER)
+    changes = {key: value for key, value in values.items() if key in EDITABLE_TASK_FIELDS}
+    if "impact_point_reward" in changes:
+        validate_task_reward(db, task.community_id, changes["impact_point_reward"])
+    if "task_type" in values and values["task_type"] != task.task_type:
+        submissions = db.scalar(select(func.count(TaskSubmission.id)).join(
+            TaskAssignment, TaskAssignment.id == TaskSubmission.assignment_id
+        ).where(TaskAssignment.task_id == task.id)) or 0
+        if submissions:
+            raise HTTPException(
+                status_code=409,
+                detail="A task with submissions cannot change its type; create a new task instead",
+            )
+        changes["task_type"] = values["task_type"]
+    try:
+        if "task_config" in changes:
+            changes["task_config"] = validate_config(
+                changes.get("task_type", task.task_type), changes["task_config"]
+            )
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    if "attachments" in changes:
+        changes["attachments"] = [str(url) for url in changes["attachments"]]
+    if "event_id" in changes and changes["event_id"] is not None:
+        event = db.get(Event, changes["event_id"])
+        if event is None or event.community_id != task.community_id:
+            raise HTTPException(status_code=404, detail="Event not found")
+    for key, value in changes.items():
+        setattr(task, key, value)
+    audit(db, actor_id=editor.id, community_id=task.community_id, action="task.updated",
+          target_type="task", target_id=task.id,
+          metadata={"fields": sorted(changes)}, commit=False)
+    db.commit()
+    return task
+
+
 def assign_task(db: Session, task: Task, assignee_id, assigner: User) -> TaskAssignment:
     task = db.scalar(select(Task).where(Task.id == task.id).with_for_update())
     require_available(db, task)

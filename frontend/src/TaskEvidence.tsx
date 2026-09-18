@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { apiJson } from './api';
+import { currentPosition, LocationFailure, type LocationFailureKind } from './geolocation';
 
 export type EvidenceFile = { id: string; filename: string; size_bytes: number };
 export function EvidenceFiles({ token, ids }: { token: string; ids: string[] }) {
@@ -36,14 +37,26 @@ export class GeolocationError extends Error {
 
 export type TaskPosition = { latitude: number; longitude: number; accuracy_meters: number; captured_at: string };
 
+// Task submissions word a location failure for the task surface; the fix itself comes from the
+// shared engine so this surface never grows a second copy of the permission/timeout handling.
+const TASK_LOCATION_MESSAGE: Record<LocationFailureKind, string> = {
+  unsupported: 'Geolocation is unavailable in this browser. This task requires valid GPS evidence.',
+  denied: 'Location permission was denied. Allow location access to submit this task.',
+  timeout: 'Location lookup timed out. Try again outdoors or with a better signal.',
+  unavailable: 'Your device could not determine its location. Try again with location services enabled.',
+  request_failed: 'This browser refused the location request. Try again, or ask the organizer to verify this task manually.',
+};
+
 export async function taskPosition(): Promise<TaskPosition> {
-  if (!navigator.geolocation) throw new GeolocationError('Geolocation is unavailable in this browser. This task requires valid GPS evidence.');
-  const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-    try {
-      navigator.geolocation.getCurrentPosition(resolve, error => reject(new GeolocationError(error.code === 1 ? 'Location permission was denied. Allow location access to submit this task.' : error.code === 3 ? 'Location lookup timed out. Try again outdoors or with a better signal.' : 'Your device could not determine its location. Try again with location services enabled.')), { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
-    } catch {
-      reject(new GeolocationError('This browser refused the location request. Try again, or ask the organizer to verify this task manually.'));
-    }
-  });
-  return { latitude: position.coords.latitude, longitude: position.coords.longitude, accuracy_meters: position.coords.accuracy, captured_at: new Date(position.timestamp).toISOString() };
+  let position;
+  try {
+    position = await currentPosition({ timeout: 15000 });
+  } catch (cause) {
+    throw new GeolocationError(
+      cause instanceof LocationFailure
+        ? TASK_LOCATION_MESSAGE[cause.kind]
+        : 'This browser refused the location request. Try again, or ask the organizer to verify this task manually.',
+    );
+  }
+  return { ...position, captured_at: new Date().toISOString() };
 }

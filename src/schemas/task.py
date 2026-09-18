@@ -55,6 +55,49 @@ class TaskCreateInput(BaseModel):
         return v
 
 
+class TaskUpdateInput(BaseModel):
+    """Authorized maintenance of an existing task; every field is optional."""
+
+    title: str | None = Field(default=None, min_length=2, max_length=200)
+    description: str | None = Field(default=None, min_length=2, max_length=5000)
+    event_id: UUID | None = None
+    due_at: datetime | None = None
+    priority: TaskPriority | None = None
+    impact_point_reward: int | None = Field(default=None, ge=0, le=10000)
+    verification_required: bool | None = None
+    attachments: list[HttpUrl] | None = Field(default=None, max_length=10)
+    task_type: TaskType | None = None
+    task_config: dict[str, Any] | None = None
+    required_evidence_types: list[str] | None = None
+    is_active: bool | None = None
+
+    @field_validator("task_config")
+    @classmethod
+    def validate_task_config(cls, v: dict | None, info: Any) -> dict | None:
+        if v is None:
+            return v
+        task_type = info.data.get("task_type")
+        if task_type is None:
+            # The service validates against the persisted type when no type is supplied.
+            return v
+        allowed = _TASK_TYPE_CONFIG_KEYS.get(task_type, set())
+        unknown = set(v.keys()) - allowed
+        if unknown:
+            raise ValueError(f"Unknown config keys for task type '{task_type}': {unknown}")
+        return validate_config(task_type, v)
+
+    @field_validator("required_evidence_types")
+    @classmethod
+    def validate_evidence_types(cls, v: list[str] | None) -> list[str] | None:
+        if v is None:
+            return v
+        allowed = {"text", "url", "attachment"}
+        invalid = set(v) - allowed
+        if invalid:
+            raise ValueError(f"Invalid evidence types: {invalid}. Allowed: {allowed}")
+        return v
+
+
 class AssignmentInput(BaseModel):
     assignee_id: UUID
 

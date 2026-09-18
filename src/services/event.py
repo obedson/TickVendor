@@ -7,16 +7,19 @@ from math import asin, cos, radians, sin, sqrt
 from uuid import UUID
 
 from fastapi import HTTPException
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from src.authorization import require_community_role, require_resource_owner_or_super_admin
 from src.models import (
+    Community,
     Event,
     EventCategory,
     EventStatus,
     LocationType,
+    Membership,
     MembershipRole,
+    MembershipStatus,
     PlatformRole,
     TicketType,
     User,
@@ -45,10 +48,9 @@ def event_distance_km(latitude: Decimal, longitude: Decimal, venue: Venue) -> fl
 
 
 def nearby_events(db: Session, latitude: Decimal, longitude: Decimal, radius_km: float,
-                  limit: int) -> list[tuple[Event, float]]:
+                  limit: int, user: User | None = None) -> list[tuple[Event, float]]:
     candidates = db.scalars(select(Event).options(selectinload(Event.venue)).join(Event.venue).where(
-        Event.status == EventStatus.PUBLISHED, Event.deleted_at.is_(None),
-        visible_content(Event),
+        *event_discovery_filters(user),
         Venue.latitude.is_not(None), Venue.longitude.is_not(None), Event.ends_at >= datetime.now(UTC),
     ).limit(500))
     result = [(event, event_distance_km(latitude, longitude, event.venue)) for event in candidates]
@@ -195,14 +197,47 @@ def publish_event(db: Session, event_id: UUID, user: User, publish: bool) -> Eve
     return event
 
 
+def event_audience_filter(user: User | None):
+    """Who may see an event at all, independent of its lifecycle state.
+
+    A public community's events are world-readable, so guests and authenticated non-members both
+    see them. A private community's events reach only that community's active members. Callers
+    that need the lifecycle conditions as well should use :func:`event_discovery_filters`.
+    """
+    public_community = Event.community_id.in_(
+        select(Community.id).where(Community.is_public.is_(True))
+    )
+    if user is None:
+        return public_community
+    return or_(
+        public_community,
+        Event.community_id.in_(select(Membership.community_id).where(
+            Membership.user_id == user.id,
+            Membership.status == MembershipStatus.ACTIVE,
+        )),
+    )
+
+
+def event_discovery_filters(user: User | None) -> list:
+    """Lifecycle and community-visibility conditions shared by every public event read.
+
+    Anonymous and non-member callers receive nothing from a private community, whether they
+    arrive through the listing, the nearby search, the single-event route or global search.
+    """
+    return [
+        visible_content(Event),
+        Event.status == EventStatus.PUBLISHED,
+        Event.deleted_at.is_(None),
+        event_audience_filter(user),
+    ]
+
+
 def discover_events(
     db: Session, search: str | None, category: str | None, upcoming: bool, limit: int, offset: int,
     city: str | None = None, price: str | None = None, sort: str = "soonest",
+    user: User | None = None,
 ) -> list[Event]:
-    query = select(Event).options(selectinload(Event.venue)).where(
-        visible_content(Event),
-        Event.status == EventStatus.PUBLISHED, Event.deleted_at.is_(None)
-    )
+    query = select(Event).options(selectinload(Event.venue)).where(*event_discovery_filters(user))
     if search:
         pattern = f"%{search.strip().lower()}%"
         query = query.where(

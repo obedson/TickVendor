@@ -11,6 +11,7 @@ from sqlalchemy import (
     Enum,
     ForeignKey,
     Index,
+    Integer,
     Numeric,
     String,
     Text,
@@ -41,6 +42,7 @@ class AttendanceReviewStatus(str, enum.Enum):
 
 class VerificationMethod(str, enum.Enum):
     GPS = "gps"
+    GPS_CHECKOUT = "gps_checkout"
     QR = "qr"
     PEER = "peer"
     ORGANIZER = "organizer"
@@ -56,6 +58,7 @@ class Attendance(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __table_args__ = (
         UniqueConstraint("event_id", "user_id", name="uq_attendance_event_user"),
         Index("ix_attendances_event_status", "event_id", "status"),
+        Index("ix_attendances_event_checkout", "event_id", "checked_out_at"),
     )
 
     event_id: Mapped[Any] = mapped_column(
@@ -73,6 +76,9 @@ class Attendance(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         nullable=False,
     )
     checked_in_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    checked_out_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Server-computed stay length, finalized at checkout. Never derived from client clocks.
+    duration_seconds: Mapped[int | None] = mapped_column(Integer)
     confidence_score: Mapped[Decimal] = mapped_column(Numeric(5, 2), default=0, nullable=False)
     flagged_for_review: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     review_reason: Mapped[str | None] = mapped_column(Text)

@@ -30,6 +30,9 @@ CONFIGURATION_FIELDS = (
     "peer_selection_limit",
     "peer_eligibility_statuses",
     "required_verification_methods",
+    "self_check_in_enabled",
+    "self_checkout_enabled",
+    "checkout_opens_at",
 )
 
 
@@ -47,6 +50,9 @@ class AttendanceConfigurationInput(BaseModel):
     peer_selection_limit: int | None = Field(default=None, ge=1, le=100)
     peer_eligibility_statuses: list[str] | None = Field(default=None, max_length=20)
     required_verification_methods: list[str] | None = Field(default=None, max_length=10)
+    self_check_in_enabled: bool | None = None
+    self_checkout_enabled: bool | None = None
+    checkout_opens_at: datetime | None = None
 
     @field_validator("required_verification_methods")
     @classmethod
@@ -60,6 +66,8 @@ class AttendanceConfigurationInput(BaseModel):
     def validate_combinations(self):
         if self.geofence_enabled and self.geofence_radius_meters is None:
             raise ValueError("geofence radius is required when enabling geofence")
+        if self.self_checkout_enabled and self.self_check_in_enabled is False:
+            raise ValueError("self checkout requires self check-in")
         return self
 
 
@@ -86,7 +94,7 @@ def update_attendance_config(community_id: UUID, event_id: UUID, payload: Attend
     event = db.scalar(select(Event).where(Event.id == event_id, Event.community_id == community_id))
     if event is None: raise HTTPException(status_code=404, detail="Event not found")
     values = payload.model_dump(exclude_unset=True)
-    if any(value is None for key, value in values.items() if key not in {"latitude", "longitude", "peer_confirmation_deadline"}):
+    if any(value is None for key, value in values.items() if key not in {"latitude", "longitude", "peer_confirmation_deadline", "checkout_opens_at"}):
         raise HTTPException(422, "Attendance policy fields cannot be null")
     coordinates = {key: values.pop(key) for key in ("latitude", "longitude") if key in values}
     if event.venue is None and not any(value is not None for value in coordinates.values()):

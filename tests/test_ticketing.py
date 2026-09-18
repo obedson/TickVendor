@@ -89,17 +89,28 @@ def test_free_order_is_idempotent_wallet_ticket_and_duplicate_scan_is_safe(tmp_p
         assert attendance.status == AttendanceStatus.CHECKED_IN
         assert db.query(ImpactTransaction).filter_by(source_type="attendance").count() == 1
         assert db.query(Notification).filter_by(notification_type="ticket_confirmed").one().user_id == buyer.id
-        with pytest.raises(HTTPException) as limit:
+        # A buyer may acquire more than one ticket; the purchase cap is per order, not per person.
+        with pytest.raises(HTTPException) as per_order:
             create_order(db, event_model.id, OrderCreate(
-                ticket_type_id=ticket_type.id, quantity=1, idempotency_key="another-safe-key-123"
+                ticket_type_id=ticket_type.id, quantity=5, idempotency_key="over-cap-key-12345"
             ), buyer)
-        assert limit.value.status_code == 409
+        assert per_order.value.status_code == 409
+        second_order = create_order(db, event_model.id, OrderCreate(
+            ticket_type_id=ticket_type.id, quantity=1, idempotency_key="another-safe-key-123"
+        ), buyer)
+        assert second_order.id != order.id
+        second_ticket = db.query(Ticket).filter_by(order_id=second_order.id).one()
+        assert second_ticket.status == TicketStatus.ACTIVE
         with pytest.raises(HTTPException):
             validate_ticket(db, event_model.id, ticket.qr_token, outsider)
         result, _ = validate_ticket(db, event_model.id, ticket.qr_token, organizer)
         assert result == "valid"
         result, _ = validate_ticket(db, event_model.id, ticket.qr_token, organizer)
         assert result == "already_used"
+        # One attendee may not redeem two admissions of the same ticket type.
+        result, _ = validate_ticket(db, event_model.id, second_ticket.qr_token, organizer)
+        assert result == "duplicate_admission"
+        assert second_ticket.status == TicketStatus.ACTIVE
         assert attendance.status == AttendanceStatus.QR_VERIFIED
         assert db.query(Attendance).filter_by(event_id=event_model.id, user_id=buyer.id).count() == 1
         assert db.query(AttendanceVerification).filter_by(

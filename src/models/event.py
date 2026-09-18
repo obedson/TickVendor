@@ -65,6 +65,7 @@ class Event(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     __table_args__ = (
         Index("ix_events_suspended", "is_suspended"),
         Index("ix_events_discovery", "status", "starts_at"),
+        Index("ix_events_discovery_ends", "status", "ends_at"),
         Index("ix_events_community_status", "community_id", "status"),
         Index("ix_events_search_title", "status", "title"),
     )
@@ -102,6 +103,9 @@ class Event(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     geofence_radius_meters: Mapped[int | None] = mapped_column(Integer)
     check_in_opens_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     check_in_closes_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    self_check_in_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    self_checkout_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    checkout_opens_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     peer_confirmation_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     confirmations_required: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     organizer_verification_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)

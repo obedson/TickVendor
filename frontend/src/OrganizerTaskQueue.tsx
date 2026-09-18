@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import './management.css';
 import { useDraftState } from './formRecovery';
 import { useRevealFocus } from './RevealFocus';
-import { LearningBuilder, buildLearning, emptyLearning } from './LearningTask';
+import { LearningBuilder, buildLearning, emptyLearning, learningFromConfig } from './LearningTask';
 import { GovernanceConfirm } from './GovernanceConfirm';
 import { EmptyState } from './AppShell';
 import { apiJson, ApiError, getLiveToken } from './api';
@@ -89,7 +89,61 @@ function buildTaskConfig(form: typeof emptyTaskForm): Record<string, unknown> {
   }
 }
 
-type OrganizerView = 'queue' | 'tasks' | 'create';
+type OrganizerView = 'queue' | 'tasks' | 'create' | 'edit';
+
+/** What `GET /tasks/{id}?management=true` returns to an organizer: the full stored config. */
+type TaskDetail = {
+  id: string;
+  title: string;
+  description: string;
+  task_type: string;
+  task_config: Record<string, any>;
+  due_at?: string | null;
+  priority: string;
+  verification_required: boolean;
+  required_evidence_types: string[];
+  impact_point_reward: number;
+  is_active: boolean;
+};
+
+/**
+ * Re-open a stored task in the same form that created it.
+ *
+ * Quiz and checkpoint answers are read here because this screen is the organizer editor, and the
+ * same config is what the participant payload strips. Nothing on this path is participant-facing.
+ */
+function taskFormFromDetail(detail: TaskDetail): typeof emptyTaskForm {
+  const config = detail.task_config ?? {};
+  const geofence = config.geofence ?? {};
+  return {
+    ...emptyTaskForm,
+    title: detail.title,
+    description: detail.description,
+    due_at: detail.due_at ? localInput(detail.due_at) : '',
+    priority: detail.priority,
+    impact_point_reward: String(detail.impact_point_reward),
+    verification_required: detail.verification_required,
+    task_type: detail.task_type,
+    required_evidence_types: detail.required_evidence_types?.length ? detail.required_evidence_types : ['text'],
+    learning: learningFromConfig(config),
+    video_url: config.video_url ?? '',
+    platform: config.platform ?? '',
+    handle: config.handle ?? '',
+    profile_url: config.profile_url ?? '',
+    survey_url: config.survey_url ?? '',
+    survey_title: config.survey_title ?? '',
+    referral_target: config.referral_target ?? '',
+    min_referrals: String(config.min_referrals ?? 1),
+    location: config.location ?? '',
+    instructions: config.instructions ?? '',
+    gps_required: Boolean(geofence.required),
+    latitude: geofence.latitude == null ? '' : String(geofence.latitude),
+    longitude: geofence.longitude == null ? '' : String(geofence.longitude),
+    radius_meters: String(geofence.radius_meters ?? 100),
+  };
+}
+
+function localInput(value: string) { const date = new Date(value); return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16); }
 
 export function OrganizerTaskQueue({ token, communityId }: { token: string; communityId?: string }) {
   const [view, setView] = useState<OrganizerView>('queue');
@@ -101,11 +155,14 @@ export function OrganizerTaskQueue({ token, communityId }: { token: string; comm
   const [expanded, setExpanded] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
   const [rejectingId, setRejectingId] = useState<string | null>(null);
-  const draft = useDraftState(communityId ? `community:${communityId}:task-create` : '', emptyTaskForm);
+  const [editingTask, setEditingTask] = useState<TaskDetail | null>(null);
+  const [taskSeed, setTaskSeed] = useState(emptyTaskForm);
+  const [taskActive, setTaskActive] = useState(true);
+  const draft = useDraftState(communityId ? `community:${communityId}:task:${editingTask ? editingTask.id : 'create'}` : '', taskSeed);
   const taskForm = draft.value; const setTaskForm = draft.set;
   const [discard, setDiscard] = useState(false);
   const [policy, setPolicy] = useState<{ community_points: number; platform_maximum: number | null; warning: string | null } | null>(null);
-  useRevealFocus(view === 'create' ? view : '', '[data-task-editor]');
+  useRevealFocus(['create', 'edit'].includes(view) ? view : '', '[data-task-editor]');
   useRevealFocus(expanded, `[data-task-reveal="${expanded}"]`);
   useRevealFocus(rejectingId, `[data-task-rejection="${rejectingId}"]`);
   useRevealFocus(error, '.management-screen [role="alert"]');
@@ -164,33 +221,69 @@ export function OrganizerTaskQueue({ token, communityId }: { token: string; comm
     }
   };
 
-  const createTask = async (e: React.FormEvent) => {
+  const beginTaskEdit = async (task: Task) => {
+    setError('');
+    setMessage('');
+    try {
+      const detail = await apiJson<TaskDetail>(`tasks/${task.id}?management=true`, {}, liveToken());
+      setTaskSeed(taskFormFromDetail(detail));
+      setEditingTask(detail);
+      setTaskActive(detail.is_active);
+      setView('edit');
+    } catch (cause) {
+      setError(cause instanceof ApiError ? cause.message : 'Unable to open this task for editing');
+    }
+  };
+
+  /**
+   * Create and edit share one payload.
+   *
+   * An edit only ever carries configuration: assignments, submissions, graded answers and the
+   * Impact already awarded are not part of this body, so the backend cannot restate them.
+   */
+  const saveTask = async (e: React.FormEvent) => {
     e.preventDefault();
     setSavingTask(true); setError('');
     try {
       const id = await getCommunityId();
-      await apiJson<unknown>(`communities/${id}/tasks`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: taskForm.title,
-          description: taskForm.description,
-          due_at: taskForm.due_at ? new Date(taskForm.due_at).toISOString() : null,
-          priority: taskForm.priority,
-          impact_point_reward: Number(taskForm.impact_point_reward),
-          verification_required: taskForm.verification_required,
-          task_type: taskForm.task_type,
-          task_config: { ...buildTaskConfig(taskForm), ...buildLearning(taskForm.task_type, taskForm.learning) },
-          required_evidence_types: taskForm.required_evidence_types,
-        }),
-      }, liveToken());
-      setMessage('Task created successfully.');
-      await draft.clear();
-      setView('tasks');
+      const body = {
+        title: taskForm.title,
+        description: taskForm.description,
+        due_at: taskForm.due_at ? new Date(taskForm.due_at).toISOString() : null,
+        priority: taskForm.priority,
+        impact_point_reward: Number(taskForm.impact_point_reward),
+        verification_required: taskForm.verification_required,
+        task_type: taskForm.task_type,
+        task_config: { ...buildTaskConfig(taskForm), ...buildLearning(taskForm.task_type, taskForm.learning) },
+        required_evidence_types: taskForm.required_evidence_types,
+      };
+      if (editingTask) {
+        await apiJson<unknown>(`tasks/${editingTask.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...body, is_active: taskActive }),
+        }, liveToken());
+        setMessage('Task updated. Assignments, submissions and awarded Impact are unchanged.');
+        setEditingTask(null);
+        await draft.clear();
+        setView('tasks');
+      } else {
+        await apiJson<unknown>(`communities/${id}/tasks`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        }, liveToken());
+        setMessage('Task created successfully.');
+        await draft.clear();
+        setView('tasks');
+      }
     } catch (cause) {
-      setError(cause instanceof ApiError ? cause.message : 'Unable to create task');
+      setError(cause instanceof ApiError ? cause.message
+        : editingTask ? 'Unable to update task' : 'Unable to create task');
     } finally { setSavingTask(false); }
   };
+
+  const leaveEditor = () => { setEditingTask(null); setDiscard(true); };
 
   const toggleEvidenceType = (type: string) => {
     setTaskForm(prev => ({
@@ -219,7 +312,7 @@ export function OrganizerTaskQueue({ token, communityId }: { token: string; comm
           <button className={view === 'tasks' ? 'accent sm' : 'secondary sm'} onClick={() => setView('tasks')}>
             All tasks
           </button>
-          <button className={view === 'create' ? 'accent sm' : 'secondary sm'} onClick={() => setView('create')}>
+          <button className={view === 'create' ? 'accent sm' : 'secondary sm'} onClick={() => { setEditingTask(null); setTaskSeed(emptyTaskForm); setTaskActive(true); setView('create'); }}>
             + Create task
           </button>
         </div>
@@ -342,6 +435,9 @@ export function OrganizerTaskQueue({ token, communityId }: { token: string; comm
                     </p>
                   </div>
                   <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap', flexShrink: 0 }}>
+                    <button className="secondary sm" onClick={() => beginTaskEdit(task)}>
+                      Edit
+                    </button>
                     <button className="secondary sm" onClick={() => setAssigningTask(task)}>
                       Assign
                     </button>
@@ -365,13 +461,19 @@ export function OrganizerTaskQueue({ token, communityId }: { token: string; comm
         </>
       )}
 
-      {/* ── Create task form ── */}
-      {view === 'create' && (
+      {/* ── Create or edit task ── */}
+      {(view === 'create' || view === 'edit') && (
         <div className="panel" data-task-editor>
-          <h2 style={{ fontSize: '1.1rem', marginBottom: '1.25rem' }}>Create new task</h2>
+          <h2 style={{ fontSize: '1.1rem', marginBottom: '1.25rem' }}>{editingTask ? `Configure "${editingTask.title}"` : 'Create new task'}</h2>
+          {editingTask && (
+            <p className="text-sm text-muted">
+              Editing configuration only. Assignments, submissions, graded answers and Impact already
+              awarded are never rewritten by this form.
+            </p>
+          )}
           <p role="status">{draft.ready ? 'Unfinished work is autosaved privately on this browser.' : 'Loading draft…'}</p>{draft.error && <p role="alert">{draft.error}</p>}
           <p>{policy ? `Community award: ${policy.community_points} points. Platform maximum: ${policy.platform_maximum ?? 'not configured'}. ${policy.warning || 'Actual reward cannot exceed the effective community rule.'}` : 'Point guidance unavailable. Use zero points or retry before promising a reward.'}</p>
-          <form onSubmit={createTask} style={{ display: 'grid', gap: '1rem' }}>
+          <form onSubmit={saveTask} style={{ display: 'grid', gap: '1rem' }}>
             <label>
               <span className="label-text">Task title *</span>
               <input required minLength={2} maxLength={200} value={taskForm.title}
@@ -507,18 +609,39 @@ export function OrganizerTaskQueue({ token, communityId }: { token: string; comm
               <span>Require organizer verification before awarding points</span>
             </label>
 
+            {editingTask && (
+              <>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '.5rem', cursor: 'pointer' }}>
+                  <input type="checkbox" checked={taskActive} onChange={e => setTaskActive(e.target.checked)} />
+                  <span>Active — participants can accept and submit this task</span>
+                </label>
+                <p className="text-sm text-muted">
+                  A task that already has submissions cannot change its type; the save will be refused
+                  and the existing submissions left untouched.
+                </p>
+              </>
+            )}
+
             <div className="form-actions">
               <button type="submit" className="accent" disabled={savingTask || !draft.ready}>
-                {savingTask ? 'Creating…' : 'Create task'}
+                {savingTask ? 'Saving…' : editingTask ? 'Save changes' : 'Create task'}
               </button>
-              <button type="button" className="secondary" onClick={() => setDiscard(true)}>
+              <button type="button" className="secondary" onClick={leaveEditor}>
                 Cancel
               </button>
             </div>
           </form>
         </div>
       )}
-      {discard && <GovernanceConfirm title="Discard task draft?" consequence="This removes your saved unfinished task." requireReason={false} onClose={() => setDiscard(false)} onConfirm={async () => { await draft.clear(); setView('tasks'); }} />}
+      {discard && <GovernanceConfirm
+        title={editingTask ? 'Discard task changes?' : 'Discard task draft?'}
+        consequence={editingTask
+          ? 'Your unsaved changes to this task are lost. The task and everything already recorded against it stay as they are.'
+          : 'This removes your saved unfinished task.'}
+        requireReason={false}
+        onClose={() => setDiscard(false)}
+        onConfirm={async () => { await draft.clear(); setTaskSeed(emptyTaskForm); setEditingTask(null); setView('tasks'); }}
+      />}
     </div>
   );
 }

@@ -11,7 +11,6 @@ from src.database import get_db
 from src.models import (
     Community,
     Event,
-    EventStatus,
     Membership,
     MembershipRole,
     MembershipStatus,
@@ -21,6 +20,7 @@ from src.models import (
     User,
 )
 from src.services.availability import visible_content
+from src.services.event import event_discovery_filters
 
 router = APIRouter(prefix="/search", tags=["search"])
 
@@ -33,8 +33,7 @@ def global_search(
 ):
     pattern = f"%{q.lower()}%"
     events = db.scalars(select(Event).where(
-        visible_content(Event), Event.deleted_at.is_(None),
-        Event.status == EventStatus.PUBLISHED, func.lower(Event.title).like(pattern)
+        *event_discovery_filters(user), func.lower(Event.title).like(pattern)
     ).limit(20))
     communities = db.scalars(select(Community).where(
         Community.is_active.is_(True), Community.deleted_at.is_(None),

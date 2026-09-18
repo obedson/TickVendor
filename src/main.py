@@ -38,6 +38,7 @@ from src.api.search import router as search_router
 from src.api.task_evidence import router as task_evidence_router
 from src.api.tasks import router as tasks_router
 from src.api.ticket_catalog import router as ticket_catalog_router
+from src.api.ticket_operations import router as ticket_operations_router
 from src.api.tickets import router as tickets_router
 from src.config import settings
 from src.logging_config import configure_logging, request_id_context
@@ -81,6 +82,7 @@ def create_app() -> FastAPI:
     application.include_router(search_router, prefix=settings.api_v1_prefix)
     application.include_router(tickets_router, prefix=settings.api_v1_prefix)
     application.include_router(ticket_catalog_router, prefix=settings.api_v1_prefix)
+    application.include_router(ticket_operations_router, prefix=settings.api_v1_prefix)
     application.include_router(promotions_router, prefix=settings.api_v1_prefix)
     application.include_router(task_evidence_router, prefix=settings.api_v1_prefix)
     application.include_router(tasks_router, prefix=settings.api_v1_prefix)

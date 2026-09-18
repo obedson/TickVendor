@@ -45,7 +45,31 @@ test('scanner retains camera, hardware/manual and server validation paths', () =
 
 test('attendance enabled methods remain separate from required methods', () => {
   const source = read('OrganizerAttendanceConfig.tsx');
-  for (const marker of ['qr_attendance_enabled', 'geofence_enabled', 'organizer_verification_enabled', 'peer_confirmation_enabled', 'disabled={!enabled}', 'current.required_verification_methods.filter', 'toggleRequired(method)', 'JSON.stringify(config)']) assert.ok(source.includes(marker), marker);
+
+  // Every enabled-method switch exists, and the required list is a separate field rather than a
+  // reuse of them: a method can be enabled without being required.
+  for (const marker of ['qr_attendance_enabled', 'geofence_enabled', 'organizer_verification_enabled', 'peer_confirmation_enabled']) {
+    assert.ok(source.includes(marker), marker);
+  }
+  assert.match(source, /required_verification_methods\s*:\s*string\[\]/);
+
+  // The required checkbox is only operable for a method that is enabled, and it toggles membership
+  // of the required list rather than overwriting it.
+  assert.match(source, /disabled=\{!enabled\}/);
+  assert.match(source, /toggleRequired\(method\)/);
+  assert.match(source, /required_verification_methods\.includes\(method\)/);
+
+  // Turning a method off must strip it from the required list, otherwise the form could save a
+  // method that is simultaneously required and disabled.
+  assert.match(source, /!enabled && method[\s\S]{0,120}current\.required_verification_methods\.filter\(item => item !== method\)/);
+
+  // The save payload sends the whole config and normalizes an untouched numeric input from '' to
+  // null. Asserting the spread plus both normalizations keeps that contract — the config values
+  // are sent, and empty coordinates become null — without pinning the literal's exact formatting.
+  assert.match(source, /JSON\.stringify\(\{\s*\.\.\.config\b/);
+  assert.match(source, /latitude:\s*config\.latitude === '' \? null : config\.latitude/);
+  assert.match(source, /longitude:\s*config\.longitude === '' \? null : config\.longitude/);
+
   assert.doesNotMatch(source, /description="Require participants to be within/);
 });
 

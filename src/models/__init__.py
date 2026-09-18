@@ -36,6 +36,14 @@ from src.models.contribution import (
     ContributionType,
     EngagementDimension,
 )
+from src.models.entitlement import (
+    Entitlement,
+    EntitlementRedemption,
+    RedemptionMode,
+    RedemptionStatus,
+    TicketEntitlement,
+    TicketEntitlementStatus,
+)
 from src.models.event import (
     Event,
     EventStaff,
@@ -74,9 +82,12 @@ from src.models.ticket import (
     Order,
     OrderStatus,
     Ticket,
+    TicketAssignmentState,
     TicketStatus,
+    TicketTransfer,
     TicketType,
     TicketVisibility,
+    TransferStatus,
 )
 from src.models.user import PlatformRole, Profile, ProfileVisibility, User
 
@@ -101,6 +112,8 @@ __all__ = [
     "ContributionBand",
     "ContributionType",
     "EngagementDimension",
+    "Entitlement",
+    "EntitlementRedemption",
     "Event",
     "EventCategory",
     "EventStaff",
@@ -142,6 +155,8 @@ __all__ = [
     "Rank",
     "RankProgression",
     "RankRequirement",
+    "RedemptionMode",
+    "RedemptionStatus",
     "ScheduledNotification",
     "ScheduledNotificationStatus",
     "Task",
@@ -152,9 +167,14 @@ __all__ = [
     "TaskSubmission",
     "TaskType",
     "Ticket",
+    "TicketAssignmentState",
+    "TicketEntitlement",
+    "TicketEntitlementStatus",
     "TicketStatus",
+    "TicketTransfer",
     "TicketType",
     "TicketVisibility",
+    "TransferStatus",
     "User",
     "Venue",
     "VerificationMethod",

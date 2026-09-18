@@ -5,6 +5,7 @@ import { useRevealFocus } from './RevealFocus';
 import { useEffect, useState } from 'react';
 import './management.css';
 import { OrganizerAttendanceConfig } from './OrganizerAttendanceConfig';
+import { OrganizerEntitlements } from './OrganizerEntitlements';
 import { apiJson, ApiError, getLiveToken } from './api';
 import { EmptyState } from './AppShell';
 import { EventCover } from './EventCover';
@@ -30,7 +31,12 @@ type Event = {
   } | null;
 };
 type Community = { id: string; community?: { name: string }; name?: string };
-type TicketType = { id: string; name: string; price: string; currency: string; quantity: number; visibility: string; availability: number };
+type TicketType = {
+  id: string; name: string; description?: string | null; price: string; currency: string;
+  quantity: number; visibility: string; availability: number; sold?: number;
+  max_per_user: number; max_per_order: number;
+  sales_start?: string | null; sales_end?: string | null;
+};
 type EventCategory = { id: string; slug: string; name: string; is_active: boolean };
 
 function localInput(value: string) { const date = new Date(value); return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16); }
@@ -55,7 +61,98 @@ const STATUS_COLORS: Record<string, string> = {
   completed: 'chip-blue',
 };
 
-const emptyTicketForm = { name: '', description: '', price: '0', currency: 'NGN', quantity: '100', max_per_user: '1', visibility: 'public' };
+const emptyTicketForm = { name: '', description: '', price: '0', currency: 'NGN', quantity: '100', max_per_user: '1', max_per_order: '4', visibility: 'public', sales_start: '', sales_end: '' };
+
+/**
+ * A ticket type's maintainable fields, minus `event_id`: a type never moves between events.
+ *
+ * `locked` omits price and currency rather than resending them. The backend reads a field that is
+ * present in the payload as a claim about that field, so restating an unchanged price on a type
+ * that has already sold would be refused as an attempt to change it. Omitting the two says the
+ * only true thing: this edit is not about them.
+ */
+function ticketTypePayload(form: typeof emptyTicketForm, locked = false) {
+  const starts = form.sales_start ? new Date(form.sales_start) : null;
+  const ends = form.sales_end ? new Date(form.sales_end) : null;
+  if (starts && ends && ends <= starts) throw new Error('Sales must end after they start.');
+  return {
+    name: form.name.trim(),
+    description: form.description.trim() || null,
+    ...(locked ? {} : { price: Number(form.price), currency: form.currency }),
+    quantity: Number(form.quantity),
+    max_per_user: Number(form.max_per_user),
+    max_per_order: Number(form.max_per_order),
+    visibility: form.visibility,
+    sales_start: starts ? starts.toISOString() : null,
+    sales_end: ends ? ends.toISOString() : null,
+  };
+}
+
+/**
+ * The editable surface of a ticket type, shared by the create and edit forms so the two can
+ * never drift apart.
+ *
+ * `lockPrice` reflects the backend's own rule: the price and currency a buyer already paid are
+ * snapshotted on the order, so once tickets are issued those two fields stop being maintainable
+ * and a new price belongs on a new ticket type.
+ */
+function TicketTypeFields({ form, setForm, lockPrice = false }: {
+  form: typeof emptyTicketForm;
+  setForm: (next: typeof emptyTicketForm) => void;
+  lockPrice?: boolean;
+}) {
+  return (
+    <>
+      <div className="form-row">
+        <label>
+          <span className="label-text">Name</span>
+          <input required value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="e.g. General Admission" />
+        </label>
+        <label>
+          <span className="label-text">Price (0 = Free)</span>
+          <input required type="number" min="0" step="0.01" value={form.price} disabled={lockPrice} onChange={e => setForm({ ...form, price: e.target.value })} />
+        </label>
+      </div>
+      {lockPrice && <p className="text-sm text-muted">Price and currency are fixed once tickets have been sold. Create a new ticket type for a new price.</p>}
+      <label>
+        <span className="label-text">Description (optional)</span>
+        <input value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="What's included…" />
+      </label>
+      <div className="form-row">
+        <label>
+          <span className="label-text">Quantity</span>
+          <input required type="number" min="1" value={form.quantity} onChange={e => setForm({ ...form, quantity: e.target.value })} />
+        </label>
+        <label>
+          <span className="label-text">Max per user</span>
+          <input required type="number" min="1" max="100" value={form.max_per_user} onChange={e => setForm({ ...form, max_per_user: e.target.value })} />
+        </label>
+        <label>
+          <span className="label-text">Max per order</span>
+          <input required type="number" min="1" max="100" value={form.max_per_order} onChange={e => setForm({ ...form, max_per_order: e.target.value })} />
+        </label>
+        <label>
+          <span className="label-text">Visibility</span>
+          <select value={form.visibility} onChange={e => setForm({ ...form, visibility: e.target.value })}>
+            <option value="public">Public</option>
+            <option value="hidden">Hidden (not listed publicly)</option>
+            <option value="invite_only">Invite only</option>
+          </select>
+        </label>
+      </div>
+      <div className="form-row">
+        <label>
+          <span className="label-text">Sales open (optional)</span>
+          <input type="datetime-local" value={form.sales_start} onChange={e => setForm({ ...form, sales_start: e.target.value })} />
+        </label>
+        <label>
+          <span className="label-text">Sales close (optional)</span>
+          <input type="datetime-local" value={form.sales_end} onChange={e => setForm({ ...form, sales_end: e.target.value })} />
+        </label>
+      </div>
+    </>
+  );
+}
 
 export function OrganizerEvents({ token, communityId }: { token: string; communityId?: string }) {
   const [events, setEvents] = useState<Event[]>([]);
@@ -71,6 +168,8 @@ export function OrganizerEvents({ token, communityId }: { token: string; communi
   const [ticketForm, setTicketForm] = useState(emptyTicketForm);
   const [showTicketForm, setShowTicketForm] = useState(false);
   const [savingTicket, setSavingTicket] = useState(false);
+  const [editingType, setEditingType] = useState<TicketType | null>(null);
+  const [typeForm, setTypeForm] = useState(emptyTicketForm);
   const [configEvent, setConfigEvent] = useState<Event | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -201,20 +300,15 @@ export function OrganizerEvents({ token, communityId }: { token: string; communi
   const createTicketType = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!configEvent) return;
+    let body: ReturnType<typeof ticketTypePayload>;
+    try { body = ticketTypePayload(ticketForm); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : 'Check the ticket type details.'); return; }
     setSavingTicket(true); setError('');
     try {
       await apiJson<TicketType>(`events/${configEvent.id}/ticket-types`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: ticketForm.name,
-          description: ticketForm.description || undefined,
-          price: Number(ticketForm.price),
-          currency: ticketForm.currency,
-          quantity: Number(ticketForm.quantity),
-          max_per_user: Number(ticketForm.max_per_user),
-          visibility: ticketForm.visibility,
-        }),
+        body: JSON.stringify(body),
       }, liveToken());
       setMessage('Ticket type created.');
       setTicketForm(emptyTicketForm);
@@ -222,6 +316,46 @@ export function OrganizerEvents({ token, communityId }: { token: string; communi
       await loadTypes(configEvent);
     } catch (cause) {
       setError(cause instanceof ApiError ? cause.message : 'Unable to create ticket type');
+    } finally { setSavingTicket(false); }
+  };
+
+  const beginTypeEdit = (type: TicketType) => {
+    setEditingType(type);
+    setShowTicketForm(false);
+    setError('');
+    setTypeForm({
+      name: type.name,
+      description: type.description ?? '',
+      price: String(Number(type.price)),
+      currency: type.currency,
+      quantity: String(type.quantity),
+      max_per_user: String(type.max_per_user),
+      max_per_order: String(type.max_per_order),
+      visibility: type.visibility,
+      sales_start: type.sales_start ? localInput(type.sales_start) : '',
+      sales_end: type.sales_end ? localInput(type.sales_end) : '',
+    });
+  };
+
+  /** Forward-looking maintenance. Issued tickets, orders and attendance are never rewritten. */
+  const updateTicketType = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!configEvent || !editingType) return;
+    let body: ReturnType<typeof ticketTypePayload>;
+    try { body = ticketTypePayload(typeForm, Boolean(editingType.sold)); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : 'Check the ticket type details.'); return; }
+    setSavingTicket(true); setError('');
+    try {
+      await apiJson<TicketType>(`events/${configEvent.id}/ticket-types/${editingType.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      }, liveToken());
+      setMessage(`"${body.name}" updated. Tickets already issued keep the terms they were sold on.`);
+      setEditingType(null);
+      await loadTypes(configEvent);
+    } catch (cause) {
+      setError(cause instanceof ApiError ? cause.message : 'Unable to update ticket type');
     } finally { setSavingTicket(false); }
   };
 
@@ -430,38 +564,7 @@ setFormSeed({
                   </div>
                   {showTicketForm && (
                     <form onSubmit={createTicketType} style={{ background: 'var(--tv-surface-sunken)', padding: '1rem', borderRadius: 'var(--tv-radius-md)', marginBottom: '1rem', display: 'grid', gap: '.75rem' }}>
-                      <div className="form-row">
-                        <label>
-                          <span className="label-text">Name</span>
-                          <input required value={ticketForm.name} onChange={e => setTicketForm({ ...ticketForm, name: e.target.value })} placeholder="e.g. General Admission" />
-                        </label>
-                        <label>
-                          <span className="label-text">Price (0 = Free)</span>
-                          <input required type="number" min="0" step="0.01" value={ticketForm.price} onChange={e => setTicketForm({ ...ticketForm, price: e.target.value })} />
-                        </label>
-                      </div>
-                      <label>
-                        <span className="label-text">Description (optional)</span>
-                        <input value={ticketForm.description} onChange={e => setTicketForm({ ...ticketForm, description: e.target.value })} placeholder="What's included…" />
-                      </label>
-                      <div className="form-row">
-                        <label>
-                          <span className="label-text">Quantity</span>
-                          <input required type="number" min="1" value={ticketForm.quantity} onChange={e => setTicketForm({ ...ticketForm, quantity: e.target.value })} />
-                        </label>
-                        <label>
-                          <span className="label-text">Max per user</span>
-                          <input required type="number" min="1" value={ticketForm.max_per_user} onChange={e => setTicketForm({ ...ticketForm, max_per_user: e.target.value })} />
-                        </label>
-                        <label>
-                          <span className="label-text">Visibility</span>
-                          <select value={ticketForm.visibility} onChange={e => setTicketForm({ ...ticketForm, visibility: e.target.value })}>
-                            <option value="public">Public</option>
-                            <option value="hidden">Hidden (not listed publicly)</option>
-                            <option value="invite_only">Invite only</option>
-                          </select>
-                        </label>
-                      </div>
+                      <TicketTypeFields form={ticketForm} setForm={setTicketForm} />
                       <div className="form-actions">
                         <button type="submit" className="accent sm" disabled={savingTicket}>{savingTicket ? 'Saving…' : 'Create ticket type'}</button>
                       </div>
@@ -472,18 +575,35 @@ setFormSeed({
                   ) : (
                     <div className="stack">
                       {types.map(type => (
-                        <div key={type.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '.65rem .85rem', background: 'var(--tv-surface-sunken)', borderRadius: 'var(--tv-radius-md)', fontSize: '.875rem', gap: '.5rem', flexWrap: 'wrap' }}>
-                          <strong>{type.name}</strong>
-                          <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center' }}>
-                            <span>{Number(type.price) === 0 ? 'Free' : `${type.currency} ${Number(type.price).toLocaleString()}`}</span>
-                            <span className={`chip ${type.availability > 0 ? 'chip-green' : 'chip-red'}`}>{type.availability} left</span>
-                            <span className="chip chip-default">{type.visibility}</span>
+                        <div key={type.id}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '.65rem .85rem', background: 'var(--tv-surface-sunken)', borderRadius: 'var(--tv-radius-md)', fontSize: '.875rem', gap: '.5rem', flexWrap: 'wrap' }}>
+                            <strong>{type.name}</strong>
+                            <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                              <span>{Number(type.price) === 0 ? 'Free' : `${type.currency} ${Number(type.price).toLocaleString()}`}</span>
+                              <span className={`chip ${type.availability > 0 ? 'chip-green' : 'chip-red'}`}>{type.availability} left</span>
+                              <span className="chip chip-default">{type.visibility}</span>
+                              <span className="chip chip-default" title="Maximum tickets one buyer may take in a single order">Max {type.max_per_order}/order</span>
+                              <button className="secondary sm" onClick={() => editingType?.id === type.id ? setEditingType(null) : beginTypeEdit(type)}>
+                                {editingType?.id === type.id ? 'Close' : 'Edit'}
+                              </button>
+                            </div>
                           </div>
+                          {editingType?.id === type.id && (
+                            <form onSubmit={updateTicketType} data-ticket-type-editor style={{ background: 'var(--tv-surface-sunken)', padding: '1rem', borderRadius: 'var(--tv-radius-md)', marginTop: '.5rem', display: 'grid', gap: '.75rem' }}>
+                              <TicketTypeFields form={typeForm} setForm={setTypeForm} lockPrice={Boolean(type.sold)} />
+                              <p className="text-sm text-muted">Changing this affects future sales only. Tickets already issued keep the terms they were sold on.</p>
+                              <div className="form-actions">
+                                <button type="submit" className="accent sm" disabled={savingTicket}>{savingTicket ? 'Saving…' : 'Save ticket type'}</button>
+                                <button type="button" className="secondary sm" onClick={() => setEditingType(null)} disabled={savingTicket}>Cancel</button>
+                              </div>
+                            </form>
+                          )}
                         </div>
                       ))}
                     </div>
                   )}
                 </div>
+                <OrganizerEntitlements eventId={event.id} token={liveToken()} />
               </div>
             )}
           </article>

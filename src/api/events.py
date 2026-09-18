@@ -12,15 +12,16 @@ from fastapi.responses import FileResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from src.api.auth import get_current_user
+from src.api.auth import get_current_user, get_optional_user
 from src.config import settings
 from src.database import get_db
-from src.models import Event, EventCategory, EventStatus, User
+from src.models import Event, EventCategory, User
 from src.schemas.event import EventCreate, EventResponse, EventUpdate
 from src.services.analytics import event_summary
 from src.services.event import (
     create_event,
     discover_events,
+    event_discovery_filters,
     nearby_events,
     publish_event,
     soft_delete_event,
@@ -143,11 +144,12 @@ def list_nearby_events(
     latitude: Annotated[Decimal, Query(ge=-90, le=90)],
     longitude: Annotated[Decimal, Query(ge=-180, le=180)],
     radius_km: float = Query(default=25, gt=0, le=500), limit: int = Query(default=20, ge=1, le=100),
+    viewer: Annotated[User | None, Depends(get_optional_user)] = None,
 ):
     return [{"id": str(event.id), "title": event.title, "starts_at": event.starts_at,
              "venue": {"name": event.venue.name, "city": event.venue.city},
              "distance_km": round(distance, 3)}
-            for event, distance in nearby_events(db, latitude, longitude, radius_km, limit)]
+            for event, distance in nearby_events(db, latitude, longitude, radius_km, limit, viewer)]
 
 
 @router.get("", response_model=list[EventResponse])
@@ -161,17 +163,20 @@ def list_events(
     sort: str = Query(default="soonest", pattern="^(soonest|latest)$"),
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
+    viewer: Annotated[User | None, Depends(get_optional_user)] = None,
 ) -> list[Event]:
-    return discover_events(db, search, category, upcoming, limit, offset, city, price, sort)
+    return discover_events(db, search, category, upcoming, limit, offset, city, price, sort, viewer)
 
 
 @router.get("/{event_id}", response_model=EventResponse)
-def get_event(event_id: UUID, db: Annotated[Session, Depends(get_db)]) -> Event:
-    from src.services.availability import visible_content
+def get_event(
+    event_id: UUID,
+    db: Annotated[Session, Depends(get_db)],
+    viewer: Annotated[User | None, Depends(get_optional_user)] = None,
+) -> Event:
     event = db.scalar(
         select(Event).options(selectinload(Event.venue)).where(
-            Event.id == event_id, Event.status == EventStatus.PUBLISHED, Event.deleted_at.is_(None),
-            visible_content(Event),
+            Event.id == event_id, *event_discovery_filters(viewer),
         )
     )
     if event is None:

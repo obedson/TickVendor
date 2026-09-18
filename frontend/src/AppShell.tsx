@@ -23,7 +23,7 @@ export const secondaryNav: NavItem[] = [
 const managementGroups: { label: string; ids: string[] }[] = [
   { label: 'Overview', ids: ['organizer-dashboard'] },
   { label: 'Programs', ids: ['organizer-events', 'organizer-opportunities', 'organizer-tasks'] },
-  { label: 'People', ids: ['organizer-members', 'organizer-review', 'organizer-attendance'] },
+  { label: 'People', ids: ['organizer-members', 'organizer-review', 'organizer-attendance', 'organizer-redemption'] },
   { label: 'Impact', ids: ['admin-leaderboards', 'admin-recognition', 'admin-adjustments'] },
   { label: 'Settings', ids: ['admin-rules', 'admin-bands', 'admin-notifications', 'admin-analytics', 'admin-audit'] },
   // Super Admin only — shown when the platform-admin nav item is present.

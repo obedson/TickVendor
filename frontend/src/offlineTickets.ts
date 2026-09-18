@@ -1,4 +1,10 @@
-export type OfflineTicket={id?:string;public_id:string;qr_token:string;status:string;attendee_id?:string;event_id?:string;ticket_type_id?:string;used_at?:string|null;event_title?:string;event_starts_at?:string;event_ends_at?:string;venue_name?:string|null;ticket_type_name?:string};
+export type OfflineTicket={id?:string;public_id:string;qr_token:string;status:string;attendee_id?:string;event_id?:string;ticket_type_id?:string;used_at?:string|null;event_title?:string;event_starts_at?:string;event_ends_at?:string;venue_name?:string|null;ticket_type_name?:string;
+// Individual-ticket facts the wallet now carries: who bought it, which order issued it, whether
+// anyone holds it yet, and the holder's own attendance. Cached offline so a ticket still explains
+// itself with no signal. `order_id` is not new data: `TicketWalletResponse` inherits it from
+// `TicketResponse` and `GET /tickets/me` copies it onto every row, so the encrypted snapshot has
+// always stored it. Declaring it here is what lets a caller read it at all.
+group?:string;purchaser_id?:string|null;order_id?:string|null;assignment_state?:string;transfer_state?:string;self_check_in_enabled?:boolean;self_checkout_enabled?:boolean;checked_in_at?:string|null;checked_out_at?:string|null;duration_seconds?:number|null};
 export type EncryptedTickets={iv:ArrayBuffer;ciphertext:ArrayBuffer};
 type CryptoProvider=Pick<Crypto,'getRandomValues'|'subtle'>;
 

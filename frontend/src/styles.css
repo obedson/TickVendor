@@ -1204,6 +1204,225 @@ tbody tr:hover { background: var(--tv-surface-sunken); }
   transition: width var(--tv-transition-slow);
 }
 
+/* --- Public shell (signed-out discovery) -------------------- */
+.public-shell {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--tv-page);
+}
+
+.public-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: .75rem 1rem;
+  background: var(--tv-surface);
+  border-bottom: 1px solid var(--tv-border);
+  position: sticky;
+  top: 0;
+  z-index: 40;
+}
+
+.public-main {
+  flex: 1;
+  width: 100%;
+  max-width: 72rem;
+  min-width: 0;
+  margin-inline: auto;
+  padding: 1.5rem 1rem 3rem;
+}
+
+/* --- Ticket detail, benefits and redemption ----------------- */
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+  flex-wrap: wrap;
+}
+
+.panel-title {
+  font-size: 1.05rem;
+  margin: 0 0 .75rem;
+}
+
+.ticket-detail {
+  display: grid;
+  gap: 1.25rem;
+  min-width: 0;
+}
+
+.ticket-detail-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 1.25rem;
+  align-items: start;
+  min-width: 0;
+}
+
+.ticket-detail-grid > * { min-width: 0; }
+
+.ticket-state-line {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  flex-wrap: wrap;
+  margin: .25rem 0 .5rem;
+}
+
+.claim-page {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 1.5rem 1rem;
+  background: var(--tv-page);
+}
+
+.claim-page .panel {
+  width: min(100%, 30rem);
+  box-shadow: var(--tv-shadow-lg);
+  min-width: 0;
+}
+
+.claim-facts {
+  display: grid;
+  grid-template-columns: minmax(6rem, max-content) minmax(0, 1fr);
+  gap: .35rem .9rem;
+  margin: .75rem 0;
+  font-size: .875rem;
+}
+
+.claim-facts dt { color: var(--tv-muted); font-weight: 600; }
+.claim-facts dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+
+.admission-code {
+  display: grid;
+  gap: .5rem;
+  justify-items: center;
+  text-align: center;
+  padding: 1rem;
+  border: 1.5px dashed var(--tv-border-strong);
+  border-radius: var(--tv-radius-md);
+  background: var(--tv-surface-sunken);
+  margin-top: .75rem;
+}
+
+.qr-image {
+  width: min(100%, 13rem);
+  height: auto;
+  border-radius: var(--tv-radius-sm);
+  background: #fff;
+  padding: .35rem;
+}
+
+.share-actions {
+  display: flex;
+  gap: .5rem;
+  flex-wrap: wrap;
+}
+
+/* Anchors that must look and behave like the secondary buttons beside them. */
+.button-like {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .45rem;
+  padding: .6rem 1.1rem;
+  border-radius: var(--tv-radius-md);
+  border: 1.5px solid var(--tv-border);
+  background: var(--tv-surface);
+  color: var(--tv-ink);
+  font-size: .875rem;
+  font-weight: 700;
+  line-height: 1.4;
+  min-height: 2.5rem;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.button-like:hover { background: var(--tv-surface-sunken); border-color: var(--tv-border-strong); }
+
+.benefit-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: .75rem;
+}
+
+.benefit {
+  display: grid;
+  gap: .35rem;
+  padding: .85rem;
+  border: 1.5px solid var(--tv-border);
+  border-radius: var(--tv-radius-md);
+  background: var(--tv-surface);
+  min-width: 0;
+}
+
+.benefit-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .5rem;
+  flex-wrap: wrap;
+}
+
+.benefit p { margin: 0; overflow-wrap: anywhere; }
+.benefit-reason { color: var(--tv-warning); font-weight: 600; }
+
+.redemption-panel {
+  border: 1.5px solid var(--tv-accent);
+  display: grid;
+  gap: .5rem;
+  justify-items: center;
+  text-align: center;
+  min-width: 0;
+}
+
+.redemption-code { display: grid; gap: .25rem; justify-items: center; }
+
+.redemption-code output {
+  font-size: clamp(2rem, 12vw, 3rem);
+  font-weight: 800;
+  letter-spacing: .35em;
+  padding-left: .35em;
+  color: var(--tv-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.validation-result { display: grid; gap: .5rem; margin-top: 1rem; }
+.issued-tickets { border-top: 1px solid var(--tv-border); padding-top: .75rem; }
+
+.quantity-field { display: flex; align-items: center; gap: .5rem; }
+.quantity-field input { width: 5rem; min-width: 0; }
+.quantity-field .label-text { margin: 0; }
+
+.check-group {
+  border: 1.5px solid var(--tv-border);
+  border-radius: var(--tv-radius-md);
+  padding: .75rem;
+  display: grid;
+  gap: .5rem;
+}
+
+.check-group legend { padding-inline: .35rem; }
+
+/* Layout only: the checkbox itself keeps the size set by the form rules above. */
+.check {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  font-weight: 500;
+  cursor: pointer;
+  margin-bottom: 0;
+}
+
 /* --- Responsive -------------------------------------------- */
 @media (max-width: 1024px) {
   .home-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -1237,6 +1456,7 @@ tbody tr:hover { background: var(--tv-surface-sunken); }
   .home-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .home-columns { grid-template-columns: 1fr; }
   .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+  .ticket-detail-grid { grid-template-columns: 1fr; }
 
   .page-header h1 { font-size: 1.5rem; }
   .page-header { padding-bottom: 1rem; margin-bottom: 1.25rem; }
@@ -1327,6 +1547,47 @@ tbody tr:hover { background: var(--tv-surface-sunken); }
   .auth .panel { padding: 1.75rem 1.25rem; }
   .form-grid { grid-template-columns: 1fr; }
   .dialog-panel { width: min(100% - 1rem, 40rem); }
+}
+
+/* Small phones (~320px–650px). Everything here exists to stop a wide child —
+   a QR image, a long code, a row of share buttons — from pushing the page
+   sideways, which is the one failure a narrow screen cannot recover from. */
+@media(max-width:650px) {
+  .app-main { padding: 1rem .75rem 5.5rem; }
+  .public-header { padding: .6rem .75rem; }
+  .public-main { padding: 1rem .75rem 2.5rem; }
+
+  /* Grid and flex children default to min-width:auto, so a long word or a
+     max-content column can still overflow at 320px. */
+  .app-main, .public-main, .app-layout,
+  .ticket-detail, .ticket-detail-grid > *, .benefit, .card, .panel { min-width:0; }
+
+  .ticket-detail-grid { grid-template-columns: 1fr; }
+
+  .claim-facts { grid-template-columns: 1fr; gap: .15rem; }
+  .claim-facts dt { margin-top: .4rem; }
+
+  .share-actions > * { flex: 1 1 100%; }
+  .form-actions { flex-direction: column; align-items: stretch; }
+  .form-actions > * { width: 100%; }
+  .button-like { width: 100%; }
+
+  .quantity-field { flex-wrap: wrap; }
+  .quantity-field input { width: 100%; }
+
+  .redemption-code output { letter-spacing: .25em; padding-left: .25em; }
+  .qr-image { width: min(100%, 11rem); }
+
+  .page-header h1 { font-size: 1.35rem; }
+  h1 { overflow-wrap: anywhere; }
+  .card, .panel { padding: .9rem; }
+  .page-header-actions { flex-wrap: wrap; }
+  .page-header-actions > * { flex: 1 1 auto; }
+  .chip { max-width: 100%; }
+  .chip > span:last-child { overflow-wrap: anywhere; }
+
+  /* The one element allowed to scroll sideways is the table wrapper. */
+  .responsive-table { overflow-x:auto; }
 }
 
 @media (prefers-reduced-motion: reduce) {

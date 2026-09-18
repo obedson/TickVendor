@@ -7,7 +7,8 @@ journey without invoking Paystack checkout:
 from datetime import UTC, datetime, timedelta
 
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, event as sa_event
+from sqlalchemy import create_engine
+from sqlalchemy import event as sa_event
 from sqlalchemy.orm import sessionmaker
 
 import src.models  # noqa: F401
@@ -181,7 +182,7 @@ def test_free_ticket_acquisition_journey(tmp_path):
     assert ticket["status"] == "active", f"Expected active, got {ticket['status']}"
     assert ticket["qr_token"], "QR token must be present"
 
-    # 5. Idempotency: duplicate order returns 409.
+    # 5. A buyer may acquire a second free ticket; only redemption is limited to one admission.
     duplicate = client.post(
         f"/api/v1/events/{event_id}/orders",
         json={
@@ -191,7 +192,12 @@ def test_free_ticket_acquisition_journey(tmp_path):
         },
         headers=auth,
     )
-    assert duplicate.status_code == 409, f"Expected 409 for duplicate, got {duplicate.status_code}"
+    assert duplicate.status_code == 201, duplicate.text
+    assert duplicate.json()["id"] != order["id"]
+    wallet_response = client.get("/api/v1/tickets/me", headers=auth)
+    assert wallet_response.status_code == 200
+    tickets = wallet_response.json()
+    assert len([t for t in tickets if t["event_id"] == event_id]) == 2
 
     engine.dispose()
 
