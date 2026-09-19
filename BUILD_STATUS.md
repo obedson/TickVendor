@@ -2,7 +2,7 @@
 
 > **How to use this file.** Entries are newest-first. Read the newest entry relevant to your task and consult older sections only when they are relevant. Append or update evidence without rewriting historical verification. Record the exact checks that were actually executed, and keep implementation status separate from verification status.
 
-## Full-suite reconciliation â€” 2026-09-17
+## Full-suite reconciliation — 2026-09-17
 
 - Continued the inherited dirty tree at base `84be0cd` without reset, clean, restore, revert, stash, discard, branch switch, commit, push or deploy, and without any provider, environment, domain or remote-database change. Scope was the four recorded full-suite failures and the two recorded observations only.
 - Migration-head test: `tests/test_start_web.py::test_blank_database_migrates_to_current_head` asserted the superseded head `f1a2b3c4d5e6`. It now reads the single expected head from the Alembic script directory and asserts `alembic current` reports it, so it still detects a startup migration that did not run, without breaking when a legitimate revision is added. No revision changed; the single head remains `e0f1a2b34567`.
@@ -11,14 +11,14 @@
 - Event soft deletion: the intended idempotency guard (409 on a repeat authorized delete) was unreachable because `get_event_for_management` hid deleted events as 404. An `include_deleted` path now authorizes a management caller before reporting the already-deleted state, so an authorized repeat delete returns 409, an unauthorized caller still receives 403 with no existence disclosure, and exactly one `event.deleted` audit entry is written.
 - Bulk assignment: the constant `ineligible: 0` was removed from the bulk-assignment response. Any per-address eligibility count (non-member, other community, nonexistent account) would make the endpoint an account/tenant enumeration oracle; the existing requester-scoped `members`/`unresolved`/`invalid` categories on the resolution endpoint remain the only safe vocabulary, and `frontend/src/BulkTaskAssignment.tsx` used neither field.
 - Promotion deep link: a promoted opportunity beyond the first fetched page fell back to the plain list because no opportunity detail endpoint existed. Added `GET /api/v1/activity-opportunities/{opportunity_id}` behind the discovery visibility predicate now shared with the listing (`_discoverable` in `src/services/opportunity.py`), and `frontend/src/Opportunities.tsx` fetches it once when a promoted id is not on the current page. Draft, deleted, expired, suspended-community and member-only-for-non-member items stay hidden, so no new authorization or privacy surface exists; task promotions still resolve against the loaded task list only.
-- Focused verification: `.venv/Scripts/python.exe -m pytest tests/test_start_web.py tests/test_migration_logging.py tests/test_google_auth_migration.py tests/test_task_evidence_migration.py tests/test_participation_migration.py tests/test_payments.py tests/test_participant_communities_api.py tests/test_governance_membership.py tests/test_soft_delete.py tests/test_events.py tests/test_task_staging_reconciliation.py tests/test_participation_reconciliation.py tests/test_activity_opportunities_api.py tests/test_platform_moderation.py tests/test_community_management.py -q` â€” **66 passed**, 2 upstream deprecation warnings. The payment logging failure was re-verified alone, in the previously reproducing order after `tests/test_participation_migration.py`, and after all in-process migration tests.
-- Full backend suite: `.venv/Scripts/python.exe -m pytest -q` â€” **276 passed**, 0 failed (previously 270 passed, 4 failed), 2 upstream deprecation warnings, 560.61 seconds.
+- Focused verification: `.venv/Scripts/python.exe -m pytest tests/test_start_web.py tests/test_migration_logging.py tests/test_google_auth_migration.py tests/test_task_evidence_migration.py tests/test_participation_migration.py tests/test_payments.py tests/test_participant_communities_api.py tests/test_governance_membership.py tests/test_soft_delete.py tests/test_events.py tests/test_task_staging_reconciliation.py tests/test_participation_reconciliation.py tests/test_activity_opportunities_api.py tests/test_platform_moderation.py tests/test_community_management.py -q` — **66 passed**, 2 upstream deprecation warnings. The payment logging failure was re-verified alone, in the previously reproducing order after `tests/test_participation_migration.py`, and after all in-process migration tests.
+- Full backend suite: `.venv/Scripts/python.exe -m pytest -q` — **276 passed**, 0 failed (previously 270 passed, 4 failed), 2 upstream deprecation warnings, 560.61 seconds.
 - Ruff: every file changed by this pass is clean. Repository-wide `ruff check .` reports 34 inherited findings: `tests/test_task_type_and_evidence.py` (17), `legacy_setup/install_pkgs.py` (4), `legacy_setup/install_remaining.py` (4), `legacy_setup/setup_venv.py` (3), `tickvendor_settings.py` (3), `tests/test_auth_refresh_behavior.py` (2), `tests/test_free_ticket_flow.py` (1). None were cleaned.
 - Frontend: `npm run build` and `npm run lint` both passed. `git diff --check` passed with only the repository's existing LF/CRLF warnings; the untracked files touched (`src/services/task_bulk.py`, `tests/test_participation_reconciliation.py`, new `tests/test_migration_logging.py`) were also checked directly for trailing whitespace and a final newline.
 - Migration safety: disposable-database `alembic upgrade head` followed by `alembic check` reported "No new upgrade operations detected." No schema, model or revision change was made.
 - No traceability matrix was regenerated, no completion counts or percentages were recalculated, no historical evidence was rewritten and no global reconciliation was performed.
 
-## Promotion delivery / governance boundary reconciliation â€” 2026-09-17
+## Promotion delivery / governance boundary reconciliation — 2026-09-17
 
 - Continued the existing interrupted working tree (inherited promotion model/service/API, `frontend/src/PromotionManager.tsx`, participation-and-promotion migration `e0f1a2b34567`, governance screens). No reset, discard, push, deployment or provider/environment/database change.
 - Scope: platform governance and moderation boundaries, Featured/Sponsored lifecycle, promotion delivery authorization and privacy, promotion schedule and placement integrity, placement surfaces, community-scoped events, and member-email disclosure.
@@ -26,30 +26,30 @@
 - Promotion schedule defect fixed: a client-supplied non-UTC offset was persisted unconverted, shifting the placement window by that offset so an active placement was not delivered. `src/api/promotions.py` now normalizes `starts_at` and `ends_at` to UTC before storage and comparison.
 - Promotion delivery defect fixed: two overlapping placements for the same underlying content on one surface returned that content twice, labelled once Featured and once Sponsored. `src/services/promotion.py` now delivers one entry per underlying item, keeping the highest-priority placement.
 - Authorization and privacy confirmed unchanged in substance: underlying content authorization is rechecked on every delivery, so suspension, privatization, lifecycle change, closure or expiry of the promoted item stops delivery without recreating the promotion; community-private and member-only content is never promoted; member-only task placements reach only active community members and never anonymous callers; covers are delivered through signed, expiring URLs.
-- Featured/Sponsored remains an approved user-requested extension, not an original specification requirement: `docs/TICKVENDOR_SPEC.md` Â§78 lists event promotion only as a future-ready capability. No requirement was added, removed, deferred or reclassified.
-- Community-scoped member events: no implementation required. Â§7 and Â§53 define platform-wide event discovery, Â§39 records events as community-owned data, and Â§35 requires community administrators (not members) to see community events. `frontend/src/CommunityMember.tsx` therefore keeps the honest platform-wide "Browse all events" action.
+- Featured/Sponsored remains an approved user-requested extension, not an original specification requirement: `docs/TICKVENDOR_SPEC.md` §78 lists event promotion only as a future-ready capability. No requirement was added, removed, deferred or reclassified.
+- Community-scoped member events: no implementation required. §7 and §53 define platform-wide event discovery, §39 records events as community-owned data, and §35 requires community administrators (not members) to see community events. `frontend/src/CommunityMember.tsx` therefore keeps the honest platform-wide "Browse all events" action.
 - Member email: the inherited organizer-and-above boundary is consistent with the other organizer workflows that already resolve member emails (task assignment candidates and the attendance roster both require community organizer). Ordinary members receive no member emails, and invite by email or username stays administrator-only. Frontend rendering cannot widen the boundary because it only displays fields the backend supplies. No change; focused coverage added for the organizer tier and suspended membership.
-- Focused verification: `.venv/Scripts/python.exe -m pytest tests/test_participation_reconciliation.py tests/test_platform_moderation.py tests/test_governance_membership.py tests/test_participation_migration.py -q` â€” **26 passed**, 2 upstream deprecation warnings; the extended promotion/email file re-run passed **17**. Ruff passed on all three changed files. `git diff --check` passed; the changed files are untracked, so they were also checked directly for trailing whitespace. No full pytest, no Playwright, no frontend build (no frontend file changed).
+- Focused verification: `.venv/Scripts/python.exe -m pytest tests/test_participation_reconciliation.py tests/test_platform_moderation.py tests/test_governance_membership.py tests/test_participation_migration.py -q` — **26 passed**, 2 upstream deprecation warnings; the extended promotion/email file re-run passed **17**. Ruff passed on all three changed files. `git diff --check` passed; the changed files are untracked, so they were also checked directly for trailing whitespace. No full pytest, no Playwright, no frontend build (no frontend file changed).
 - No global traceability counts or percentages were recalculated, no historical evidence was rewritten, and no full-spec reconciliation was performed.
 
-## Authentication recovery / Google completion â€” 2026-09-13
+## Authentication recovery / Google completion — 2026-09-13
 
 - Continued from `f997e135c84d94229d74e4a140baec45d344df44`, preserving the completed task/reward/governance/payment/attendance pass. No push, deployment, external configuration or live provider operation.
 - Root causes: reset routes/tokens existed but no recovery UI; the shared token-email helper rendered verification links even for reset emails; no actual OIDC provider or stable external identities existed. Reset UI/template and shared accessible masked-by-default password controls now cover every actual password form.
 - Existing auth/session primitives are reused. Reset requests remain generic even on delivery failure, suppress repeat emails for one minute, claim expiring hashed tokens once, consume sibling reset tokens, revoke refresh sessions and audit safely. Email verification and suspension remain intact; existing stateless access JWTs retain their configured expiry (default 30 minutes).
 - Google uses server-side authorization-code OIDC with the official verifier, state/cookie/nonce/PKCE, fixed configured redirects and a short-lived proof-bound return grant. Stable provider subjects, same-email password confirmation, unique constraints and normal TickVendor sessions preserve accounts/RBAC/history. New Google accounts have NULL passwords; suspension cannot be bypassed by creating a duplicate.
-- Google-specific sign-in and visibility controls are user-requested compatible extensions, not fabricated original-spec requirements. Â§6 reset/session requirements are preserved. Only TV-6.94 and TV-6.96 classifications/evidence were updated to B (implemented but external verification outstanding); no historical/global traceability counts or percentages were recalculated.
-- Migration `d9e0f1a23456` â†’ parent `c8d9e0f12345`: nullable local password plus external identities/ephemeral flows. A real populated test caught SQLite FK failure rebuilding `users`; connection-local FK handling now surrounds the rebuild and verifies/restores integrity. Populated rows across profiles, membership, sessions, tickets/payments, attendance, tasks, Impact, recognition and audits are unchanged. PostgreSQL ALTER/DDL compilation passes; single head verified. Downgrade/re-upgrade tested before identity use; downgrade refuses existing external identities and retains permissive password nullability.
+- Google-specific sign-in and visibility controls are user-requested compatible extensions, not fabricated original-spec requirements. §6 reset/session requirements are preserved. Only TV-6.94 and TV-6.96 classifications/evidence were updated to B (implemented but external verification outstanding); no historical/global traceability counts or percentages were recalculated.
+- Migration `d9e0f1a23456` → parent `c8d9e0f12345`: nullable local password plus external identities/ephemeral flows. A real populated test caught SQLite FK failure rebuilding `users`; connection-local FK handling now surrounds the rebuild and verifies/restores integrity. Populated rows across profiles, membership, sessions, tickets/payments, attendance, tasks, Impact, recognition and audits are unchanged. PostgreSQL ALTER/DDL compilation passes; single head verified. Downgrade/re-upgrade tested before identity use; downgrade refuses existing external identities and retains permissive password nullability.
 - Test corrections addressed only the structurally undersized expired-token fixture and an assertion selecting an unrelated session guard. Production validation was not weakened.
-- Final focused backend command: `.venv/Scripts/python.exe -m pytest tests/test_auth_recovery_google.py tests/test_google_auth_migration.py tests/test_task_evidence_migration.py tests/test_auth.py tests/test_auth_refresh_behavior.py tests/test_auth_abuse.py tests/test_notification_email.py tests/test_authorization.py -q --tb=short` â€” **39 passed**, 2 upstream Starlette/httpx/AnyIO deprecation warnings, 137.22 seconds. Includes generated RSA signatures verified by the real Google library; wrong issuer/audience/expiry/signature, linking/uniqueness/role preservation, reset/session/suspension, rate-limit and secret-redaction checks. No live Google credentials.
-- Frontend: `node --test scripts/test-auth-recovery.mjs` â€” **8 passed**; `npm run build` (TypeScript + Vite) â€” passed, 97 modules; `npm run lint` â€” passed. Deterministic hook/handler tests are not browser acceptance. No Playwright or full backend suite run.
+- Final focused backend command: `.venv/Scripts/python.exe -m pytest tests/test_auth_recovery_google.py tests/test_google_auth_migration.py tests/test_task_evidence_migration.py tests/test_auth.py tests/test_auth_refresh_behavior.py tests/test_auth_abuse.py tests/test_notification_email.py tests/test_authorization.py -q --tb=short` — **39 passed**, 2 upstream Starlette/httpx/AnyIO deprecation warnings, 137.22 seconds. Includes generated RSA signatures verified by the real Google library; wrong issuer/audience/expiry/signature, linking/uniqueness/role preservation, reset/session/suspension, rate-limit and secret-redaction checks. No live Google credentials.
+- Frontend: `node --test scripts/test-auth-recovery.mjs` — **8 passed**; `npm run build` (TypeScript + Vite) — passed, 97 modules; `npm run lint` — passed. Deterministic hook/handler tests are not browser acceptance. No Playwright or full backend suite run.
 - Changed-file Ruff passed for all 17 changed/new Python files. `git diff --check` passed. Final review found no temporary databases, generated assets, real secrets or unrelated domain edits in the intended change set.
 - Handoff/configuration/manual acceptance: `docs/AUTH_GOOGLE_PASSWORD_RESET_2026_09_13.md`. Live Google setup/login, reset email receipt, desktop/mobile/PWA/password-manager behavior, staging PostgreSQL upgrade/concurrent requests, distributed limiting and edge-log handling remain external/manual verification outstanding. No additional absent specification-backed auth implementation was identified in this scoped pass; no other domain was reassessed.
 
-## Task / evidence / Impact staging reconciliation â€” 2026-09-13
+## Task / evidence / Impact staging reconciliation — 2026-09-13
 
 - Continued the intentional diff from `6c345166065e7cfd11aab4ee33272b2534a3d5eb`; no restart, discarded work, push, deployment or provider/environment changes.
-- Real user staging evidence: video and physical tasks were created/assigned/submitted/reviewed; cards advertised 20/10, but a configured 5-point Task Completion rule produced totals 10 â†’ 15 â†’ 20 and task count 0 â†’ 1 â†’ 2. Missing-rule verification originally returned 409. Suspended sign-in returned generic invalid credentials; forms lacked refresh recovery; action visibility/member identification and long Home loading were reported.
+- Real user staging evidence: video and physical tasks were created/assigned/submitted/reviewed; cards advertised 20/10, but a configured 5-point Task Completion rule produced totals 10 → 15 → 20 and task count 0 → 1 → 2. Missing-rule verification originally returned 409. Suspended sign-in returned generic invalid credentials; forms lacked refresh recovery; action visibility/member identification and long Home loading were reported.
 - Root cause: stored task rewards previously acted only as nonzero eligibility flags. Existing tasks retain `legacy_rule` meaning; new `explicit` tasks have bounded rewards. Display uses current effective policy, notifications use posted points, and historical transactions are not rewritten. Positive verification without an active rule still fails rather than silently finalizing with zero.
 - Requested compatible extensions, **not additions to the original spec inventory**: embedded quiz grading, opinion-neutral surveys, optional video attention checkpoints and separate platform ceilings. No illustrative 20-point default, LMS, global rank subsystem or guaranteed YouTube watch proof.
 - Super Admin controls unique nonnegative source ceilings with reasons/audit; positive community rules/new tasks require configured ceilings. Server award service clamps configured source overrides. Community rule precedence is explicit on PostgreSQL; one community/source rule remains enforced and active global/source gets a partial unique index.
@@ -61,7 +61,7 @@
 - Final frontend task/governance/management checks: **38 passed**. Final `npm run build` (TypeScript + Vite, 94 modules), `npm run lint`, changed-file Ruff and `git diff --check` passed. No Playwright or full backend suite ran.
 - Design, security decisions, exact verification commands, migration recovery caveats, changed-file inventory and manual checklist: `docs/TASK_STAGING_RECONCILIATION_2026_09_13.md`. Browser/device/draft recovery/provider receipt/PostgreSQL concurrency and large-community acceptance remain outstanding. Previously identified dedicated create-community UI remains not yet implemented. No overall completion assessment or global traceability count changes.
 
-## Governance / membership / moderation / personal-space continuation â€” 2026-09-12
+## Governance / membership / moderation / personal-space continuation — 2026-09-12
 
 - Resumed the existing interrupted working tree from `4a89a0225df39c6b99df28f5f0b305a93588e3dc`; no reset, stash, discard, push or deployment. Prior responsive/media/payment/attendance work preserved.
 - Implemented explicit membership access policies and invitation/join/request/leave transitions; backend-enforced Super Admin-only community Admin assignment/demotion, tenant checks, reasons, audits and preference-aware notifications. Closed the legacy admin role-route bypass during final review.
@@ -73,92 +73,92 @@
 - Detailed design, exact API/schema inventory, last-Admin decision, immutable-record policy, test commands and participant/Admin/Super Admin acceptance checklist: `docs/GOVERNANCE_MEMBERSHIP_MODERATION_2026_09_12.md`.
 - No manual staging or viewport testing claimed. Required external verification includes 320/360/390/414/768/1024/1280px flows, keyboard/dialog behavior, notification delivery, PostgreSQL migration and concurrency. Community creation has an authorized API but its dedicated UI form remains unfinished. No overall completion assessment or authoritative traceability count/percentage changes.
 
-## Spec Reconciliation Remediation Pass 2 â€” 2026-09-10
+## Spec Reconciliation Remediation Pass 2 — 2026-09-10
 
 Branch: `duo/feature/spec-reconciliation-remediation`
 
-#### FIRST PLATFORM ADMIN BOOTSTRAP â€” IMPLEMENTED, LOCALLY VERIFIED
+#### FIRST PLATFORM ADMIN BOOTSTRAP — IMPLEMENTED, LOCALLY VERIFIED
 - Added `scripts/provision_first_super_admin.py` for the one-time operator bootstrap. It only promotes an existing active, email-verified user when no `super_admin` exists, requires explicit `--confirm`, is not an HTTP endpoint, and records `platform.super_admin_bootstrapped` in the append-only audit log.
 - The development/demo seed remains separate and must not be used against staging or production. Default event categories are seeded only when the development/business seed is explicitly run; deployed startup does not mutate business configuration.
 - Fixed the Platform Admin user overview to derive email verification from `email_verified_at` rather than the nonexistent `is_email_verified` attribute.
 - Focused verification: bootstrap, category authorization, and platform authorization tests pass; Ruff, compilation, and `git diff --check` pass.
 
-### Pass 2 â€” Task UI, Members Browser, Category API, Static Review Fixes
+### Pass 2 — Task UI, Members Browser, Category API, Static Review Fixes
 
-#### PRIORITY 3 â€” Category API Design (IMPLEMENTED, verification outstanding)
+#### PRIORITY 3 — Category API Design (IMPLEMENTED, verification outstanding)
 - Decision: Public category discovery exposed at `GET /api/v1/events/categories` (non-admin route matching project conventions for public reads like events/communities). Mutations (POST/PATCH) remain under `/admin/categories` super_admin-only.
 - `OrganizerEvents.tsx` updated to use `/events/categories` instead of `/admin/categories`.
 - `PlatformAdmin.tsx` CategoryManager still uses `/admin/categories?active_only=false` (authenticated super_admin route) to see all categories including inactive.
 - Category selector UX: loading state, error with retry button, clear "no active categories" message that disables submit (no free-text fallback).
 - Bug fixed: `select` was missing from imports in `src/api/admin.py` (would have caused NameError at runtime on `list_categories`).
-- New platform admin endpoints: `GET /admin/platform/users` and `GET /admin/platform/communities` (super_admin only) â€” replaces broken `search?q=` usage in PlatformAdmin.tsx (search requires min_length=2).
+- New platform admin endpoints: `GET /admin/platform/users` and `GET /admin/platform/communities` (super_admin only) — replaces broken `search?q=` usage in PlatformAdmin.tsx (search requires min_length=2).
 - Verification: NOT VERIFIED (Python deps / npm blocked).
 
-#### PRIORITY 4 â€” Static Review Defects Fixed (IMPLEMENTED, verification outstanding)
-- `api.ts`: Added `isBodyReReadable()` guard â€” FormData and ReadableStream bodies are NOT retried after 401 (prevents double-consumption / empty body on retry). Auth endpoints (auth/login, auth/refresh) are excluded from refresh-on-401 to prevent recursive loops. After a successful refresh, if the retry also returns 401, `clearSession()` is called exactly once.
-- `OrganizerEvents.tsx`: Removed `members_only` ticket visibility option (not in backend `TicketVisibility` enum; backend only has public/hidden/invite_only). Category payload sends slug (correct â€” backend `validate_category` normalizes to slug).
+#### PRIORITY 4 — Static Review Defects Fixed (IMPLEMENTED, verification outstanding)
+- `api.ts`: Added `isBodyReReadable()` guard — FormData and ReadableStream bodies are NOT retried after 401 (prevents double-consumption / empty body on retry). Auth endpoints (auth/login, auth/refresh) are excluded from refresh-on-401 to prevent recursive loops. After a successful refresh, if the retry also returns 401, `clearSession()` is called exactly once.
+- `OrganizerEvents.tsx`: Removed `members_only` ticket visibility option (not in backend `TicketVisibility` enum; backend only has public/hidden/invite_only). Category payload sends slug (correct — backend `validate_category` normalizes to slug).
 - `PlatformAdmin.tsx`: Fixed user/community listing to use dedicated platform admin endpoints instead of search endpoint.
-- Management nav structure verified: OVERVIEW (Dashboard), PROGRAMS (Events, Opportunities, Tasks), PEOPLE (Members, Attendance Review, Check-in), IMPACT (Leaderboard, Recognition, Adjustments), SETTINGS (Point rules, Contribution Tiers, Notifications, Analytics, Audit log), PLATFORM (Platform Admin â€” super_admin only). Matches spec requirement exactly.
+- Management nav structure verified: OVERVIEW (Dashboard), PROGRAMS (Events, Opportunities, Tasks), PEOPLE (Members, Attendance Review, Check-in), IMPACT (Leaderboard, Recognition, Adjustments), SETTINGS (Point rules, Contribution Tiers, Notifications, Analytics, Audit log), PLATFORM (Platform Admin — super_admin only). Matches spec requirement exactly.
 - Verification: NOT VERIFIED (npm blocked).
 
-#### PRIORITY 1 â€” Task UI (IMPLEMENTED, verification outstanding)
+#### PRIORITY 1 — Task UI (IMPLEMENTED, verification outstanding)
 - `Tasks.tsx`: Evidence submission modal now exposes `evidence_text`, `evidence_url`, and `evidence_attachments` (up to 10 URLs) with usable controls. Client-side validation enforces `required_evidence_types` per task config (required fields marked *, block submit). URL format validation with onBlur feedback. Task cards show task-type-specific quick info (video link, social follow link, survey link, referral instructions, physical location).
-- `OrganizerTaskQueue.tsx` (full rewrite): Three-view layout â€” Verification Queue / All Tasks / Create Task. Verification queue shows all evidence types including attachments; reject action prompts for rejection reason. All tasks list with assign-to-member modal. Create task form supports all 6 task types with per-type config fields.
+- `OrganizerTaskQueue.tsx` (full rewrite): Three-view layout — Verification Queue / All Tasks / Create Task. Verification queue shows all evidence types including attachments; reject action prompts for rejection reason. All tasks list with assign-to-member modal. Create task form supports all 6 task types with per-type config fields.
 - Backend: `TaskType` enum (general/video/social_follow/survey/referral/physical) added to `src/models/task.py`. `task_type`, `task_config` (JSON), `required_evidence_types` columns added with Alembic migration `a1b2c3d4e5f6`. `TaskCreateInput` validates config keys per task type. `submit_task()` enforces `required_evidence_types` (raises 422 if required evidence missing). Task list API includes new fields in response.
 - Referral tasks: use manual/organizer verification (no platform referral tracking exists; anti-abuse note shown in UI; organizer verifies referred users are new/verified accounts).
 - Verification: NOT VERIFIED (Python deps / npm blocked).
 
-#### PRIORITY 2 â€” Members Browser (IMPLEMENTED, verification outstanding)
-- Backend: `POST /communities/{id}/members/invite` endpoint added â€” accepts `identifier` (email or username), looks up user, creates INVITED membership. Privacy-safe (returns 404 for both not-found and privacy-redacted). Self-invite and admin-role escalation guards. Audit record fires.
+#### PRIORITY 2 — Members Browser (IMPLEMENTED, verification outstanding)
+- Backend: `POST /communities/{id}/members/invite` endpoint added — accepts `identifier` (email or username), looks up user, creates INVITED membership. Privacy-safe (returns 404 for both not-found and privacy-redacted). Self-invite and admin-role escalation guards. Audit record fires.
 - `OrganizerMembers.tsx`: Invite form (email/username + role selector). Role management: "Change role" button opens confirmation modal with role selector (disabled when new role equals current). Status display: invited/pending shown with yellow chip. Empty state has "Invite member" action.
 - Verification: NOT VERIFIED (npm blocked).
 
-#### Tests Added (Pass 2) â€” NOT VERIFIED
+#### Tests Added (Pass 2) — NOT VERIFIED
 - `tests/test_task_type_and_evidence.py`: 9 focused backend tests covering task type creation, evidence validation (text/url required), tenant isolation (cross-community task creation denied), member denied on verification queue, ordinary admin denied on category mutations, public /events/categories endpoint.
 - `frontend/src/__tests__/api.test.ts`: 7 vitest unit tests for api.ts covering refresh-on-401, single retry, no second retry, concurrent dedup (single refresh promise), failed-refresh sign-out, FormData body guard, auth endpoint exclusion.
 
 #### Checks Executed (Pass 2)
-- `python3 -m py_compile src/api/admin.py src/api/events.py src/api/tasks.py src/api/community_management.py src/models/task.py src/models/__init__.py src/schemas/task.py src/services/task.py src/main.py` â†’ Exit 0 (all OK)
-- `python3 -m py_compile tests/test_task_type_and_evidence.py tests/test_event_categories_admin.py tests/test_free_ticket_flow.py` â†’ Exit 0 (all OK)
-- `git diff --check` â†’ Exit 0 (no whitespace issues)
-- Brace balance check on all modified .tsx/.ts files â†’ all balanced
+- `python3 -m py_compile src/api/admin.py src/api/events.py src/api/tasks.py src/api/community_management.py src/models/task.py src/models/__init__.py src/schemas/task.py src/services/task.py src/main.py` → Exit 0 (all OK)
+- `python3 -m py_compile tests/test_task_type_and_evidence.py tests/test_event_categories_admin.py tests/test_free_ticket_flow.py` → Exit 0 (all OK)
+- `git diff --check` → Exit 0 (no whitespace issues)
+- Brace balance check on all modified .tsx/.ts files → all balanced
 
 ---
 
-## Spec Reconciliation Remediation â€” 2026-09-10
+## Spec Reconciliation Remediation — 2026-09-10
 
 Branch: `duo/feature/spec-reconciliation-remediation`
 
-### Priority 1 â€” Central Auth/Session Fix (IMPLEMENTED, verification outstanding)
+### Priority 1 — Central Auth/Session Fix (IMPLEMENTED, verification outstanding)
 - Root cause: `api.ts` `refreshSession()` read from `sessionStorage` but did not update live React state; concurrent refresh races were not prevented; all protected calls used stale token props/closures.
 - Fix: Canonical `SessionData` type; `addAuthListener`/`persistSession`/`clearSession`/`getLiveToken` exported from `api.ts`; single in-flight `_refreshPromise` prevents concurrent refresh races; `apiJson` always reads `getLiveToken()` before using the prop token; retry-once after 401; invalid refresh triggers `clearSession()` (clean sign-out); React root subscribes via `addAuthListener`; `apiFetchAuth` wrapper for non-JSON authenticated calls.
 - All 19 frontend components updated to use `apiJson`/`getLiveToken()` instead of raw `apiFetch` with stale token props.
 - Verification: NOT VERIFIED locally (npm registry blocked in this environment; no node_modules). Requires frontend build + browser test in staging.
 
-### Priority 2 â€” Event Categories (IMPLEMENTED, verification outstanding)
+### Priority 2 — Event Categories (IMPLEMENTED, verification outstanding)
 - Root cause: No GET endpoint for categories; `OrganizerEvents.tsx` hardcoded `category: 'community'`; form had no selector.
 - Fix: Added `GET /api/v1/admin/categories` public endpoint (no auth required, `active_only=true` by default); `OrganizerEvents.tsx` loads categories from API on mount; renders `<select>` with human-readable names; falls back to text input if API unavailable; default set to first active category.
 - Backend test added: `tests/test_event_categories_admin.py::test_list_categories_public_endpoint`.
 - Verification: Backend test NOT VERIFIED (Python deps not installed in this environment). Frontend NOT VERIFIED (npm blocked).
 
-### Priority 3 â€” Free Event Tickets (IMPLEMENTED, verification outstanding)
+### Priority 3 — Free Event Tickets (IMPLEMENTED, verification outstanding)
 - Root cause: `acquire()` in `main.tsx` used stale `session.access_token` prop; free ticket path used `apiJson` but with stale token.
 - Fix: `acquire()` now uses `getLiveToken() ?? session.access_token`; free ticket path (price=0) calls `apiJson` for order creation and wallet refresh with live token; no Paystack checkout for free orders.
-- Backend tests added: `tests/test_free_ticket_flow.py` â€” covers free ticket acquisition, active status, QR token presence, duplicate protection, and payment initialization rejection for confirmed free orders.
+- Backend tests added: `tests/test_free_ticket_flow.py` — covers free ticket acquisition, active status, QR token presence, duplicate protection, and payment initialization rejection for confirmed free orders.
 - Verification: NOT VERIFIED (Python deps not installed).
 
 ### Community/Organization Admin (IMPLEMENTED, verification outstanding)
 - Fix: `managedCommunities` filter now includes `role === 'organizer'` in addition to `role === 'admin'`; uses `apiJson` with live token.
-- Tenant isolation: preserved â€” backend enforces community-scoped authorization on all management endpoints.
+- Tenant isolation: preserved — backend enforces community-scoped authorization on all management endpoints.
 
 ### Super Admin / Platform Admin (IMPLEMENTED, verification outstanding)
-- New: `frontend/src/PlatformAdmin.tsx` â€” restricted to `super_admin` role; provides Event Category CRUD (create/edit/activate/deactivate), Platform Users overview, Platform Communities overview.
+- New: `frontend/src/PlatformAdmin.tsx` — restricted to `super_admin` role; provides Event Category CRUD (create/edit/activate/deactivate), Platform Users overview, Platform Communities overview.
 - Integrated into management workspace nav as "Platform" group (only visible to super_admin).
-- Backend: `GET /api/v1/admin/categories` (public), `POST /api/v1/admin/categories` (super_admin), `PATCH /api/v1/admin/categories/{id}` (super_admin) â€” all existing.
+- Backend: `GET /api/v1/admin/categories` (public), `POST /api/v1/admin/categories` (super_admin), `PATCH /api/v1/admin/categories/{id}` (super_admin) — all existing.
 - Verification: NOT VERIFIED (npm blocked).
 
 ### Contribution Tiers Wording (IMPLEMENTED)
-- Frontend-only: "Contribution Bands" â†’ "Contribution Tiers" in all UI labels, messages, headings, and nav items.
+- Frontend-only: "Contribution Bands" → "Contribution Tiers" in all UI labels, messages, headings, and nav items.
 - Backend/API/database identifiers unchanged (`contribution-bands`, `ContributionBand`).
 - Description: "Define contribution ranges and the Impact Points members earn for each tier."
 - Create button: "Create contribution tier"; Save button: "Save contribution tier"; List heading: "Configured tiers".
@@ -169,7 +169,7 @@ Branch: `duo/feature/spec-reconciliation-remediation`
 - Verification: NOT VERIFIED (npm blocked).
 
 ### Management UX (PRESERVED)
-- Nav structure: OVERVIEW (Dashboard), PROGRAMS (Events, Opportunities, Tasks), PEOPLE (Members, Attendance Review, Check-in), IMPACT (Leaderboard, Recognition, Adjustments), SETTINGS (Point rules, Contribution Tiers, Notifications, Analytics, Audit log), PLATFORM (Platform Admin â€” super_admin only).
+- Nav structure: OVERVIEW (Dashboard), PROGRAMS (Events, Opportunities, Tasks), PEOPLE (Members, Attendance Review, Check-in), IMPACT (Leaderboard, Recognition, Adjustments), SETTINGS (Point rules, Contribution Tiers, Notifications, Analytics, Audit log), PLATFORM (Platform Admin — super_admin only).
 - Compact workspace behavior preserved; My Space = participant nav only; Managed Community = management nav only.
 
 ### API Consistency (IMPLEMENTED, verification outstanding)
@@ -178,17 +178,17 @@ Branch: `duo/feature/spec-reconciliation-remediation`
 - `apiFetch` still exported for internal use by `apiJson`/`apiFetchAuth`.
 
 ### Tests Added
-- `tests/test_event_categories_admin.py::test_list_categories_public_endpoint` â€” GET categories public endpoint.
-- `tests/test_free_ticket_flow.py` â€” free ticket acquisition journey (2 tests).
-- `tests/test_auth_refresh_behavior.py` â€” refresh token rotation, invalid token 401, expired access token flow (3 tests).
+- `tests/test_event_categories_admin.py::test_list_categories_public_endpoint` — GET categories public endpoint.
+- `tests/test_free_ticket_flow.py` — free ticket acquisition journey (2 tests).
+- `tests/test_auth_refresh_behavior.py` — refresh token rotation, invalid token 401, expired access token flow (3 tests).
 
 ### Verification Status
-- Backend tests: NOT VERIFIED â€” Python dependencies (pytest, fastapi, sqlalchemy, etc.) not installed in this execution environment. Command attempted: `python3 -m pytest tests/ -x -q` â†’ `No module named pytest`.
-- Frontend build: NOT VERIFIED â€” npm registry blocked (403 Forbidden). Command attempted: `npm run build` â†’ `tsc: command not found` (no node_modules).
+- Backend tests: NOT VERIFIED — Python dependencies (pytest, fastapi, sqlalchemy, etc.) not installed in this execution environment. Command attempted: `python3 -m pytest tests/ -x -q` → `No module named pytest`.
+- Frontend build: NOT VERIFIED — npm registry blocked (403 Forbidden). Command attempted: `npm run build` → `tsc: command not found` (no node_modules).
 - All code changes are syntactically correct based on static inspection and follow existing patterns.
 - Previous test suite (47 backend tests, 14 Playwright tests) was green at the prior commit; these changes are additive and do not modify existing test logic.
 
-## Recovery Audit â€” 2026-08-31
+## Recovery Audit — 2026-08-31
 
 - Recovery checkpoint: Git initialized; pre-repair state committed as `f8206db`.
 - Valid and preserved: authoritative documents, the small database engine/session/Base
@@ -225,12 +225,12 @@ dashboards, complete frontend journeys/screens, full PWA offline/install behavio
 handling, distributed rate limiting, comprehensive fraud analysis, and live external-provider
 verification. These remain active work; no completion claim is made.
 
-## Final Specification Audit â€” 2026-09-01
+## Final Specification Audit — 2026-09-01
 
 The checklist below corrects earlier backend-capability claims that were broader than the
 integrated product evidence. TickVendor is not specification-complete or production-ready.
 
-## Product Identity Decision â€” TickVendor
+## Product Identity Decision — TickVendor
 
 - [x] Active product branding, application/package metadata, PWA identity, configuration defaults,
   documentation, examples, email subjects, cache namespaces, and canonical URLs use TickVendor and
@@ -240,7 +240,7 @@ integrated product evidence. TickVendor is not specification-complete or product
   directory name because they are isolated historical machine-specific artifacts, not active product
   identifiers; Git history, Alembic revision IDs, and database objects were not rewritten.
 
-## V1 Payment Decision â€” Paystack
+## V1 Payment Decision — Paystack
 
 - [x] Paystack is TickVendor's required and default V1 production provider. Stripe and Flutterwave
   remain isolated optional/future adapters and are not V1 release blockers.
@@ -514,14 +514,14 @@ integrated product evidence. TickVendor is not specification-complete or product
 - [x] Added the complete repository-backed requirement matrix at `docs/TRACEABILITY_MATRIX.md`, concise
   assessment index at `docs/TRACEABILITY_SUMMARY.md`, and external verification procedure at
   `docs/EXTERNAL_VERIFICATION_RUNBOOK.md`; current totals are 771 requirements, 639 A, 132 B, 0 C.
-- [x] Added idempotent complete local demo/bootstrap seed coverage for the Â§73 named dataset and
-  repository-backed architecture/API/deployment documentation for Â§74; `tests/test_demo_seed.py` passes.
+- [x] Added idempotent complete local demo/bootstrap seed coverage for the §73 named dataset and
+  repository-backed architecture/API/deployment documentation for §74; `tests/test_demo_seed.py` passes.
 - [x] Added the exact remaining-B external verification manifest at `docs/EXTERNAL_VERIFICATION_MANIFEST.md`;
   remaining B rows are not treated as deferred and require the listed provider or deployed evidence.
 - [x] Classified all 132 remaining B matrix rows by verification dependency: L1 local automated (73),
   L2 local manual/inspection (48), E1 external provider (2), and E2 deployed infrastructure (9).
 
-## Implementation Checklist â€” Grouped by Dependency-Aware Subsystem
+## Implementation Checklist — Grouped by Dependency-Aware Subsystem
 
 ### Foundation / Architecture
 - [x] Project structure and configuration (venv, validated settings, declared packages)
@@ -636,7 +636,7 @@ integrated product evidence. TickVendor is not specification-complete or product
 ### Rank System
 - [x] Rank/RankRequirement schema (community-scoped points, ordered progression, activity/milestone/badge references)
 - [x] Database-configured point-based current-rank evaluation foundation
-- [x] Idempotent configurable rank seed thresholds: Starter (0â€“49), Active Member (50â€“149), Contributor (150â€“299), Community Builder (300â€“499), Community Leader (500â€“799), Impact Champion (800+)
+- [x] Idempotent configurable rank seed thresholds: Starter (0–49), Active Member (50–149), Contributor (150–299), Community Builder (300–499), Community Leader (500–799), Impact Champion (800+)
 - [x] Rank qualification evaluates configured activity-count, milestone and non-revoked badge requirements in addition to minimum points
 - [x] Tenant admins define ranks through validated, audited API without code changes
 - [x] Member profile API reports current rank, next rank threshold and remaining Impact Points
@@ -783,7 +783,7 @@ integrated product evidence. TickVendor is not specification-complete or product
 
 - A community administrator created `Micro Impacts Attendance Test Event`, configured a free `Community Ticket`, and a participant acquired it without Paystack checkout.
 - The active ticket appeared in My Tickets with its generated QR code.
-- Participant self-check-in requested browser location. The user selected Allow, but the UI reported `Location access denied â€” checking in without GPS.` The API accepted the check-in as `checked_in`.
+- Participant self-check-in requested browser location. The user selected Allow, but the UI reported `Location access denied — checking in without GPS.` The API accepted the check-in as `checked_in`.
 - Attendance Review contained no flagged records.
 - Organizer ticket validation rejected a truncated 24-character token in HTML validation, accepted the complete token, returned `valid`, and marked the ticket `used`.
 - The participant then had 10 Impact Points, one event participation, one badge, one milestone, and no rank.
@@ -873,7 +873,7 @@ integrated product evidence. TickVendor is not specification-complete or product
 ### Wallet and repeat-attempt findings
 
 - The prior wallet query excluded only `reserved` and `pending_payment`; it intentionally grouped every `cancelled`, `refunded`, and `expired` ticket row into the specification's Cancelled Tickets area. An initialization failure changes the paid order and its reservation ticket to `cancelled`, so the endpoint returned that never-issued reservation as a cancelled QR ticket. This was a backend eligibility defect, not CSS and not primarily stale React state.
-- The wallet now requires the ticket's order to be `confirmed` or `refunded` (or permits a ticket with no order) in addition to excluding `reserved` and `pending_payment`. Consequently, failed/expired checkout reservations are absent, while active and used tickets and legitimately cancelled/refunded issued tickets remain available as required by Â§11.
+- The wallet now requires the ticket's order to be `confirmed` or `refunded` (or permits a ticket with no order) in addition to excluding `reserved` and `pending_payment`. Consequently, failed/expired checkout reservations are absent, while active and used tickets and legitimately cancelled/refunded issued tickets remain available as required by §11.
 - The encrypted offline-wallet record was versioned so a client falling back offline cannot revive a snapshot populated under the old eligibility rule.
 - Each explicit retry after immediate initialization failure creates a new order/reservation because the preceding order is terminal and is not reopened. The terminal orders, reservation rows, and `order.cancelled` audits remain as immutable checkout history; only live `pending` reservations are reused. This one-record-per-explicit-attempt behavior is retained for auditability, but terminal reservation rows are no longer projected as ticket-wallet credentials or counted as inventory.
 - Focused repeated-failure coverage performs two independent rejected initializations: both reservations become terminal, wallet output remains empty, and availability returns to the full quantity after each attempt. A live pending reservation consumes exactly one unit, and verified payment keeps exactly that one unit consumed by activating the existing ticket row.
@@ -894,7 +894,7 @@ integrated product evidence. TickVendor is not specification-complete or product
 ## Focused UI/UX and private event-media reconciliation (2026-09-12)
 
 - Continued from `1839119` and the inherited dirty tree without reset/restore. Audited and retained the interrupted management imports, stable S3 identity change and storage test; completed the missing stylesheet and read-time media resolution. Historical `95a59ec` was design evidence only.
-- Real staging evidence supplied by the user: at approximately 360â€“414px Attendance's peer sidebar squeezed check-in into a tiny column; Profile's fixed summary column squeezed the form; Recognition at 360Ã—740 exposed expanded raw CRUD/JSON and community IDs. These are accepted observations, not newly performed tests. The reported peer-candidates 403 can legitimately occur before eligible attendance; UI now explains it without changing RBAC.
+- Real staging evidence supplied by the user: at approximately 360–414px Attendance's peer sidebar squeezed check-in into a tiny column; Profile's fixed summary column squeezed the form; Recognition at 360×740 exposed expanded raw CRUD/JSON and community IDs. These are accepted observations, not newly performed tests. The reported peer-candidates 403 can legitimately occur before eligible attendance; UI now explains it without changing RBAC.
 - Structural repairs replace fixed desktop asides with a shared stacking layout, bound nested grid tracks to available width, allow content to shrink, style implicit text inputs, wrap form actions and provide labelled mobile member/roster cards. Attendance, Profile, Opportunities and Event Detail stack through 1024px; wallet/Home mobile columns are bounded. Other participant screens inherit the shared shell/form fixes without functional rewrites.
 - Completed shared management styling across Dashboard, Events/create/edit, attendance config, Opportunities, Tasks, Members, flagged review, Check-in/roster, Leaderboard, Recognition, Adjustments, Point Rules, Contribution Tiers, Notifications, Analytics and Audit Log. Existing readable audit presentation/raw detail and Contribution Tiers wording remain.
 - Mobile navigation replaces the sidebar through 900px; More has focus containment, Escape/Close and focus restoration. Workspace changes remount page state and do not silently choose another community. Attendance review/check-in now explicitly select a community-filtered authorized event, replacing the incorrect first-public-Discover-event binding.
@@ -902,8 +902,8 @@ integrated product evidence. TickVendor is not specification-complete or product
 - Preserved participant geolocation/error classification, enabled-vs-required methods, attendance qualification, peer/organizer verification, QR evidence, camera/manual/hardware scanning and cleanup, roster reload, rewards/idempotency, free/paid ticket paths and wallet eligibility. No payment/attendance/auth service changes were made. Source tests guard scanner/configuration contracts but are not camera/device acceptance tests.
 - Real organizer cover management supports upload, replace and remove with existing size/type/signature validation, tenant/event-scoped unique keys, stable persisted identity, same-transaction upload audit, and cleanup on replacement/deletion/PATCH or failed commit. EventResponse and organizer listing generate signed delivery URLs at read time. Local delivery is expiring/HMAC-validated and path-contained; S3/R2 remains private. Known configured-host legacy signed URLs are re-signed; unrelated external covers remain unchanged. Frontend never renders raw `s3://`.
 - Covers and tasteful non-photo fallbacks now appear in Discover, Event Detail and organizer events. Event stories retain line breaks, and media crops at responsive aspect ratios rather than stretching. Ticket selection/acquisition logic remains untouched.
-- Added empty-by-default Sponsored Placement presentation slots on Home, Discover, Event Detail after the story, and between Opportunities result groups. Authentication, payment, attendance, scanner/QR, Platform Admin and management remain ad-free. Separate EventSupport accepts real partners only; no campaign or relationship was invented. Spec Â§78's architecture instruction was reconciled; no advertising billing/targeting backend was fabricated.
-- Discovered backend/surface limitations, not rewritten: organizer events listing is creator-only; organizer Dashboard is cross-community (now explicitly labelled); Recognition lists omit full definitions and badges/milestones lack edit endpoints; peer candidates lack participant names. Event Detail still lacks complete organizer/map/rules/attendance-information presentation from Â§55. These are not labelled complete or deferred. Campaign/event-partner domain administration remains unimplemented, separate from the new presentation foundation. Existing task/member dialogs require a full accessibility/focus review.
+- Added empty-by-default Sponsored Placement presentation slots on Home, Discover, Event Detail after the story, and between Opportunities result groups. Authentication, payment, attendance, scanner/QR, Platform Admin and management remain ad-free. Separate EventSupport accepts real partners only; no campaign or relationship was invented. Spec §78's architecture instruction was reconciled; no advertising billing/targeting backend was fabricated.
+- Discovered backend/surface limitations, not rewritten: organizer events listing is creator-only; organizer Dashboard is cross-community (now explicitly labelled); Recognition lists omit full definitions and badges/milestones lack edit endpoints; peer candidates lack participant names. Event Detail still lacks complete organizer/map/rules/attendance-information presentation from §55. These are not labelled complete or deferred. Campaign/event-partner domain administration remains unimplemented, separate from the new presentation foundation. Existing task/member dialogs require a full accessibility/focus review.
 - Focused verification: management/source and executable Recognition contract tests **26 passed**; object storage **3 passed**; event-media **2 passed**; with existing upload validation the combined backend media run was **7 passed**, with one existing Starlette/httpx deprecation warning. Final event-media rerun passed including malformed-signature rejection. Frontend production build/TypeScript and ESLint passed; changed-file Ruff and `git diff --check` passed. No Playwright or full backend suite ran.
 - External/manual verification remains required at 320/360/390/414/768/1024/1280px, Android/iOS/PWA cameras and accessibility, multi-community switching, private R2 delivery/expiry/CORS, failure/concurrent-replacement cleanup recovery, and preserved real free/paid attendance journeys. No new browser/device/staging results are claimed; no push/deploy/Render/secrets changes occurred.
 - Full 38-item reconciliation, file inventory, caveats and exact manual checklist: `docs/UI_UX_RECONCILIATION_2026_09_12.md`. No traceability completion counts changed and no overall project assessment was made.
@@ -986,9 +986,9 @@ The backend now validates the effective merged event state before persistence so
 Regression coverage was added in `tests/test_attendance_configuration_api.py`.
 
 Verification:
-- `pytest tests/test_attendance_configuration_api.py -q` — 8 passed
-- Ruff on attendance configuration backend/test files — passed
-- `git diff --check` — passed, with line-ending normalization warnings only
-- frontend production build — passed
-- frontend ESLint — passed
-- `node scripts/test-management-layout.mjs` — 28 passed
+- `pytest tests/test_attendance_configuration_api.py -q` - 8 passed
+- Ruff on attendance configuration backend/test files - passed
+- `git diff --check` - passed, with line-ending normalization warnings only
+- frontend production build - passed
+- frontend ESLint - passed
+- `node scripts/test-management-layout.mjs` - 28 passed
