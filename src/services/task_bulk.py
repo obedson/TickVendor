@@ -8,10 +8,9 @@ from fastapi import HTTPException
 from pydantic import EmailStr, TypeAdapter
 from sqlalchemy import func, select
 
-from src.authorization import require_community_role
+from src.authorization import require_task_management_authority
 from src.models import (
     Membership,
-    MembershipRole,
     MembershipStatus,
     Profile,
     ScheduledNotification,
@@ -29,7 +28,7 @@ def eligible_query(task):
 
 
 def resolve(db, task, actor, emails=None, search="", all_members=False):
-    require_community_role(db, task.community_id, actor, MembershipRole.ORGANIZER)
+    require_task_management_authority(db, task, actor, action="assign")
     require_available(db, task)
     if not task.is_active:
         raise HTTPException(409, "Task is inactive")
@@ -58,7 +57,7 @@ def resolve(db, task, actor, emails=None, search="", all_members=False):
 
 def assign_bulk(db, task, actor, selected_ids, all_members=False, selection_version=None):
     task = db.scalar(select(Task).where(Task.id == task.id).with_for_update().execution_options(populate_existing=True))
-    require_community_role(db, task.community_id, actor, MembershipRole.ORGANIZER)
+    require_task_management_authority(db, task, actor, action="assign")
     require_available(db, task)
     if not task.is_active:
         raise HTTPException(409, "Task is inactive")

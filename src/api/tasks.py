@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from src.api.auth import get_current_user
-from src.authorization import require_community_role
+from src.authorization import require_community_role, require_task_management_authority
 from src.database import get_db
 from src.models import (
     MembershipRole,
@@ -47,13 +47,17 @@ router = APIRouter(tags=["tasks"])
 
 @router.get("/communities/{community_id}/task-verification-queue")
 def verification_queue(community_id: UUID, db: Annotated[Session, Depends(get_db)], user: Annotated[User, Depends(get_current_user)]):
-    require_community_role(db, community_id, user, MembershipRole.ORGANIZER)
+    # An Organizer reviews the tasks they created; a community Admin reviews every task in the
+    # community. Super Admin arrives here as an Admin membership.
+    membership = require_community_role(db, community_id, user, MembershipRole.ORGANIZER)
     latest = select(TaskSubmission.id).where(TaskSubmission.assignment_id == TaskAssignment.id).order_by(TaskSubmission.submitted_at.desc(), TaskSubmission.id).limit(1).correlate(TaskAssignment).scalar_subquery()
-    rows = db.execute(select(TaskAssignment, Task, TaskSubmission, Profile).join(Task, Task.id == TaskAssignment.task_id)
-                      .join(TaskSubmission, TaskSubmission.assignment_id == TaskAssignment.id)
-                      .outerjoin(Profile, Profile.user_id == TaskAssignment.assignee_id)
-                      .where(Task.community_id == community_id, TaskAssignment.status == TaskAssignmentStatus.SUBMITTED, TaskSubmission.id == latest)
-                      .order_by(TaskSubmission.submitted_at, TaskAssignment.id))
+    query = select(TaskAssignment, Task, TaskSubmission, Profile).join(Task, Task.id == TaskAssignment.task_id) \
+        .join(TaskSubmission, TaskSubmission.assignment_id == TaskAssignment.id) \
+        .outerjoin(Profile, Profile.user_id == TaskAssignment.assignee_id) \
+        .where(Task.community_id == community_id, TaskAssignment.status == TaskAssignmentStatus.SUBMITTED, TaskSubmission.id == latest)
+    if membership.role != MembershipRole.ADMIN:
+        query = query.where(Task.created_by_id == user.id)
+    rows = db.execute(query.order_by(TaskSubmission.submitted_at, TaskAssignment.id))
     return [{"assignment_id": str(assignment.id), "task_id": str(task.id), "task_title": task.title,
              "assignee_id": str(assignment.assignee_id), "submitted_at": submission.submitted_at,
              "evidence_text": submission.evidence_text, "evidence_url": submission.evidence_url,
@@ -76,13 +80,16 @@ def verification_queue(community_id: UUID, db: Annotated[Session, Depends(get_db
 @router.get("/communities/{community_id}/tasks", response_model=list[TaskResponse])
 def list_tasks(community_id: UUID, db: Annotated[Session, Depends(get_db)],
                user: Annotated[User, Depends(get_current_user)], status_filter: TaskAssignmentStatus | None = None, management: bool = False):
-    from src.authorization import require_community_role
-    require_community_role(db, community_id, user)
-    if management:
-        require_community_role(db, community_id, user, MembershipRole.ORGANIZER)
+    membership = require_community_role(db, community_id, user)
     query = select(Task).where(Task.community_id == community_id, Task.is_active.is_(True))
     from src.services.availability import visible_content
     query = query.where(visible_content(Task))
+    if management:
+        # Full task configuration is management data: an Organizer sees the configuration of the
+        # tasks they run, an Admin sees the whole community. Participants keep the redacted view.
+        membership = require_community_role(db, community_id, user, MembershipRole.ORGANIZER)
+        if membership.role != MembershipRole.ADMIN:
+            query = query.where(Task.created_by_id == user.id)
     if status_filter:
         query = query.where(Task.id.in_(select(TaskAssignment.task_id).where(TaskAssignment.status == status_filter, *([] if management else [TaskAssignment.assignee_id == user.id]))))
     policy = task_policy(db, community_id)
@@ -240,8 +247,9 @@ def task_detail(task_id: UUID, db: Annotated[Session, Depends(get_db)], user: An
     task = require_available(db, db.get(Task, task_id))
     require_community_role(db, task.community_id, user)
     if management:
-        # Organizer-only: full configuration, still never cached or shown to participants.
-        require_community_role(db, task.community_id, user, MembershipRole.ORGANIZER)
+        # Organizer-only: full configuration, still never cached or shown to participants. Scoped
+        # to the tasks this Organizer runs, matching the edit authority the same data feeds.
+        require_task_management_authority(db, task, user, action="inspect")
     assignment = db.scalar(select(TaskAssignment).where(TaskAssignment.task_id == task.id, TaskAssignment.assignee_id == user.id))
     submissions = list(db.scalars(select(TaskSubmission).where(TaskSubmission.assignment_id == assignment.id).order_by(TaskSubmission.submitted_at.desc()).limit(20))) if assignment else []
     return {"id": str(task.id), "community_id": str(task.community_id), "title": task.title, "description": task.description,

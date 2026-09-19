@@ -6,7 +6,11 @@ from fastapi import HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from src.authorization import require_community_role
+from src.authorization import (
+    EVENT_MANAGEMENT_STAFF_ROLES,
+    require_community_role,
+    require_event_staff_authority,
+)
 from src.models import (
     Attendance,
     AttendanceStatus,
@@ -172,10 +176,18 @@ def organizer_summary(db: Session, user: User) -> dict[str, object]:
 
 
 def event_summary(db: Session, event_id, user: User) -> dict[str, object]:
+    """Operational reporting for one event.
+
+    Event-scoped, not community-wide: an Organizer of the community who does not run this event
+    reads nothing here. The figures include contributions and Impact points, so a delegated
+    EventStaff member reaches them only in the ``manager`` role — the job named for running the
+    event — and the three single-job roles do not, which is the narrowest reading of a
+    specification that does not grant staff reporting.
+    """
     event = db.get(Event, event_id)
     if event is None:
         raise HTTPException(status_code=404, detail="Event not found")
-    require_community_role(db, event.community_id, user, MembershipRole.ORGANIZER)
+    require_event_staff_authority(db, event, user, staff_roles=EVENT_MANAGEMENT_STAFF_ROLES)
     verified_states = [
         "GPS_VERIFIED",
         "QR_VERIFIED",

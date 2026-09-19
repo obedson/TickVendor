@@ -15,6 +15,7 @@ from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from src.authorization import EVENT_ADMISSION_STAFF_ROLES, EVENT_MANAGEMENT_STAFF_ROLES
 from src.models import (
     Attendance,
     AttendanceStatus,
@@ -65,7 +66,8 @@ def create_entitlement(db: Session, event: Event, payload, user: User) -> Entitl
     ticket_type = db.get(TicketType, payload.ticket_type_id)
     if ticket_type is None or ticket_type.event_id != event.id:
         raise HTTPException(status_code=404, detail="Ticket type not found")
-    require_event_staff(db, event, user)
+    # Defining a benefit changes what the event gives away, so it is management, not door work.
+    require_event_staff(db, event, user, staff_roles=EVENT_MANAGEMENT_STAFF_ROLES)
     model = Entitlement(event_id=event.id, created_by_id=user.id, **payload.model_dump())
     db.add(model)
     db.flush()
@@ -80,7 +82,7 @@ def create_entitlement(db: Session, event: Event, payload, user: User) -> Entitl
 def update_entitlement(db: Session, event: Event, entitlement: Entitlement, payload, user: User) -> Entitlement:
     if entitlement is None or entitlement.event_id != event.id:
         raise HTTPException(status_code=404, detail="Benefit not found")
-    require_event_staff(db, event, user)
+    require_event_staff(db, event, user, staff_roles=EVENT_MANAGEMENT_STAFF_ROLES)
     changes = payload.model_dump(exclude_unset=True)
     for key, value in changes.items():
         setattr(entitlement, key, value)
@@ -364,7 +366,8 @@ def validate_redemption(
     event = db.get(Event, event_id)
     if event is None:
         raise HTTPException(status_code=404, detail="Event not found")
-    require_event_staff(db, event, staff)
+    # Redeeming a benefit is door work: whoever may admit an attendee may hand over their perk.
+    require_event_staff(db, event, staff, staff_roles=EVENT_ADMISSION_STAFF_ROLES)
     redemption = _resolve_credential(db, event_id, code, qr_payload)
     if redemption is None:
         raise HTTPException(status_code=404, detail="Invalid or unknown redemption credential")

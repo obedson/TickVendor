@@ -50,23 +50,21 @@ def _load_ticket(db: Session, event_id: UUID, ticket_id: UUID, user: User) -> Ti
     return ticket
 
 
-def require_event_staff(db: Session, event: Event, user: User) -> None:
-    """Authorized organizer, admin, platform admin, or active event staff member."""
-    from src.authorization import require_community_role
-    from src.models import EventStaff, MembershipRole, PlatformRole
+def require_event_staff(db: Session, event: Event, user: User, *, staff_roles=None) -> None:
+    """Authorized organizer, admin, platform admin, or active event staff member.
 
-    if user.role == PlatformRole.SUPER_ADMIN or event.organizer_id == user.id:
-        return
-    staff = db.scalar(select(EventStaff.id).where(
-        EventStaff.event_id == event.id,
-        EventStaff.user_id == user.id,
-        EventStaff.is_active.is_(True),
-    ))
-    if staff is not None:
-        return
-    membership = require_community_role(db, event.community_id, user, MembershipRole.ADMIN)
-    if membership.role != MembershipRole.ADMIN:
-        raise HTTPException(status_code=403, detail="Event management permission required")
+    Delegates to the shared event-operational helper so ticket validation and benefit redemption
+    apply exactly the same owner-scoped rule as attendance verification: an Organizer of this
+    community who does not run this event and holds no staff assignment on it is refused.
+
+    ``staff_roles`` narrows which EventStaff roles qualify; callers pass one of the
+    ``EVENT_*_STAFF_ROLES`` groups from :mod:`src.authorization` so that a job's authority is
+    declared once rather than restated at each call site. Omit it only where the question is
+    genuinely "is this person attached to this event at all?".
+    """
+    from src.authorization import require_event_staff_authority
+
+    require_event_staff_authority(db, event, user, staff_roles=staff_roles)
 
 
 def _geofence_point(event: Event, payload: AttendanceCheckIn | None, *, label: str) -> tuple | None:

@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from src.api.auth import get_current_user
-from src.authorization import require_community_role
+from src.authorization import EVENT_ATTENDANCE_STAFF_ROLES, require_event_staff_authority
 from src.database import get_db
 from src.models import (
     Attendance,
@@ -17,9 +17,6 @@ from src.models import (
     AttendanceStatus,
     AttendanceVerification,
     Event,
-    EventStaff,
-    EventStaffRole,
-    MembershipRole,
     PeerConfirmation,
     Profile,
     Ticket,
@@ -139,14 +136,8 @@ def _review_payload(attendance: Attendance) -> dict:
 
 
 def _require_review_access(db: Session, event: Event, user: User) -> None:
-    membership = require_community_role(db, event.community_id, user, MembershipRole.ORGANIZER)
-    if user.role.value == "super_admin" or event.organizer_id == user.id or membership.role.value == "admin":
-        return
-    staff = db.scalar(select(EventStaff).where(
-        EventStaff.event_id == event.id, EventStaff.user_id == user.id,
-        EventStaff.role == EventStaffRole.ATTENDANCE_VERIFIER, EventStaff.is_active.is_(True)))
-    if staff is None:
-        raise HTTPException(status_code=403, detail="Attendance review permission required")
+    """Review and roster are event operations, so they follow event ownership, not community role."""
+    require_event_staff_authority(db, event, user, staff_roles=EVENT_ATTENDANCE_STAFF_ROLES)
 
 
 @router.get("/review", response_model=list[AttendanceReviewResponse])

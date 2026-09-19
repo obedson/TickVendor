@@ -9,17 +9,18 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from src.authorization import require_community_role
+from src.authorization import (
+    EVENT_ADMISSION_STAFF_ROLES,
+    EVENT_ATTENDANCE_STAFF_ROLES,
+    require_event_staff_authority,
+)
 from src.models import (
     Attendance,
     AttendanceStatus,
     AttendanceVerification,
     Event,
-    EventStaff,
-    MembershipRole,
     PeerConfirmation,
     PeerConfirmationDecision,
-    PlatformRole,
     PointRule,
     Ticket,
     TicketStatus,
@@ -334,7 +335,9 @@ def organizer_verify(db: Session, attendance: Attendance, organizer: User, appro
     event = db.get(Event, attendance.event_id)
     if not event.organizer_verification_enabled:
         raise HTTPException(status_code=409, detail="Organizer verification is disabled")
-    require_community_role(db, event.community_id, organizer, MembershipRole.ORGANIZER)
+    # Owner-scoped: an Organizer of this community who neither owns the event nor holds an active
+    # attendance-verifier staff assignment on it has no authority here.
+    require_event_staff_authority(db, event, organizer, staff_roles=EVENT_ATTENDANCE_STAFF_ROLES)
     signal = db.scalar(select(AttendanceVerification).where(
         AttendanceVerification.attendance_id == attendance.id,
         AttendanceVerification.method == VerificationMethod.ORGANIZER,
@@ -365,16 +368,9 @@ def qr_verify(db: Session, attendance: Attendance, ticket: Ticket, verifier: Use
     event = db.get(Event, attendance.event_id)
     if not event.qr_attendance_enabled:
         raise HTTPException(status_code=409, detail="QR attendance verification is disabled")
-    require_community_role(db, event.community_id, verifier, MembershipRole.ORGANIZER)
-    if verifier.role != PlatformRole.SUPER_ADMIN and event.organizer_id != verifier.id:
-        staff = db.scalar(select(EventStaff).where(
-            EventStaff.event_id == event.id,
-            EventStaff.user_id == verifier.id,
-            EventStaff.is_active.is_(True),
-        ))
-        membership = require_community_role(db, event.community_id, verifier, MembershipRole.ORGANIZER)
-        if staff is None and membership.role != MembershipRole.ADMIN:
-            raise HTTPException(status_code=403, detail="QR attendance verification permission required")
+    # Any role that works the door may scan; the tenant boundary and the community's suspension
+    # state are still enforced first, so a foreign Organizer can never reach this event.
+    require_event_staff_authority(db, event, verifier, staff_roles=EVENT_ADMISSION_STAFF_ROLES)
     if ticket.event_id != attendance.event_id or ticket.attendee_id != attendance.user_id:
         raise HTTPException(status_code=403, detail="Ticket does not match attendance")
     if ticket.status not in {TicketStatus.ACTIVE, TicketStatus.USED}:

@@ -9,14 +9,16 @@ from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile, status
 from fastapi.responses import FileResponse
+from pydantic import BaseModel, ConfigDict
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from src.api.auth import get_current_user, get_optional_user
 from src.config import settings
 from src.database import get_db
-from src.models import Event, EventCategory, User
+from src.models import Event, EventCategory, EventStaffRole, User
 from src.schemas.event import EventCreate, EventResponse, EventUpdate
+from src.services import event_staff
 from src.services.analytics import event_summary
 from src.services.event import (
     create_event,
@@ -239,3 +241,43 @@ def delete_event(
 ) -> Response:
     soft_delete_event(db, event_id, current_user)
     return Response(status_code=204)
+
+
+class EventStaffAssign(BaseModel):
+    """Appoint one active community member to one operational job on one event."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    user_id: UUID
+    role: EventStaffRole = EventStaffRole.ATTENDANCE_VERIFIER
+
+
+@router.get("/{event_id}/staff")
+def list_event_staff(
+    event_id: UUID,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> list[dict]:
+    """Event owner, community Admin or Super Admin only — existing staff cannot re-delegate."""
+    return event_staff.list_staff(db, event_id, current_user)
+
+
+@router.post("/{event_id}/staff", status_code=status.HTTP_201_CREATED)
+def assign_event_staff(
+    event_id: UUID,
+    payload: EventStaffAssign,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> dict:
+    return event_staff.assign_staff(db, event_id, current_user, payload.user_id, payload.role)
+
+
+@router.delete("/{event_id}/staff/{staff_id}")
+def revoke_event_staff(
+    event_id: UUID,
+    staff_id: UUID,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> dict:
+    """Deactivate an assignment. The row is kept so the grant/revoke history stays auditable."""
+    return event_staff.revoke_staff(db, event_id, current_user, staff_id)

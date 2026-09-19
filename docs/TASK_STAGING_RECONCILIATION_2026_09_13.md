@@ -276,3 +276,76 @@ tests/test_tasks.py
 tests/test_task_evidence_migration.py
 tests/test_task_staging_reconciliation.py
 ```
+
+## Superseding note — 2026-09-19: Organizer least-privilege boundary
+
+Appended rather than substituted. Everything above stands as the record of what was verified on
+2026-09-13; the statements below are corrected here, in a dated section, instead of being edited in
+place. Nothing above was rewritten.
+
+### Member visibility — supersedes the assignment-selection paragraph
+
+The paragraph "Assignment selection searches display name/username … search is client-side, not a
+claimed new server-paginated directory" described the *then-current* boundary. The boundary is now:
+
+- `GET /communities/{community_id}/members` — the directory, contact details included — requires a
+  community **Admin** membership. It is governance data and amounts to a bulk export of personal
+  information that operational event and task delivery never needs.
+- Organizers resolve **one member at a time** through
+  `GET /communities/{community_id}/members/search`. It requires a real query of at least two
+  characters, is capped at `MEMBER_SEARCH_LIMIT` (10) with no offset to page through, and can only
+  see `ACTIVE` memberships belonging to active users. Left, suspended and non-member users are not
+  reachable, and a user outside the community is indistinguishable from a user who does not exist.
+- An email address is echoed only when the query *was* that exact address. A display-name or
+  username match never returns an address, so a name search is not a harvesting route.
+- LIKE wildcards in `q` are escaped, so a query of `%` cannot be turned into a directory dump.
+- Each search is audited as a query kind, a truncated digest and a result count — never the raw
+  term, so the audit trail cannot itself become a store of members' addresses.
+
+The performance observation in that paragraph is unaffected and remains an external load-test
+concern.
+
+### Organizer task authority — clarifies the task sections
+
+The task material above describes creation, assignment, submission and verification without saying
+who may perform them. Current authority:
+
+| Actor | Task authority |
+|---|---|
+| Participant | Submits and reads their own assignments. **Unchanged** by this reconciliation. |
+| Organizer | Creates tasks; manages, assigns, verifies and rejects **the tasks they created**. |
+| Community Admin | Manages **all** tasks in the community. |
+| Super Admin | Unchanged platform oversight. |
+
+The enforcement point is the shared helper in `src/authorization.py`, which resolves ownership from
+the task's creator and admits a community Admin as an override.
+
+### Other boundaries settled in the same pass
+
+- **Attendance.** Verification, the review queue and the roster follow event-scoped authority —
+  event owner, an assigned `EventStaff` member holding a suitable role, or a community Admin — not
+  membership in the community. An Organizer of the community who does not run the event reads and
+  resolves nothing on it.
+- **Event analytics.** `event_summary` is event-scoped on the same terms, with delegated staff
+  limited to the `manager` role. Community-wide analytics remain Admin-gated and were not narrowed.
+- **Ticket validation.** `POST /events/{event_id}/tickets/validate` now authorizes through the
+  shared event-scoped helper, so an appointed member-level `EventStaff` with a door role is admitted
+  instead of being refused by the community-role floor. Ticket ownership, ticket status, event
+  lifecycle and tenant checks were not weakened.
+- **EventStaff delegation.** The write path to appoint and revoke event staff exists, so the
+  delegation the model describes is usable rather than only readable.
+- **Frontend.** Management navigation is derived from the selected community membership role rather
+  than the platform role, and a stale or hand-set view is resolved back to a permitted destination.
+  This is presentation only — backend authorization remains the enforcement point.
+
+### Specification clauses not aligned with the above
+
+`TICKVENDOR_SPEC.md` was **not** modified. §5 (USER ROLES) lists, under **Organizer**, "Assign
+tasks" (line 185), "Verify task completion" (line 186) and "View analytics" (line 189) with no
+ownership qualifier, and lists "Manage community-wide activities" (line 202) and "View community
+analytics" (line 203) as things a **Community Administrator** can do *additionally*. The
+implementation reads the unqualified Organizer entries as scoped to what the Organizer runs, which
+is what makes the *additionally* clause meaningful; it does not narrow anything the spec grants
+Admins. §5 (USER ROLES) also lists "Validate tickets" for Organizer without describing delegated
+event staff, so the `EventStaff` roles carry no role semantics in the specification at all. These
+are recorded as conflicts, not as new requirements.

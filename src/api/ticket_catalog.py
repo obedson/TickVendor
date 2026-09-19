@@ -23,24 +23,35 @@ from src.models import (
 from src.services.availability import require_available
 from src.services.event import event_audience_filter
 from src.services.payment import RELEASABLE_PAYMENT_STATUSES
-from src.services.ticket import CAPACITY_HOLDING_TICKET_STATUSES, expire_pending_orders
-from src.services.ticket_attendance import require_event_staff
+from src.services.ticket import (
+    CAPACITY_HOLDING_TICKET_STATUSES,
+    expire_pending_orders,
+    manage_event,
+)
 
 router = APIRouter(tags=["ticketing"])
 
 
 def _maintains_event(db: Session, event: Event, user: User | None) -> bool:
-    """Whether the caller maintains this event, asked as a question rather than a demand.
+    """Whether the caller maintains this event's ticket inventory, asked as a question.
 
-    ``require_event_staff`` is the single authority on what "event staff" means; restating its
-    rules here would give the codebase a second copy to drift out of step. So its refusal is read
-    as "not staff". This only ever broadens what an authorized maintainer sees — the ``False``
-    branch is the narrower public view.
+    The maintainer question is the ticket module's own: ``manage_event`` is what creating and
+    editing a ticket type demands, so whoever may set a type's ``visibility`` is exactly who may
+    see the tiers it hides. Asking it here rather than restating it keeps one definition of that
+    authority, and the refusal is read as "not a maintainer" — this only ever broadens what an
+    authorized maintainer sees, since the ``False`` branch is the narrower public view.
+
+    It is deliberately *not* the operational event-staff question. Working an event is a wider set
+    than configuring its inventory: a door scanner is event staff without ever choosing what is on
+    sale, and answering "yes" for every EventStaff role would hand the hidden and invite-only tiers
+    to each of them by delegation. It is also why an Organizer of the community who does not own
+    the event sees only public inventory — a community-wide badge is not authority over somebody
+    else's event, which is the boundary the least-privilege pass drew.
     """
     if user is None:
         return False
     try:
-        require_event_staff(db, event, user)
+        manage_event(db, event.id, user)
     except HTTPException:
         return False
     return True
@@ -64,8 +75,8 @@ def list_event_ticket_types(
     require_available(db, event)
     if event is None:
         raise HTTPException(status_code=404, detail="Event not found")
-    # An organizer maintains hidden and invite-only tiers as well, and cannot maintain what the
-    # listing hides from them; everyone else sees only what is on sale.
+    # Whoever configures the inventory also sees all of it — they cannot maintain what the listing
+    # hides from them; everyone else sees only what is on sale.
     conditions = [TicketType.event_id == event_id]
     if not _maintains_event(db, event, user):
         conditions.append(TicketType.visibility == TicketVisibility.PUBLIC)

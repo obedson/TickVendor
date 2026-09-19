@@ -61,7 +61,13 @@ def test_bulk_selected_members_rechecked(context):
 
 
 def test_member_directory_scopes_email_to_community_managers(context):
-    """Managers must tell similar display names apart; ordinary members must not harvest emails."""
+    """Contact details are governance data: only a community Admin reads the directory.
+
+    The earlier boundary let an Organizer — and a plain member — page the whole community with
+    emails redacted. Both now resolve one member at a time through the constrained
+    ``/members/search`` lookup instead, so the roster is no longer an enumeration path for anyone
+    below Admin.
+    """
     client, (admin, member, outsider, community), _ = context
     path = f'/api/v1/communities/{community}/members'
     managed = client.get(path, headers=headers(admin))
@@ -69,28 +75,35 @@ def test_member_directory_scopes_email_to_community_managers(context):
     rows = {row['user_id']: row for row in managed.json()['members']}
     assert rows[str(member)]['display_name'] == 'Member'
     assert rows[str(member)]['email'] == 'member@example.com'
-    plain = client.get(path, headers=headers(member))
-    assert plain.status_code == 200, plain.text
-    assert sorted(row['display_name'] for row in plain.json()['members']) == ['Admin', 'Member']
-    assert all('email' not in row for row in plain.json()['members'])
-    # Tenant boundary is server-side: a non-member never reaches the directory at all.
+    # A plain member is refused the directory and pointed at the constrained lookup, which
+    # answers an exact-address question without exposing anybody else.
+    assert client.get(path, headers=headers(member)).status_code == 403
+    found = client.get(path + '/search', headers=headers(member), params={'q': 'admin@example.com'})
+    assert found.status_code == 403
+    # Tenant boundary is server-side: a non-member never reaches either surface.
     assert client.get(path, headers=headers(outsider)).status_code == 403
+    assert client.get(path + '/search', headers=headers(outsider),
+                      params={'q': 'admin@example.com'}).status_code == 403
 
 
-def test_member_directory_email_boundary_covers_organizers_and_suspended_memberships(context):
-    """Organizers run the assignment and roster workflows that need member emails; a suspended membership loses the directory entirely."""
+def test_member_directory_is_admin_only_and_suspended_memberships_lose_every_view(context):
+    """An Organizer keeps an operational lookup but not the directory; suspension loses both."""
     from src.models import MembershipRole
     client, (admin, member, _, community), sessions = context
     path = f'/api/v1/communities/{community}/members'
     with sessions() as db:
         item = db.scalar(select(Membership).where(Membership.user_id == member, Membership.community_id == community))
         item.role = MembershipRole.ORGANIZER; db.commit()
-    rows = {row['user_id']: row for row in client.get(path, headers=headers(member)).json()['members']}
-    assert rows[str(admin)]['email'] == 'admin@example.com'
+    assert client.get(path, headers=headers(member)).status_code == 403
+    rows = client.get(path + '/search', headers=headers(member), params={'q': 'community-admin'}).json()['members']
+    assert [row['user_id'] for row in rows] == [str(admin)]
+    assert 'email' not in rows[0]
     with sessions() as db:
         item = db.scalar(select(Membership).where(Membership.user_id == member, Membership.community_id == community))
         item.status = MembershipStatus.SUSPENDED; db.commit()
     assert client.get(path, headers=headers(member)).status_code == 403
+    assert client.get(path + '/search', headers=headers(member),
+                      params={'q': 'community-admin'}).status_code == 403
 
 
 def test_private_upload_and_authorized_retrieval(context, monkeypatch):

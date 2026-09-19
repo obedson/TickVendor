@@ -8,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from src.api.auth import get_current_user
+from src.authorization import EVENT_MANAGEMENT_STAFF_ROLES
 from src.config import settings
 from src.database import get_db
 from src.models import (
@@ -191,7 +192,8 @@ def list_event_entitlements(
     user: Annotated[User, Depends(get_current_user)],
 ):
     event = _event_or_404(db, event_id)
-    require_event_staff(db, event, user)
+    # Reading the benefit definitions is reading event configuration, not working the door.
+    require_event_staff(db, event, user, staff_roles=EVENT_MANAGEMENT_STAFF_ROLES)
     rows = db.scalars(select(Entitlement).where(Entitlement.event_id == event_id)
                       .order_by(Entitlement.name)).all()
     return [EntitlementResponse.model_validate(row) for row in rows]
@@ -251,6 +253,8 @@ def validate_benefit(
 ):
     from src.services.entitlement import validate_redemption
 
+    # Resolved for the route's own existence check; the service takes the event *id*, not the row.
+    event = _event_or_404(db, event_id)
     point = None
     if payload.latitude is not None and payload.longitude is not None:
         point = AttendanceCheckIn(
@@ -258,7 +262,7 @@ def validate_benefit(
             accuracy_meters=payload.accuracy_meters,
         )
     return RedemptionValidateResponse(**validate_redemption(
-        db, _event_or_404(db, event_id), user,
+        db, event.id, user,
         code=payload.code, qr_payload=payload.qr_payload, point=point,
     ))
 
@@ -272,7 +276,8 @@ def list_redemptions(
     from src.services.entitlement import redemption_history
 
     event = _event_or_404(db, event_id)
-    require_event_staff(db, event, user)
+    # Redemption history names attendees and what they took: oversight of the event, not door work.
+    require_event_staff(db, event, user, staff_roles=EVENT_MANAGEMENT_STAFF_ROLES)
     return redemption_history(db, event_id)
 
 

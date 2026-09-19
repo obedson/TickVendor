@@ -6,7 +6,7 @@ from fastapi import HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from src.authorization import require_community_role
+from src.authorization import require_community_role, require_task_management_authority
 from src.models import (
     Event,
     Membership,
@@ -59,10 +59,13 @@ def update_task(db: Session, task: Task, values: dict, editor: User) -> Task:
 
     Only configuration is touched: assignments, submissions, assessment history and Impact
     transactions are never rewritten, so historical evidence stays auditable.
+
+    Closing the task (``is_active=False``) is included here deliberately — deactivating somebody
+    else's task withdraws it from participants exactly as destructively as editing its reward.
     """
     task = db.scalar(select(Task).where(Task.id == task.id).with_for_update())
     require_available(db, task)
-    require_community_role(db, task.community_id, editor, MembershipRole.ORGANIZER)
+    require_task_management_authority(db, task, editor, action="edit")
     changes = {key: value for key, value in values.items() if key in EDITABLE_TASK_FIELDS}
     if "impact_point_reward" in changes:
         validate_task_reward(db, task.community_id, changes["impact_point_reward"])
@@ -101,7 +104,7 @@ def update_task(db: Session, task: Task, values: dict, editor: User) -> Task:
 def assign_task(db: Session, task: Task, assignee_id, assigner: User) -> TaskAssignment:
     task = db.scalar(select(Task).where(Task.id == task.id).with_for_update())
     require_available(db, task)
-    require_community_role(db, task.community_id, assigner, MembershipRole.ORGANIZER)
+    require_task_management_authority(db, task, assigner, action="assign")
     if not task.is_active:
         raise HTTPException(409, "Task is inactive")
     member = db.scalar(select(Membership).where(
@@ -213,7 +216,7 @@ def verify_task(db: Session, assignment: TaskAssignment, verifier: User, approve
     assignment = db.scalar(select(TaskAssignment).where(TaskAssignment.id == assignment.id).with_for_update().execution_options(populate_existing=True))
     require_available(db, db.get(Task, assignment.task_id))
     task = db.get(Task, assignment.task_id)
-    require_community_role(db, task.community_id, verifier, MembershipRole.ORGANIZER)
+    require_task_management_authority(db, task, verifier, action="verify")
     if assignment.status == TaskAssignmentStatus.VERIFIED and approve:
         evaluate_recognition(db, assignment.assignee_id, task.community_id)
         return assignment

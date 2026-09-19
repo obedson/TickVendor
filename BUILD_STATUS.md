@@ -2,6 +2,40 @@
 
 > **How to use this file.** Entries are newest-first. Read the newest entry relevant to your task and consult older sections only when they are relevant. Append or update evidence without rewriting historical verification. Record the exact checks that were actually executed, and keep implementation status separate from verification status.
 
+## Organizer least-privilege / RBAC hardening reconciliation — 2026-09-19
+
+Verified final state:
+
+- Organizer no longer receives unrestricted community member directory/contact data.
+- Organizer can perform constrained, community-scoped member lookup by exact email / username / name with privacy minimization and capped results.
+- Admin retains full community member directory/governance access.
+- Organizer management navigation is role-aware; Admin-only views are hidden and stale views resolve safely.
+- Attendance/event authority is scoped to event owner, Community Admin, Super Admin, or explicitly assigned EventStaff according to staff-role semantics.
+- EventStaff delegation is implemented with assignment/revocation and role-specific authority groups.
+- Ticket validation now supports properly assigned EventStaff without broadening community-wide Organizer authority.
+- Event analytics are owner/Admin/Super Admin or Manager EventStaff scoped.
+- Organizer task management is owner-scoped; Community Admin may manage all community tasks.
+- Ticket catalog visibility preserves public-only inventory for ordinary members/unrelated organizers and hidden inventory only for legitimate maintainers.
+- Historical task reconciliation documentation received a superseding note rather than rewriting old history.
+- `docs/TICKVENDOR_SPEC.md` conflicts were reported, not silently rewritten.
+
+Verification evidence:
+
+- `python -m pytest tests/test_organizer_least_privilege.py -q` — **45 passed**, 2 warnings.
+- Related backend regression batch — **28 passed**, 2 warnings.
+- Broader backend event/task/ticket regression batch — **81 passed**, 2 warnings.
+- `python -m pytest tests/test_ticket_type_api.py -q` — **7 passed**, 2 warnings.
+- Full backend, `python -m pytest -q` — **403 passed**, 6 warnings.
+- Ruff across all changed Python files — all checks passed.
+- Frontend: `npm run build` passed; `npm run lint` passed; `node scripts/test-management-layout.mjs` — **28 passed, 0 failed**.
+- `git diff --check` — no whitespace or conflict-marker errors; only the working copy's existing LF→CRLF warnings.
+- Vitest was **not run** for `frontend/src/__tests__/managementNav.test.ts`: Vitest is not a project dependency and dependencies were deliberately not mutated for verification alone. No Vitest pass is claimed.
+
+Migration-test repair carried in this pass, which the 403-passed full-backend result depends on:
+
+- `tests/test_participation_migration.py` pinned the chain head to the superseded `e0f1a2b34567`, and because its `populate` helper runs to head, its "before" snapshot was taken after the migration under test had already been applied, so the before/after comparison asserted nothing. It now asserts the revision under test exists and upgrades to that revision from the revision preceding it (`d9e0f1a23456`), mirroring `tests/test_google_auth_migration.py`.
+- That path exposed `migrations/versions/b3c4d5e6f7a8_ticket_holders_entitlements.py`, whose `downgrade()` dropped the `tickets` foreign key and named columns outside batch mode, which SQLite cannot execute. The drop now runs inside `op.batch_alter_table("tickets")`, as that migration's own `upgrade()` and every other constraint drop in `migrations/versions/` already do. No revision, schema or historical row was changed.
+
 ## Full-suite reconciliation — 2026-09-17
 
 - Continued the inherited dirty tree at base `84be0cd` without reset, clean, restore, revert, stash, discard, branch switch, commit, push or deploy, and without any provider, environment, domain or remote-database change. Scope was the four recorded full-suite failures and the two recorded observations only.

@@ -12,7 +12,6 @@ from sqlalchemy.orm import Session
 from src.authorization import require_community_role
 from src.models import (
     Event,
-    EventStaff,
     EventStatus,
     MembershipRole,
     Order,
@@ -369,14 +368,16 @@ def create_order(db: Session, event_id: UUID, payload: OrderCreate, user: User) 
 
 
 def validate_ticket(db: Session, event_id: UUID, qr_token: str, staff: User) -> tuple[str, Ticket | None]:
-    event = manage_event(db, event_id, staff)
-    authorized_staff = db.scalar(select(EventStaff.id).where(
-        EventStaff.event_id == event_id, EventStaff.user_id == staff.id, EventStaff.is_active.is_(True)
-    ))
-    if staff.role != PlatformRole.SUPER_ADMIN and event.organizer_id != staff.id and authorized_staff is None:
-        membership = require_community_role(db, event.community_id, staff, MembershipRole.ADMIN)
-        if membership.role != MembershipRole.ADMIN:
-            raise HTTPException(status_code=403, detail="Ticket validation permission required")
+    from src.authorization import EVENT_ADMISSION_STAFF_ROLES, require_event_staff_authority
+    from src.services.availability import require_available
+
+    event = require_available(db, db.get(Event, event_id))
+    # Admission is an event operation, not ticket *configuration*, so it follows event-scoped
+    # authority rather than the Organizer community floor ``manage_event`` enforces for the
+    # inventory. An appointed EventStaff member is admitted here; a fellow Organizer who neither
+    # owns this event nor holds a staff assignment on it is not. ``require_available`` above keeps
+    # the tenant boundary and the event/community suspension checks that gate used to provide.
+    require_event_staff_authority(db, event, staff, staff_roles=EVENT_ADMISSION_STAFF_ROLES)
     ticket = db.scalar(select(Ticket).where(Ticket.qr_token == qr_token).with_for_update())
     if ticket is None:
         return "invalid", None
@@ -450,8 +451,11 @@ def cancel_single_ticket(db: Session, ticket: Ticket, user: User) -> Ticket:
         raise HTTPException(status_code=404, detail="Ticket not found")
     event = db.get(Event, ticket.event_id)
     if ticket.attendee_id != user.id and user.role != PlatformRole.SUPER_ADMIN:
+        from src.authorization import EVENT_MANAGEMENT_STAFF_ROLES
         from src.services.ticket_attendance import require_event_staff
-        require_event_staff(db, event, user)
+        # Withdrawing somebody else's ticket is a management act, not door work: it releases
+        # inventory and can trigger money movement, so it stays with the role that runs the event.
+        require_event_staff(db, event, user, staff_roles=EVENT_MANAGEMENT_STAFF_ROLES)
     if ticket.status not in {TicketStatus.RESERVED, TicketStatus.PENDING_PAYMENT, TicketStatus.ACTIVE}:
         raise HTTPException(status_code=409, detail="Ticket cannot be cancelled")
     ticket.status = TicketStatus.CANCELLED

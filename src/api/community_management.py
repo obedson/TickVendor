@@ -1,16 +1,17 @@
 """Community and membership management API."""
 
+import hashlib
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import select
+from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from src.api.auth import get_current_user
-from src.authorization import ROLE_RANK, require_community_role
+from src.authorization import require_community_role
 from src.database import get_db
 from src.models import (
     Community,
@@ -78,7 +79,7 @@ def _community(data):
 
 
 def _member_payload(membership, profile, viewer, email=None):
-    """Shape one membership. `email` is supplied only for community organizers/administrators."""
+    """Shape one membership. `email` is supplied only on the Admin-gated governance surfaces."""
     visible = profile is not None and (profile.visibility != ProfileVisibility.PRIVATE or membership.user_id == viewer.id)
     data = {"id": str(membership.id), "user_id": str(membership.user_id), "role": membership.role.value,
             "status": membership.status.value}
@@ -165,18 +166,100 @@ def update_community(community_id: UUID, payload: CommunityUpdate, db: Annotated
 
 @router.get("/{community_id}/members")
 def list_members(community_id: UUID, db: Annotated[Session, Depends(get_db)], user: Annotated[User, Depends(get_current_user)]):
-    viewer = require_community_role(db, community_id, user)
-    # Organizers/administrators already receive member emails from assignment-candidate resolution and
-    # invite by email, and need them to tell similar display names apart. Ordinary members never do.
-    privileged = ROLE_RANK[viewer.role] >= ROLE_RANK[MembershipRole.ORGANIZER]
+    """The community member directory, including contact details.
+
+    This is governance data, so it stays with community Admins. Organizers resolve one member at
+    a time through ``/members/search`` instead: the directory as a whole is a bulk export of
+    personal information that operational event and task delivery never needs.
+    """
+    viewer = require_community_role(db, community_id, user, MembershipRole.ADMIN)
     rows = db.execute(select(Membership, Profile, User.email)
                       .join(User, User.id == Membership.user_id)
                       .outerjoin(Profile, Profile.user_id == Membership.user_id)
                       .where(Membership.community_id == community_id,
                              Membership.status != MembershipStatus.LEFT)
                       .order_by(Membership.created_at)).all()
-    return {"members": [_member_payload(item, profile, user, email if privileged else None)
-                        for item, profile, email in rows]}
+    return {"members": [_member_payload(item, profile, viewer, email) for item, profile, email in rows]}
+
+
+MEMBER_SEARCH_LIMIT = 10
+
+
+def _like_pattern(term: str) -> str:
+    """Escape LIKE wildcards so a query of ``%`` cannot be turned into a directory dump."""
+    escaped = term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    return f"%{escaped}%"
+
+
+def _search_kind(term: str) -> str:
+    return "email" if "@" in term else "name"
+
+
+@router.get("/{community_id}/members/search")
+def search_members(
+    community_id: UUID,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
+    q: Annotated[str, Query(min_length=2, max_length=320)],
+):
+    """Constrained operational member lookup for community Organizers.
+
+    Deliberately not a directory: a real query is required, the result set is capped at
+    ``MEMBER_SEARCH_LIMIT`` with no offset to page through, only active memberships are visible,
+    and the response carries the minimum needed to identify somebody operationally. An email is
+    disclosed only when the query *was* that exact address, so a name or username search never
+    becomes a way to harvest addresses. A user outside this community is indistinguishable from
+    a user who does not exist, so cross-community membership cannot be probed.
+    """
+    viewer = require_community_role(db, community_id, user, MembershipRole.ORGANIZER)
+    term = q.strip()
+    if len(term) < 2:
+        raise HTTPException(status_code=422, detail="Enter at least two characters to search")
+    lowered = term.lower()
+    exact_email = lowered if "@" in lowered else None
+    username = lowered.lstrip("@")
+    rows = db.execute(
+        select(Membership, Profile, User)
+        .join(User, User.id == Membership.user_id)
+        .outerjoin(Profile, Profile.user_id == Membership.user_id)
+        .where(
+            Membership.community_id == community_id,
+            Membership.status == MembershipStatus.ACTIVE,
+            User.is_active.is_(True),
+            or_(
+                User.email == exact_email,
+                func.lower(Profile.username) == username,
+                func.lower(Profile.username).like(_like_pattern(username), escape="\\"),
+                func.lower(Profile.display_name).like(_like_pattern(lowered), escape="\\"),
+            ),
+        )
+        .order_by(Profile.display_name, User.id)
+        .limit(MEMBER_SEARCH_LIMIT)
+    ).all()
+    members = []
+    for membership, profile, target in rows:
+        visible = profile is not None and (
+            profile.visibility != ProfileVisibility.PRIVATE or membership.user_id == viewer.user_id
+        )
+        item = {
+            "user_id": str(membership.user_id),
+            "membership_id": str(membership.id),
+            "display_name": profile.display_name if visible else "Private member",
+            "username": profile.username if visible else None,
+            "role": membership.role.value,
+            "status": membership.status.value,
+        }
+        # Only an exact-email lookup may echo the address back; a name match must not.
+        if exact_email is not None and target.email.lower() == exact_email:
+            item["email"] = target.email
+        members.append(item)
+    # Recorded as a digest, never the raw term, so the audit trail cannot itself become a store
+    # of members' email addresses.
+    audit(db, actor_id=viewer.user_id, community_id=community_id, action="community.member_searched",
+          target_type="community", target_id=community_id,
+          metadata={"query_kind": _search_kind(term), "query_digest": hashlib.sha256(lowered.encode()).hexdigest()[:16],
+                    "result_count": len(members)})
+    return {"members": members}
 
 
 @router.post("/{community_id}/members", status_code=status.HTTP_201_CREATED)

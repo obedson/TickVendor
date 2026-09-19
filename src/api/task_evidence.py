@@ -9,10 +9,9 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from src.api.auth import get_current_user
-from src.authorization import require_community_role
+from src.authorization import require_community_role, require_task_management_authority
 from src.database import get_db
 from src.models import (
-    MembershipRole,
     Task,
     TaskAssignment,
     TaskAssignmentStatus,
@@ -80,6 +79,7 @@ def attachment(attachment_id: UUID, response: Response, db: Annotated[Session, D
     assignment = db.get(TaskAssignment, item.assignment_id)
     task = db.get(Task, assignment.task_id)
     if item.owner_id != user.id:
-        require_community_role(db, task.community_id, user, MembershipRole.ORGANIZER)
+        # Evidence review belongs to whoever runs the task: its creator, or a community Admin.
+        require_task_management_authority(db, task, user, action="read evidence for")
     return {"id": str(item.id), "filename": item.filename, "content_type": item.content_type,
             "size_bytes": item.size_bytes, "url": get_object_storage().get_url(item.object_key)}

@@ -35,6 +35,7 @@ import './styles.css';
 import './workspace-selector.css';
 import './management.css';
 import { AppShell, EmptyState, type WorkspaceCommunity } from './AppShell';
+import { isCommunityAdmin, managementNav, permittedManagementView, type CommunityRole, type ManagementViewId } from './managementNav';
 import { HomeDashboard } from './HomeDashboard';
 import { EventCover } from './EventCover';
 import { SponsoredPlacement } from './SponsoredPlacement';
@@ -752,12 +753,10 @@ function App() {
   const [view, setView] = useState<
     'home' | 'events' | 'opportunities' | 'tickets' | 'attendance' | 'tasks' |
     'recognition' | 'profile' | 'communities' | 'notifications' |
-    'organizer-dashboard' | 'organizer-events' | 'organizer-opportunities' |
-    'organizer-tasks' | 'organizer-members' | 'organizer-review' | 'organizer-attendance' |
-    'organizer-redemption' |
-    'admin-rules' | 'admin-bands' | 'admin-leaderboards' | 'admin-adjustments' |
-    'admin-recognition' | 'admin-notifications' | 'admin-analytics' | 'admin-audit' |
-    'platform-admin'
+    // The management destinations are the navigation catalogue's own ids, so this list and the
+    // sidebar cannot drift apart: a destination is a member of the union the moment it is in the
+    // catalogue, and `permittedManagementView` returns exactly this union.
+    ManagementViewId
     // A guest has no Home to land on: discovery is the one view they are entitled to.
   >(() => (session ? 'home' : 'events'));
   const [showAuth, setShowAuth] = useState(false);
@@ -794,27 +793,21 @@ function App() {
   }, []);
 
   const isSuperAdmin = session?.user?.role === 'super_admin';
+  const selectedCommunity = managedCommunities.find(item => item.id === selectedCommunityId);
+  // The selected *community membership* role governs these pages — never the platform role, so a
+  // Super Admin browsing a community they only organize there still gets the Organizer view.
+  const communityRole = selectedCommunity?.role as CommunityRole | undefined;
+  const communityAdmin = isCommunityAdmin(communityRole);
 
-  const roleItems = [
-    { id: 'organizer-dashboard', label: 'Dashboard', icon: '⌂' },
-    { id: 'organizer-events', label: 'Events', icon: '◈' },
-    { id: 'organizer-opportunities', label: 'Opportunities', icon: '◇' },
-    { id: 'organizer-tasks', label: 'Tasks', icon: '✓' },
-    { id: 'organizer-members', label: 'Members', icon: '♧' },
-    { id: 'organizer-review', label: 'Attendance review', icon: '◎' },
-    { id: 'organizer-attendance', label: 'Check-in', icon: '▣' },
-    { id: 'organizer-redemption', label: 'Benefit validation', icon: '▦' },
-    { id: 'admin-rules', label: 'Point rules', icon: '◆' },
-    { id: 'admin-bands', label: 'Contribution Tiers', icon: '◫' },
-    { id: 'admin-leaderboards', label: 'Leaderboard', icon: '▥' },
-    { id: 'admin-adjustments', label: 'Adjustments', icon: '±' },
-    { id: 'admin-recognition', label: 'Recognition', icon: '★' },
-    { id: 'admin-notifications', label: 'Notifications', icon: '◌' },
-    { id: 'admin-analytics', label: 'Analytics', icon: '▤' },
-    { id: 'admin-audit', label: 'Audit log', icon: '≡' },
-    // Super Admin only — platform-wide administration.
-    ...(isSuperAdmin ? [{ id: 'platform-admin', label: 'Platform Admin', icon: '⚙' }] : []),
-  ];
+  const roleItems = managementNav(communityRole, isSuperAdmin);
+  // A stale or hand-edited view must not leave the management workspace pointing at a destination
+  // this membership does not offer. The render guards below already refuse to mount it, so this is
+  // not what keeps an Organizer out of an Admin screen — it is what stops that refusal from
+  // presenting as a blank page after a demotion or a switch to a community they only organize.
+  const permittedView = permittedManagementView(view, roleItems);
+  useEffect(() => {
+    if (workspace === 'management' && permittedView && permittedView !== view) setView(permittedView);
+  }, [workspace, view, permittedView]);
 
   // Service worker + install prompt
   useEffect(() => {
@@ -1083,7 +1076,7 @@ function App() {
       roleItems={roleItems}
       workspace={workspace}
       isSuperAdmin={isSuperAdmin}
-      selectedCommunity={managedCommunities.find(item => item.id === selectedCommunityId)}
+      selectedCommunity={selectedCommunity}
       managedCommunities={managedCommunities}
       onWorkspaceChange={(next, communityId) => {
         if (next === 'management' && !managedCommunities.some(item => item.id === communityId)) return;
@@ -1132,20 +1125,22 @@ function App() {
           {view === 'notifications' && <Notifications token={session.access_token} />}
           {view === 'organizer-dashboard' && <OrganizerDashboard token={session.access_token} />}
           {view === 'organizer-events' && <OrganizerEvents token={session.access_token} communityId={selectedCommunityId} />}
-          {view === 'organizer-opportunities' && <OrganizerOpportunities token={session.access_token} communityId={selectedCommunityId} />}
+          {view === 'organizer-opportunities' && communityAdmin && <OrganizerOpportunities token={session.access_token} communityId={selectedCommunityId} />}
           {view === 'organizer-tasks' && <OrganizerTaskQueue token={session.access_token} communityId={selectedCommunityId} />}
-          {view === 'organizer-members' && <OrganizerMembers token={session.access_token} communityId={selectedCommunityId} />}
+          {view === 'organizer-members' && <OrganizerMembers token={session.access_token} communityId={selectedCommunityId} role={communityRole} />}
           {view === 'organizer-review' && <ManagedEventSelector token={session.access_token} communityId={selectedCommunityId}>{eventId => <OrganizerAttendanceReview token={session.access_token} eventId={eventId} />}</ManagedEventSelector>}
           {view === 'organizer-attendance' && <ManagedEventSelector token={session.access_token} communityId={selectedCommunityId}>{eventId => <OrganizerAttendanceOperations token={session.access_token} eventId={eventId} />}</ManagedEventSelector>}
           {view === 'organizer-redemption' && <StaffRedemption token={session.access_token} communityId={selectedCommunityId} />}
-          {view === 'admin-rules' && workspace === 'management' && <AdminPointRules token={session.access_token} communityId={selectedCommunityId} />}
-          {view === 'admin-bands' && workspace === 'management' && <AdminContributionBands token={session.access_token} communityId={selectedCommunityId} />}
-          {view === 'admin-leaderboards' && workspace === 'management' && <AdminLeaderboards token={session.access_token} communityId={selectedCommunityId} />}
-          {view === 'admin-adjustments' && workspace === 'management' && <AdminImpactAdjustment token={session.access_token} communityId={selectedCommunityId} />}
-          {view === 'admin-recognition' && workspace === 'management' && <AdminRecognition token={session.access_token} communityId={selectedCommunityId} />}
-          {view === 'admin-notifications' && workspace === 'management' && <AdminNotificationRules token={session.access_token} communityId={selectedCommunityId} />}
-          {view === 'admin-analytics' && workspace === 'management' && <AdminAnalytics token={session.access_token} communityId={selectedCommunityId} />}
-          {view === 'admin-audit' && workspace === 'management' && <AdminAuditLogs token={session.access_token} communityId={selectedCommunityId} />}
+          {/* Governance surfaces are gated on the selected community's membership role as well as
+              the workspace, so switching to an Organizer community cannot leave an Admin page mounted. */}
+          {view === 'admin-rules' && workspace === 'management' && communityAdmin && <AdminPointRules token={session.access_token} communityId={selectedCommunityId} />}
+          {view === 'admin-bands' && workspace === 'management' && communityAdmin && <AdminContributionBands token={session.access_token} communityId={selectedCommunityId} />}
+          {view === 'admin-leaderboards' && workspace === 'management' && communityAdmin && <AdminLeaderboards token={session.access_token} communityId={selectedCommunityId} />}
+          {view === 'admin-adjustments' && workspace === 'management' && communityAdmin && <AdminImpactAdjustment token={session.access_token} communityId={selectedCommunityId} />}
+          {view === 'admin-recognition' && workspace === 'management' && communityAdmin && <AdminRecognition token={session.access_token} communityId={selectedCommunityId} />}
+          {view === 'admin-notifications' && workspace === 'management' && communityAdmin && <AdminNotificationRules token={session.access_token} communityId={selectedCommunityId} />}
+          {view === 'admin-analytics' && workspace === 'management' && communityAdmin && <AdminAnalytics token={session.access_token} communityId={selectedCommunityId} />}
+          {view === 'admin-audit' && workspace === 'management' && communityAdmin && <AdminAuditLogs token={session.access_token} communityId={selectedCommunityId} />}
           {view === 'platform-admin' && isSuperAdmin && <PlatformAdmin token={session.access_token} userRole={session.user.role} />}
         </main>
       </Suspense>
