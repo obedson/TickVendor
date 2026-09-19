@@ -8,7 +8,7 @@ from sqlalchemy.orm import sessionmaker
 import src.models  # noqa: F401
 from src.database import Base, get_db
 from src.main import create_app
-from src.models import Membership, MembershipRole, User
+from src.models import Event, Membership, MembershipRole, User
 from src.security import create_access_token, hash_password
 from tests.test_database import create_event_context
 
@@ -111,4 +111,117 @@ def test_required_attendance_methods_must_be_enabled(tmp_path):
             json=payload,
         )
         assert response.status_code == 422, method
+    engine.dispose()
+
+
+def attendance_client(tmp_path, name):
+    """An admin-only client for one event, plus the ids, headers and session factory to drive it."""
+    engine = create_engine(f"sqlite:///{tmp_path / name}", connect_args={"check_same_thread": False})
+    Base.metadata.create_all(engine)
+    sessions = sessionmaker(bind=engine, expire_on_commit=False)
+    with sessions() as db:
+        admin, community, event = create_event_context(db)
+        db.add(Membership(community_id=community.id, user_id=admin.id, role=MembershipRole.ADMIN))
+        db.commit()
+        ids = admin.id, community.id, event.id
+    app = create_app()
+
+    def override():
+        with sessions() as db:
+            yield db
+
+    app.dependency_overrides[get_db] = override
+    admin, community, event = ids
+    client = TestClient(app)
+    headers = {"Authorization": f"Bearer {create_access_token(admin, 'participant')}"}
+    url = f"/api/v1/communities/{community}/events/{event}/attendance-config"
+    return client, sessions, engine, event, headers, url
+
+
+def test_self_checkout_is_rejected_when_stored_check_in_is_off(tmp_path):
+    """A partial PATCH names only checkout; the guard must judge the merged state, not the payload."""
+    client, sessions, engine, event, headers, url = attendance_client(tmp_path, "self-service-merged.db")
+    response = client.patch(url, headers=headers, json={"self_checkout_enabled": True})
+    assert response.status_code == 422, response.text
+    with sessions() as db:
+        stored = db.get(Event, event)
+        assert stored.self_checkout_enabled is False
+        assert stored.self_check_in_enabled is False
+    engine.dispose()
+
+
+def test_self_checkout_is_accepted_when_stored_check_in_is_on(tmp_path):
+    client, sessions, engine, event, headers, url = attendance_client(tmp_path, "self-service-allowed.db")
+    check_in = client.patch(url, headers=headers, json={"self_check_in_enabled": True})
+    assert check_in.status_code == 200, check_in.text
+    response = client.patch(url, headers=headers, json={"self_checkout_enabled": True})
+    assert response.status_code == 200, response.text
+    assert response.json()["self_checkout_enabled"] is True
+    # Both halves in one payload are accepted too, and a null checkout window is a legal stored value.
+    together = client.patch(url, headers=headers, json={"self_check_in_enabled": True, "self_checkout_enabled": True,
+                                                        "checkout_opens_at": None})
+    assert together.status_code == 200, together.text
+    assert together.json()["checkout_opens_at"] is None
+    with sessions() as db:
+        stored = db.get(Event, event)
+        assert stored.self_check_in_enabled is True
+        assert stored.self_checkout_enabled is True
+    engine.dispose()
+
+
+def test_disabling_self_check_in_cannot_leave_checkout_enabled(tmp_path):
+    client, sessions, engine, event, headers, url = attendance_client(tmp_path, "self-service-disabled.db")
+    enabled = client.patch(url, headers=headers, json={"self_check_in_enabled": True, "self_checkout_enabled": True})
+    assert enabled.status_code == 200, enabled.text
+    response = client.patch(url, headers=headers, json={"self_check_in_enabled": False})
+    assert response.status_code == 422, response.text
+    with sessions() as db:
+        stored = db.get(Event, event)
+        assert stored.self_check_in_enabled is True
+        assert stored.self_checkout_enabled is True
+    # Naming both halves is how the pair comes down.
+    together = client.patch(url, headers=headers, json={"self_check_in_enabled": False, "self_checkout_enabled": False,
+                                                        "checkout_opens_at": None})
+    assert together.status_code == 200, together.text
+    with sessions() as db:
+        stored = db.get(Event, event)
+        assert stored.self_check_in_enabled is False
+        assert stored.self_checkout_enabled is False
+    engine.dispose()
+
+
+def test_unrelated_partial_patch_preserves_valid_self_service_state(tmp_path):
+    client, sessions, engine, event, headers, url = attendance_client(tmp_path, "self-service-unrelated.db")
+    enabled = client.patch(url, headers=headers, json={"self_check_in_enabled": True, "self_checkout_enabled": True})
+    assert enabled.status_code == 200, enabled.text
+    response = client.patch(url, headers=headers, json={"geofence_radius_meters": 250})
+    assert response.status_code == 200, response.text
+    assert response.json()["geofence_radius_meters"] == 250
+    # The PATCH response echoes only the fields it was sent, so read the whole config back.
+    loaded = client.get(url, headers=headers)
+    assert loaded.status_code == 200
+    body = loaded.json()
+    assert body["self_check_in_enabled"] is True
+    assert body["self_checkout_enabled"] is True
+    assert body["geofence_radius_meters"] == 250
+    with sessions() as db:
+        stored = db.get(Event, event)
+        assert stored.self_check_in_enabled is True
+        assert stored.self_checkout_enabled is True
+    engine.dispose()
+
+
+def test_self_service_guard_leaves_required_method_rule_unchanged(tmp_path):
+    """The merged-state guard must not shadow the pre-existing verification-method rule."""
+    client, sessions, engine, event, headers, url = attendance_client(tmp_path, "self-service-methods.db")
+    enabled = client.patch(url, headers=headers, json={"self_check_in_enabled": True, "self_checkout_enabled": True})
+    assert enabled.status_code == 200, enabled.text
+    rejected = client.patch(url, headers=headers, json={"required_verification_methods": ["gps"]})
+    assert rejected.status_code == 422, rejected.text
+    accepted = client.patch(url, headers=headers, json={"required_verification_methods": ["qr"]})
+    assert accepted.status_code == 200, accepted.text
+    with sessions() as db:
+        stored = db.get(Event, event)
+        assert stored.required_verification_methods == ["qr"]
+        assert stored.self_checkout_enabled is True
     engine.dispose()

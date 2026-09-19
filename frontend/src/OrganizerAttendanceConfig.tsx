@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import './management.css';
 import { apiJson, ApiError, getLiveToken } from './api';
+import { resolveSelfServiceToggle, toCheckoutInput, toCheckoutInstant } from './attendanceConfigForm';
 
 type Config = {
   latitude: string | number | null;
@@ -14,6 +15,10 @@ type Config = {
   confirmations_required: number;
   peer_selection_limit: number;
   required_verification_methods: string[];
+  self_check_in_enabled: boolean;
+  self_checkout_enabled: boolean;
+  /** Held in the wall-clock form the datetime input speaks; converted to an instant on save. */
+  checkout_opens_at: string | null;
 };
 
 const initial: Config = {
@@ -27,6 +32,9 @@ const initial: Config = {
   confirmations_required: 0,
   peer_selection_limit: 5,
   required_verification_methods: [],
+  self_check_in_enabled: false,
+  self_checkout_enabled: false,
+  checkout_opens_at: null,
 };
 
 export function OrganizerAttendanceConfig({ token, communityId, eventId }: { token: string; communityId: string; eventId: string }) {
@@ -38,7 +46,7 @@ export function OrganizerAttendanceConfig({ token, communityId, eventId }: { tok
   useEffect(() => {
     if (!communityId || !eventId) return;
     apiJson<Config>(`communities/${communityId}/events/${eventId}/attendance-config`, {}, getLiveToken() ?? token)
-      .then(setConfig)
+      .then(loaded => setConfig({ ...loaded, checkout_opens_at: toCheckoutInput(loaded.checkout_opens_at) }))
       .catch(() => setError('Unable to load attendance configuration.'));
   }, [communityId, eventId, token]);
 
@@ -51,13 +59,18 @@ export function OrganizerAttendanceConfig({ token, communityId, eventId }: { tok
       peer_confirmation_enabled: 'peer',
     };
     const method = methodByField[field];
-    return {
+    const next: Config = {
       ...current,
       [field]: enabled,
       required_verification_methods: !enabled && method
         ? current.required_verification_methods.filter(item => item !== method)
         : current.required_verification_methods,
     };
+    // Self check-in and self checkout are two halves of one journey, so they move together: see
+    // `resolveSelfServiceToggle`. Everything else here is a switch of its own.
+    return field === 'self_check_in_enabled' || field === 'self_checkout_enabled'
+      ? { ...next, ...resolveSelfServiceToggle(next, field, enabled) }
+      : next;
   });
   const toggleRequired = (method: string) => setConfig(current => ({
     ...current,
@@ -73,7 +86,13 @@ export function OrganizerAttendanceConfig({ token, communityId, eventId }: { tok
       await apiJson<Config>(`communities/${communityId}/events/${eventId}/attendance-config`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...config, latitude: config.latitude === '' ? null : config.latitude, longitude: config.longitude === '' ? null : config.longitude }),
+        body: JSON.stringify({
+          ...config,
+          latitude: config.latitude === '' ? null : config.latitude,
+          longitude: config.longitude === '' ? null : config.longitude,
+          // Blank means no checkout window; the API takes null and rejects an empty string.
+          checkout_opens_at: toCheckoutInstant(config.checkout_opens_at),
+        }),
       }, getLiveToken() ?? token);
       setMessage('Attendance configuration saved.');
     } catch (cause) {
@@ -81,11 +100,12 @@ export function OrganizerAttendanceConfig({ token, communityId, eventId }: { tok
     } finally { setBusy(false); }
   };
 
-  const CheckRow = ({ label, field, description }: { label: string; field: keyof Config; description?: string }) => (
-    <label style={{ display: 'flex', alignItems: 'flex-start', gap: '.75rem', padding: '.75rem 0', borderTop: '1px solid var(--tv-border)', margin: 0, cursor: 'pointer' }}>
+  const CheckRow = ({ label, field, description, disabled }: { label: string; field: keyof Config; description?: string; disabled?: boolean }) => (
+    <label style={{ display: 'flex', alignItems: 'flex-start', gap: '.75rem', padding: '.75rem 0', borderTop: '1px solid var(--tv-border)', margin: 0, cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.6 : 1 }}>
       <input
         type="checkbox"
         checked={config[field] as boolean}
+        disabled={disabled}
         onChange={() => toggle(field)}
         style={{ marginTop: '.15rem', flexShrink: 0 }}
       />
@@ -106,6 +126,40 @@ export function OrganizerAttendanceConfig({ token, communityId, eventId }: { tok
         <CheckRow label="Organizer verification" field="organizer_verification_enabled" description="Allow organizers to manually verify attendance." />
         <CheckRow label="Peer confirmation" field="peer_confirmation_enabled" description="Allow participants to confirm each other's attendance." />
       </div>
+
+      <fieldset style={{ marginBottom: '1rem' }}>
+        <legend>Participant self service</legend>
+        <p className="text-muted text-sm" style={{ marginBottom: '.5rem' }}>
+          Let participants record their own attendance from their ticket instead of an organizer scanning it.
+          Both are off unless they are switched on here.
+        </p>
+        <CheckRow
+          label="Allow participant self check-in"
+          field="self_check_in_enabled"
+          description="Participants can check themselves in from their own ticket. Turning this off also turns self checkout off."
+        />
+        <CheckRow
+          label="Allow participant self checkout"
+          field="self_checkout_enabled"
+          disabled={!config.self_check_in_enabled}
+          description={config.self_check_in_enabled
+            ? 'Participants can finalize their own attendance after checking in.'
+            : 'Self checkout needs self check-in: nobody can check out who was never checked in.'}
+        />
+        {config.self_checkout_enabled && (
+          <label style={{ display: 'block', padding: '.25rem 0 0' }}>
+            <span className="label-text">Checkout opens at</span>
+            <input
+              type="datetime-local"
+              value={config.checkout_opens_at ?? ''}
+              onChange={e => setConfig({ ...config, checkout_opens_at: e.target.value })}
+            />
+            <small style={{ display: 'block', color: 'var(--tv-muted)', fontSize: '.8rem' }}>
+              Optional, in your local time. Leave blank to allow checkout as soon as a participant has checked in.
+            </small>
+          </label>
+        )}
+      </fieldset>
 
       {config.geofence_enabled && <fieldset><legend>Attendance location</legend><p>Use the actual venue coordinates. Addresses are not automatically geocoded.</p><div className="form-row"><label>Latitude<input type="number" required min={-90} max={90} step="any" value={config.latitude ?? ''} onChange={e => setConfig({ ...config, latitude: e.target.value })} /></label><label>Longitude<input type="number" required min={-180} max={180} step="any" value={config.longitude ?? ''} onChange={e => setConfig({ ...config, longitude: e.target.value })} /></label></div></fieldset>}
       <fieldset style={{ marginBottom: '1rem' }}>

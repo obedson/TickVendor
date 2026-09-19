@@ -73,6 +73,72 @@ test('attendance enabled methods remain separate from required methods', () => {
   assert.doesNotMatch(source, /description="Require participants to be within/);
 });
 
+test('participant self check-in, self checkout and the checkout window are configurable', () => {
+  const source = read('OrganizerAttendanceConfig.tsx');
+
+  // The three fields are part of what the screen loads, holds its state in, and sends back. Without
+  // them the API's only writer is a hand-made request, which is how an event ends up with self
+  // checkout permanently off and every participant's checkout hidden.
+  assert.match(source, /self_check_in_enabled: boolean/);
+  assert.match(source, /self_checkout_enabled: boolean/);
+  assert.match(source, /checkout_opens_at: string \| null/);
+  assert.match(source, /self_check_in_enabled: false/);
+  assert.match(source, /self_checkout_enabled: false/);
+  assert.match(source, /checkout_opens_at: toCheckoutInput\(loaded\.checkout_opens_at\)/);
+
+  // Both switches are rendered under their own words, and the saved payload carries them: the
+  // window is normalized at the boundary, so a blank input reaches the API as null rather than ''.
+  assert.match(source, /label="Allow participant self check-in"/);
+  assert.match(source, /field="self_check_in_enabled"/);
+  assert.match(source, /label="Allow participant self checkout"/);
+  assert.match(source, /field="self_checkout_enabled"/);
+  assert.match(source, /checkout_opens_at: toCheckoutInstant\(config\.checkout_opens_at\)/);
+
+  // Checkout cannot be switched on while check-in is off, and the window is only offered while
+  // checkout is on — a time for a feature that is off could not be seen, let alone corrected.
+  assert.match(source, /label="Allow participant self checkout"[\s\S]{0,200}disabled=\{!config\.self_check_in_enabled\}/);
+  assert.match(source, /config\.self_checkout_enabled && \([\s\S]{0,300}type="datetime-local"/);
+
+  // Geofence configuration is untouched by any of this.
+  assert.match(source, /label="GPS \/ geofence verification" field="geofence_enabled"/);
+});
+
+test('self service toggles and the checkout window follow the rules the API enforces', async () => {
+  const ts = await import('typescript');
+  const { outputText } = ts.transpileModule(read('attendanceConfigForm.ts'), { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } });
+  const { resolveSelfServiceToggle, toCheckoutInput, toCheckoutInstant } = await import(`data:text/javascript;base64,${Buffer.from(outputText).toString('base64')}`);
+
+  const off = { self_check_in_enabled: false, self_checkout_enabled: false, checkout_opens_at: null };
+  const on = { self_check_in_enabled: true, self_checkout_enabled: true, checkout_opens_at: '2026-09-18T10:00' };
+
+  // Checkout cannot be switched on while check-in is off: the API rejects that pair outright
+  // ("self checkout requires self check-in"), so the form declines to compose it and stays put.
+  assert.deepEqual(resolveSelfServiceToggle(off, 'self_checkout_enabled', true), off);
+
+  // Switching check-in off takes checkout, and the window it was holding, down with it.
+  assert.deepEqual(resolveSelfServiceToggle(on, 'self_check_in_enabled', false), off);
+  assert.deepEqual(resolveSelfServiceToggle(off, 'self_check_in_enabled', true), { ...off, self_check_in_enabled: true });
+
+  // Switching checkout off drops the window, and switching it back on keeps only what is still set.
+  assert.deepEqual(resolveSelfServiceToggle(on, 'self_checkout_enabled', false), { ...on, self_checkout_enabled: false, checkout_opens_at: null });
+  assert.deepEqual(resolveSelfServiceToggle({ ...on, self_checkout_enabled: false }, 'self_checkout_enabled', true), on);
+  assert.deepEqual(resolveSelfServiceToggle(off, 'self_checkout_enabled', false), off);
+
+  // A blank window is null, which is what the API stores for "no window" — never an empty string,
+  // which it would reject as a null policy field.
+  assert.equal(toCheckoutInstant(''), null);
+  assert.equal(toCheckoutInstant(null), null);
+  assert.equal(toCheckoutInstant('not a date'), null);
+
+  // The input speaks wall-clock and the API speaks instants, so the two conversions have to be
+  // inverses: a saved window must come back looking exactly as it was typed.
+  const stored = toCheckoutInstant('2026-09-18T10:00');
+  assert.equal(new Date(stored).getTime(), new Date('2026-09-18T10:00').getTime());
+  assert.equal(toCheckoutInput(stored), '2026-09-18T10:00');
+  assert.equal(toCheckoutInput(null), '');
+  assert.equal(toCheckoutInput('not a date'), '');
+});
+
 test('participant asides stack and wallet keeps a full-width mobile column', () => {
   for (const screen of ['Attendance', 'ProfileEditor', 'Opportunities']) {
     assert.match(read(`${screen}.tsx`), /className="content-with-aside"/);

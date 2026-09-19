@@ -127,6 +127,12 @@ def update_attendance_config(community_id: UUID, event_id: UUID, payload: Attend
         raise HTTPException(status_code=422, detail="Peer confirmation limit must be positive")
     if values.get("peer_confirmation_enabled") and values.get("peer_selection_limit") == 0:
         raise HTTPException(status_code=422, detail="Peer selection limit must be positive")
+    # Self-service depends on the merged state, not on the payload alone: a partial PATCH that names
+    # only one half of the pair must not leave checkout on while check-in is off in storage.
+    self_check_in_enabled = values.get("self_check_in_enabled", event.self_check_in_enabled)
+    self_checkout_enabled = values.get("self_checkout_enabled", event.self_checkout_enabled)
+    if self_checkout_enabled and not self_check_in_enabled:
+        raise HTTPException(status_code=422, detail="Self checkout requires self check-in")
     for field, value in values.items(): setattr(event, field, value)
     audit(db, actor_id=user.id, community_id=community_id, action="attendance_configuration.updated",
           target_type="event", target_id=event.id, metadata={"fields": sorted([*values, *coordinates])}, commit=False)
