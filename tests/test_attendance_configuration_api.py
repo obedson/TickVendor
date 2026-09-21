@@ -1,5 +1,6 @@
 """Attendance configuration API tests."""
 
+from datetime import UTC, datetime
 
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -166,6 +167,34 @@ def test_self_checkout_is_accepted_when_stored_check_in_is_on(tmp_path):
         stored = db.get(Event, event)
         assert stored.self_check_in_enabled is True
         assert stored.self_checkout_enabled is True
+    engine.dispose()
+
+
+def test_checkout_opens_at_round_trips_without_changing_the_utc_instant(tmp_path):
+    client, sessions, engine, event, headers, url = attendance_client(tmp_path, "self-service-window.db")
+    checkout_opens_at = datetime(2030, 6, 1, 14, 30, tzinfo=UTC)
+    response = client.patch(
+        url,
+        headers=headers,
+        json={
+            "self_check_in_enabled": True,
+            "self_checkout_enabled": True,
+            "checkout_opens_at": checkout_opens_at.isoformat(),
+        },
+    )
+    assert response.status_code == 200, response.text
+    assert datetime.fromisoformat(response.json()["checkout_opens_at"]) == checkout_opens_at
+
+    loaded = client.get(url, headers=headers)
+    assert loaded.status_code == 200, loaded.text
+    loaded_checkout_opens_at = datetime.fromisoformat(loaded.json()["checkout_opens_at"])
+    # SQLite drops timezone metadata for DateTime columns; production PostgreSQL does not.
+    if loaded_checkout_opens_at.tzinfo is None:
+        loaded_checkout_opens_at = loaded_checkout_opens_at.replace(tzinfo=UTC)
+    assert loaded_checkout_opens_at == checkout_opens_at
+    with sessions() as db:
+        stored = db.get(Event, event)
+        assert stored.checkout_opens_at.replace(tzinfo=UTC) == checkout_opens_at
     engine.dispose()
 
 
