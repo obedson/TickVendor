@@ -156,7 +156,7 @@ class Ticket(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         Enum(TicketAssignmentState, native_enum=False, length=20),
         default=TicketAssignmentState.CLAIMED,
         nullable=False,
-        server_default="claimed",
+        server_default="CLAIMED",
     )
     status: Mapped[TicketStatus] = mapped_column(
         Enum(TicketStatus, native_enum=False, length=24),
@@ -195,6 +195,7 @@ class TicketTransfer(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         Enum(TransferStatus, native_enum=False, length=12),
         default=TransferStatus.PENDING,
         nullable=False,
+        server_default="PENDING",
     )
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     claimed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

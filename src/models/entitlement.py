@@ -83,6 +83,7 @@ class Entitlement(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         Enum(RedemptionMode, native_enum=False, length=12),
         default=RedemptionMode.EITHER,
         nullable=False,
+        server_default="EITHER",
     )
     redemption_starts_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     redemption_ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -129,6 +130,7 @@ class TicketEntitlement(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         Enum(TicketEntitlementStatus, native_enum=False, length=12),
         default=TicketEntitlementStatus.AVAILABLE,
         nullable=False,
+        server_default="AVAILABLE",
     )
     last_redeemed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
@@ -164,6 +166,7 @@ class EntitlementRedemption(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         Enum(RedemptionStatus, native_enum=False, length=12),
         default=RedemptionStatus.ISSUED,
         nullable=False,
+        server_default="ISSUED",
     )
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     redeemed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
