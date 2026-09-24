@@ -2,6 +2,19 @@
 
 > **How to use this file.** Entries are newest-first. Read the newest entry relevant to your task and consult older sections only when they are relevant. Append or update evidence without rewriting historical verification. Record the exact checks that were actually executed, and keep implementation status separate from verification status.
 
+## Community application / administrator governance — 2026-09-22
+
+- Implemented the user-requested governance extension without changing the original §5 role inventory: independent communities now use `DRAFT -> PENDING_REVIEW -> ACTIVE/REJECTED`, with reversible `ACTIVE <-> SUSPENDED` moderation. Draft/pending/rejected communities are inactive and excluded from ordinary discovery/authority.
+- Any active email-verified user may save and submit an independent application. Applicant-only submission is idempotent, audited and notifies active Super Admins. Super Admin review requires a reason and an active verified initial Community Admin; approval atomically activates/verifies the organization, activates the scoped Admin membership and records reviewer/time/reason. Rejection retains application and audit history.
+- Community Admin creation authority is organization-scoped: direct creation is allowed only inside an organization containing another active community the caller actively administers. The creator becomes that new community's Admin. Cross-organization creation is denied. Super Admin direct creation requires an explicitly selected verified initial Admin.
+- Community authority remains membership-scoped. Only Super Admin can manage Admin roles. New/reactivated Admins require verified email; platform Super Admin authority cannot be duplicated into a membership. The final active Admin and final active verified Admin cannot be removed or suspended until a verified replacement exists. Community restoration requires a verified active Admin.
+- Retired ambiguous platform-wide `organizer`/`community_admin` roles. Migration normalizes those unused user-role values to `PARTICIPANT` without modifying authoritative membership rows. Demo/E2E seeds now express Organizer authority through memberships.
+- Migration `d5e6f7a8b9c0` follows `c4d5e6f7a8b9`: existing active/inactive communities retain deployed active/suspended meaning, organization-owner provenance is backfilled, and membership/history data is unchanged. Populated SQLite upgrade/downgrade/re-upgrade and PostgreSQL offline SQL compilation pass. Fresh SQLite upgrade to head plus `alembic check` pass; one head is `d5e6f7a8b9c0`.
+- Focused backend governance/auth/moderation batch: **39 passed**; final community/application/migration batch after server-draft integration: **14 passed**; final governance state-machine rerun: **8 passed**. Two upstream Starlette/httpx/AnyIO deprecation warnings only. No full backend suite or Playwright run.
+- Frontend: production build passed (113 modules) after rerunning sequentially with a local Node heap allowance; lint passed; governance + management source-contract checks **35 passed**. The initial concurrent build/lint attempt exhausted the Node heap before compilation and is not counted as product failure.
+- `compileall`, changed-file Ruff and `git diff --check` pass. Detailed design, API/schema behavior, migration policy and manual staging checklist: `docs/COMMUNITY_APPLICATION_GOVERNANCE_2026_09_22.md`.
+- External/manual verification outstanding: staging PostgreSQL migration, separate-account draft/submit/review/reject, notification receipt, organization-scope acceptance, replacement-Admin protection, and mobile/keyboard/dialog behavior. No push, deployment, provider configuration or live database operation was performed.
+
 ## Organizer least-privilege / RBAC hardening reconciliation — 2026-09-19
 
 Verified final state:

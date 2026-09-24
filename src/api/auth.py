@@ -49,6 +49,7 @@ def serialize_user(user: User) -> UserResponse:
     return UserResponse(
         id=str(user.id), email=user.email, role=user.role.value,
         username=user.profile.username, display_name=user.profile.display_name,
+        is_email_verified=user.email_verified_at is not None,
     )
 
 

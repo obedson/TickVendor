@@ -1121,7 +1121,7 @@ function App() {
           {view === 'tasks' && <Tasks initialTaskId={promotedTaskId} token={session.access_token} />}
           {view === 'recognition' && <Recognition token={session.access_token} />}
           {view === 'profile' && <ProfileEditor token={session.access_token} />}
-          {view === 'communities' && <Communities isSuperAdmin={isSuperAdmin} token={session.access_token} />}
+          {view === 'communities' && <Communities isSuperAdmin={isSuperAdmin} isEmailVerified={session.user.is_email_verified} token={session.access_token} />}
           {view === 'notifications' && <Notifications token={session.access_token} />}
           {view === 'organizer-dashboard' && <OrganizerDashboard token={session.access_token} />}
           {view === 'organizer-events' && <OrganizerEvents token={session.access_token} communityId={selectedCommunityId} />}

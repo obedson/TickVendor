@@ -394,6 +394,7 @@ def list_platform_communities(
             "slug": c.slug,
             "is_active": c.is_active,
             "is_public": c.is_public,
+            "lifecycle_status": c.lifecycle_status.value,
         }
         for c in communities
     ]

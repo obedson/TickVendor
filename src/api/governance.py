@@ -20,7 +20,13 @@ from src.models import (
     Profile,
     User,
 )
-from src.services.governance import MODERATION_MODELS, assign_admin, manage_membership, moderate
+from src.services.governance import (
+    MODERATION_MODELS,
+    assign_admin,
+    manage_membership,
+    moderate,
+    review_community_application,
+)
 
 router = APIRouter(prefix="/admin/platform/governance", tags=["platform governance"])
 DB = Annotated[Session, Depends(get_db)]
@@ -52,6 +58,11 @@ class MembershipChange(Reason):
     role: MembershipRole | None = None
 
 
+class CommunityReview(Reason):
+    approve: bool
+    initial_admin_user_id: UUID | None = None
+
+
 def identity(db, user_id):
     user = db.get(User, user_id)
     profile = user.profile if user else None
@@ -79,6 +90,10 @@ def summary(db, kind, item):
                       is_email_verified=item.email_verified_at is not None)
     if kind == "community":
         result.update(is_public=item.is_public, is_active=item.is_active, membership_access=item.membership_access.value,
+                      lifecycle_status=item.lifecycle_status.value,
+                      organization_id=str(item.organization_id),
+                      submitted_by=identity(db, item.submitted_by_id) if item.submitted_by_id else None,
+                      reviewed_at=item.reviewed_at, review_reason=item.review_reason,
                       member_count=db.scalar(select(func.count(Membership.id)).where(Membership.community_id == item.id,
                           Membership.status == MembershipStatus.ACTIVE)))
     if kind in {"event", "opportunity", "task"}:
@@ -92,7 +107,8 @@ def summary(db, kind, item):
 
 @router.get("/history")
 def history(db: DB, user: Admin, target_id: UUID | None = None, offset: int = Query(0, ge=0)):
-    query = select(AuditLog).where(or_(AuditLog.action.like("moderation.%"), AuditLog.action.like("membership.%")))
+    query = select(AuditLog).where(or_(AuditLog.action.like("moderation.%"), AuditLog.action.like("membership.%"),
+                                      AuditLog.action.in_(("community.draft_created", "community.application_submitted", "community.approved", "community.rejected"))))
     if target_id:
         query = query.where(or_(AuditLog.target_id == target_id, AuditLog.community_id == target_id,
             AuditLog.target_id.in_(select(Membership.id).where(Membership.user_id == target_id))))
@@ -136,6 +152,11 @@ def directory(kind: Kind, db: DB, user: Admin, q: str = Query("", max_length=100
                     query = query.where(model.status == enum(status))
                 except ValueError as exc:
                     raise HTTPException(422, "Invalid content status") from exc
+    elif kind == "community" and status:
+        try:
+            query = query.where(model.lifecycle_status == model.lifecycle_status.type.enum_class(status))
+        except ValueError as exc:
+            raise HTTPException(422, "Invalid community lifecycle status") from exc
     if after:
         query = query.where(model.created_at >= after)
     if before:
@@ -173,6 +194,19 @@ def moderation(kind: Kind, target_id: UUID, payload: ModerationInput, db: DB, us
 def administrator(community_id: UUID, payload: AdminAssignment, db: DB, user: Admin):
     item = assign_admin(db, community_id, payload.user_id, user, payload.reason)
     return {"id": str(item.id), "role": item.role.value, "status": item.status.value}
+
+
+@router.post("/community/{community_id}/review")
+def review(community_id: UUID, payload: CommunityReview, db: DB, user: Admin):
+    item = review_community_application(
+        db,
+        community_id,
+        user,
+        approve=payload.approve,
+        reason=payload.reason,
+        initial_admin_user_id=payload.initial_admin_user_id,
+    )
+    return summary(db, "community", item)
 
 
 @router.patch("/community/{community_id}/memberships/{membership_id}")

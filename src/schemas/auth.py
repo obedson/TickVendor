@@ -49,6 +49,7 @@ class UserResponse(BaseModel):
     role: str
     username: str
     display_name: str
+    is_email_verified: bool
 
 
 class TokenResponse(BaseModel):

@@ -1,5 +1,11 @@
 # Governance, membership, moderation and personal-space reconciliation
 
+> Superseded governance decision (2026-09-22): the earlier no-minimum-Admin and immediate-creation
+> decisions below describe the historical implementation at the time of this report. The current
+> reviewed lifecycle, verified initial-Admin requirement, final-active-Admin protection and
+> organization-scoped creation are documented in
+> `docs/COMMUNITY_APPLICATION_GOVERNANCE_2026_09_22.md`.
+
 Date: 2026-09-12. Starting commit: `4a89a0225df39c6b99df28f5f0b305a93588e3dc`.
 Scope: finish the interrupted working tree, verify locally, and commit locally. No push,
 deployment, Render configuration, environment-variable or secret changes. This is not an

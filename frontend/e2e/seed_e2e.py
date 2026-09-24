@@ -58,7 +58,7 @@ def main() -> None:
         )
         organizer = User(
             email="e2e-organizer@example.com", password_hash=hash_password("e2e-password-123"),
-            role=PlatformRole.ORGANIZER, email_verified_at=now,
+            role=PlatformRole.PARTICIPANT, email_verified_at=now,
             profile=Profile(username="e2e-organizer", display_name="E2E Organizer"),
         )
         peer = User(

@@ -48,7 +48,7 @@ def main() -> None:
         users = {}
         for email, username, role in [
             ("demo-participant@example.com", "demo-participant", PlatformRole.PARTICIPANT),
-            ("demo-organizer@example.com", "demo-organizer", PlatformRole.ORGANIZER),
+            ("demo-organizer@example.com", "demo-organizer", PlatformRole.PARTICIPANT),
             ("demo-admin@example.com", "demo-admin", PlatformRole.SUPER_ADMIN),
         ]:
             user = db.scalar(select(User).where(User.email == email))

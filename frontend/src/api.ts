@@ -11,7 +11,7 @@ export async function apiFetch(path: string, init: RequestInit = {}, token?: str
 // token via props but the canonical live value lives here so that a refresh
 // updates every in-flight and subsequent request without stale closures.
 
-export type SessionData = { access_token: string; refresh_token: string; user: { id: string; email: string; role: string; username: string; display_name: string } };
+export type SessionData = { access_token: string; refresh_token: string; user: { id: string; email: string; role: string; username: string; display_name: string; is_email_verified?: boolean } };
 
 // Callbacks registered by the React root to react to token changes / sign-out.
 type AuthListener = (session: SessionData | null) => void;

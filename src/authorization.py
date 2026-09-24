@@ -21,6 +21,7 @@ from sqlalchemy.orm import Session
 from src.api.auth import get_current_user
 from src.models import (
     Community,
+    CommunityLifecycleStatus,
     EventStaff,
     EventStaffRole,
     Membership,
@@ -94,8 +95,8 @@ def require_community_role(
         raise HTTPException(status_code=404, detail="Community not found")
     if current_user.role == PlatformRole.SUPER_ADMIN:
         return _acting_admin_membership(community_id, current_user)
-    if not community.is_active:
-        raise HTTPException(status_code=403, detail="Community is suspended")
+    if not community.is_active or community.lifecycle_status != CommunityLifecycleStatus.ACTIVE:
+        raise HTTPException(status_code=403, detail="Community is not active")
     membership = db.scalar(
         select(Membership).where(
             Membership.community_id == community_id,
