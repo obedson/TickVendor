@@ -15,8 +15,6 @@ from src.models import (
     Membership,
     MembershipRole,
     MembershipStatus,
-    Task,
-    TaskAssignmentStatus,
     TaskType,
     User,
 )
@@ -24,7 +22,6 @@ from src.services.task import (
     assign_task,
     create_task,
     submit_task,
-    transition_assignment,
 )
 from tests.test_database import create_event_context
 
@@ -58,7 +55,7 @@ def test_create_general_task_succeeds(tmp_path):
     """General task with no config creates successfully."""
     sessions, engine = _make_session(tmp_path, "general.db")
     with sessions() as db:
-        organizer, member, community, event = _setup_community(db)
+        organizer, _member, community, _event = _setup_community(db)
         task = create_task(
             db, community.id, organizer,
             title="General task", description="Do something",
@@ -73,7 +70,7 @@ def test_create_video_task_with_config(tmp_path):
     """Video task stores video_url and platform in task_config."""
     sessions, engine = _make_session(tmp_path, "video.db")
     with sessions() as db:
-        organizer, member, community, event = _setup_community(db)
+        organizer, _member, community, _event = _setup_community(db)
         task = create_task(
             db, community.id, organizer,
             title="Watch video", description="Watch this video",
@@ -90,7 +87,7 @@ def test_create_referral_task_with_config(tmp_path):
     """Referral task stores referral_target and min_referrals."""
     sessions, engine = _make_session(tmp_path, "referral.db")
     with sessions() as db:
-        organizer, member, community, event = _setup_community(db)
+        organizer, _member, community, _event = _setup_community(db)
         task = create_task(
             db, community.id, organizer,
             title="Invite friends", description="Invite new members",
@@ -109,7 +106,7 @@ def test_submit_task_requires_text_when_configured(tmp_path):
     """Submission fails when text evidence is required but not provided."""
     sessions, engine = _make_session(tmp_path, "evidence_text.db")
     with sessions() as db:
-        organizer, member, community, event = _setup_community(db)
+        organizer, member, community, _event = _setup_community(db)
         task = create_task(
             db, community.id, organizer,
             title="Text task", description="Needs text",
@@ -128,7 +125,7 @@ def test_submit_task_requires_url_when_configured(tmp_path):
     """Submission fails when URL evidence is required but not provided."""
     sessions, engine = _make_session(tmp_path, "evidence_url.db")
     with sessions() as db:
-        organizer, member, community, event = _setup_community(db)
+        organizer, member, community, _event = _setup_community(db)
         task = create_task(
             db, community.id, organizer,
             title="URL task", description="Needs URL",
@@ -148,7 +145,7 @@ def test_submit_task_succeeds_with_all_required_evidence(tmp_path):
     """Submission succeeds when all required evidence types are provided."""
     sessions, engine = _make_session(tmp_path, "evidence_all.db")
     with sessions() as db:
-        organizer, member, community, event = _setup_community(db)
+        organizer, member, community, _event = _setup_community(db)
         task = create_task(
             db, community.id, organizer,
             title="Full evidence task", description="Needs text and URL",
@@ -173,7 +170,7 @@ def test_organizer_cannot_create_task_in_another_community(tmp_path):
     """An organizer from community A cannot create tasks in community B."""
     sessions, engine = _make_session(tmp_path, "tenant_isolation.db")
     with sessions() as db:
-        organizer_a, _, community_a, _ = _setup_community(db)
+        organizer_a, _, _community_a, _ = _setup_community(db)
         # Create a second community with a different organizer.
         # Create a genuinely separate second tenant. Do not call
         # _setup_community() again because create_event_context() uses
@@ -227,8 +224,9 @@ def test_organizer_cannot_create_task_in_another_community(tmp_path):
 def test_member_cannot_access_task_verification_queue(tmp_path):
     """A regular member gets 403 when accessing the task verification queue."""
     from fastapi.testclient import TestClient
-    from src.main import create_app
+
     from src.database import get_db
+    from src.main import create_app
     from src.security import create_access_token
 
     engine = create_engine(
@@ -246,7 +244,7 @@ def test_member_cannot_access_task_verification_queue(tmp_path):
     client = TestClient(app)
 
     with sessions() as db:
-        organizer, community, event = create_event_context(db)
+        organizer, community, _event = create_event_context(db)
         member = User(email="queue-member@example.com", password_hash="hash")
         db.add(member)
         db.flush()
@@ -272,8 +270,9 @@ def test_member_cannot_access_task_verification_queue(tmp_path):
 def test_ordinary_admin_cannot_mutate_categories(tmp_path):
     """A community admin (not super_admin) gets 403 on POST /admin/categories."""
     from fastapi.testclient import TestClient
-    from src.main import create_app
+
     from src.database import get_db
+    from src.main import create_app
     from src.models import PlatformRole
     from src.security import create_access_token
 
@@ -311,8 +310,9 @@ def test_ordinary_admin_cannot_mutate_categories(tmp_path):
 def test_public_events_categories_endpoint_returns_active(tmp_path):
     """GET /events/categories returns only active categories without auth."""
     from fastapi.testclient import TestClient
-    from src.main import create_app
+
     from src.database import get_db
+    from src.main import create_app
     from src.models import EventCategory
 
     engine = create_engine(

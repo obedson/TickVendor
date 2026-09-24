@@ -7,7 +7,8 @@ Tests:
 - Expired access token + valid refresh token allows re-authentication.
 """
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, event as sa_event
+from sqlalchemy import create_engine
+from sqlalchemy import event as sa_event
 from sqlalchemy.orm import sessionmaker
 
 import src.models  # noqa: F401
@@ -51,8 +52,6 @@ def test_refresh_returns_new_tokens_and_invalidates_old(tmp_path):
     })
     assert reg.status_code == 201
     original_refresh = reg.json()["refresh_token"]
-    original_access = reg.json()["access_token"]
-
     # Refresh with the original token.
     refresh_response = client.post("/api/v1/auth/refresh", json={"refresh_token": original_refresh})
     assert refresh_response.status_code == 200, refresh_response.text

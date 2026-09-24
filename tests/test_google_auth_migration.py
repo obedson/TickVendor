@@ -62,7 +62,7 @@ def test_populated_auth_upgrade(tmp_path, monkeypatch):
     assert next(c for c in sa.inspect(engine).get_columns('users') if c['name'] == 'password_hash')['nullable']
     assert {tuple(c['column_names']) for c in sa.inspect(engine).get_unique_constraints('external_identities')} == {('provider', 'provider_subject'), ('user_id', 'provider')}
     command.downgrade(config, 'c8d9e0f12345')
-    command.upgrade(config, 'head')
+    command.upgrade(config, 'd9e0f1a23456')
     engine.dispose()
 
 

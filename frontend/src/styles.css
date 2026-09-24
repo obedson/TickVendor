@@ -1219,7 +1219,7 @@ tbody tr:hover { background: var(--tv-surface-sunken); }
   justify-content: space-between;
   gap: 1rem;
   flex-wrap: wrap;
-  padding: .75rem 1rem;
+  padding: 1rem clamp(1.25rem, 4vw, 3.25rem);
   background: var(--tv-surface);
   border-bottom: 1px solid var(--tv-border);
   position: sticky;
@@ -1230,10 +1230,147 @@ tbody tr:hover { background: var(--tv-surface-sunken); }
 .public-main {
   flex: 1;
   width: 100%;
-  max-width: 72rem;
   min-width: 0;
+  padding: 0;
+}
+
+.public-brand {
+  display: flex;
+  align-items: center;
+  gap: .7rem;
+  color: #103e36;
+}
+
+.public-brand-mark {
+  width: 2.55rem;
+  height: 2.55rem;
+  display: grid;
+  place-items: center;
+  border-radius: .7rem;
+  background: #123f36;
+  color: #f6cf58;
+  font-size: 1.75rem;
+  font-weight: 900;
+  transform: rotate(-7deg);
+}
+
+.public-brand-copy { display: grid; line-height: 1; }
+.public-brand-name { font-size: 1.3rem; font-weight: 900; letter-spacing: -.05em; }
+.public-brand-name span { color: #0d4138; }
+.public-brand-name { color: #d49a14; }
+.public-brand-tagline {
+  margin-top: .38rem;
+  font-size: .58rem;
+  font-weight: 900;
+  letter-spacing: .26em;
+  text-transform: uppercase;
+  color: #60776f;
+}
+
+.public-nav { display: flex; align-items: center; gap: 1.6rem; }
+.public-discover-link {
+  min-height: auto;
+  padding: .35rem 0;
+  background: transparent;
+  color: #103e36;
+}
+.public-discover-link:hover:not(:disabled) { background: transparent; color: #b97f00; }
+.public-sign-in, .public-sign-in:hover:not(:disabled) {
+  padding: .78rem 1.2rem;
+  border-radius: .65rem;
+  background: #123f36;
+  color: #fff;
+}
+
+.public-hero {
+  min-height: 21.75rem;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(24rem, 1fr);
+  align-items: center;
+  overflow: hidden;
+  padding: 2.25rem clamp(1.5rem, 5.5vw, 4.75rem);
+  background: #103f36;
+  color: #fff;
+}
+
+.public-hero-copy { position: relative; z-index: 2; max-width: 35rem; }
+.public-kicker {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  margin-bottom: 1rem;
+  color: #f4c94f;
+  font-size: .72rem;
+  font-weight: 900;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+}
+.public-kicker span { width: 1.5rem; height: 2px; background: #f4c94f; }
+.public-hero h1 {
+  margin: 0 0 .7rem;
+  color: #fff;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: clamp(3rem, 5vw, 4.4rem);
+  font-weight: 500;
+  line-height: .94;
+  letter-spacing: -.045em;
+}
+.public-hero h1 em { color: #f3cc62; font-weight: 500; }
+.public-hero-copy > p:not(.public-kicker) { max-width: 34rem; font-size: 1rem; line-height: 1.55; }
+.public-hero-action, .public-hero-action:hover:not(:disabled) {
+  margin-top: .35rem;
+  padding: .75rem 1rem;
+  background: #f4cf60;
+  color: #103f36;
+  border-radius: .6rem;
+}
+.public-hero-action span { margin-left: 1.2rem; }
+
+.public-pass-stage { position: relative; min-height: 18rem; display: grid; place-items: center; }
+.public-pass-rings {
+  position: absolute;
+  width: 38rem;
+  aspect-ratio: 1;
+  border: 1px solid rgba(244,207,96,.24);
+  border-radius: 50%;
+  box-shadow: 0 0 0 4.5rem transparent, 0 0 0 calc(4.5rem + 1px) rgba(244,207,96,.18), 0 0 0 9rem transparent, 0 0 0 calc(9rem + 1px) rgba(244,207,96,.14);
+}
+.public-pass {
+  position: relative;
+  z-index: 1;
+  width: min(92%, 20rem);
+  min-height: 9rem;
+  padding: 1.2rem 1.3rem 1rem;
+  overflow: hidden;
+  border-radius: .75rem;
+  background: #f6d66f;
+  color: #103f36;
+  box-shadow: 0 1rem 2.5rem rgba(0,0,0,.16);
+  transform: rotate(-4deg);
+}
+.public-pass::before, .public-pass::after {
+  content: '';
+  position: absolute;
+  top: 56%;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 50%;
+  background: #103f36;
+}
+.public-pass::before { left: -.55rem; }
+.public-pass::after { right: -.55rem; }
+.public-pass-label { display: block; font-size: .48rem; font-weight: 900; letter-spacing: .2em; text-transform: uppercase; }
+.public-pass-number { float: right; font-size: .45rem; font-weight: 900; letter-spacing: .12em; }
+.public-pass strong { display: flex; align-items: center; gap: .65rem; margin-top: .75rem; font-size: 1.2rem; line-height: .9; text-transform: uppercase; }
+.public-pass strong span { width: 2.4rem; height: 2.4rem; display: grid; place-items: center; border: 2px solid #103f36; border-radius: 50%; font-size: 1.5rem; }
+.public-pass-divider { display: block; margin: 1rem 0 .6rem; border-top: 1px dashed rgba(16,63,54,.55); }
+.public-pass-steps { display: block; text-align: center; font-size: .43rem; font-weight: 900; letter-spacing: .16em; text-transform: uppercase; }
+
+.public-discovery {
+  width: min(100%, 72rem);
   margin-inline: auto;
-  padding: 1.5rem 1rem 3rem;
+  padding: 2rem 1rem 3rem;
+  scroll-margin-top: 5rem;
 }
 
 /* --- Ticket detail, benefits and redemption ----------------- */
@@ -1428,6 +1565,8 @@ tbody tr:hover { background: var(--tv-surface-sunken); }
   .home-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .grid-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .public-hero { grid-template-columns: minmax(0, 1fr) minmax(19rem, .8fr); }
+  .public-pass-rings { width: 31rem; }
 }
 
 @media (max-width: 900px) {
@@ -1555,7 +1694,24 @@ tbody tr:hover { background: var(--tv-surface-sunken); }
 @media(max-width:650px) {
   .app-main { padding: 1rem .75rem 5.5rem; }
   .public-header { padding: .6rem .75rem; }
-  .public-main { padding: 1rem .75rem 2.5rem; }
+  .public-main { padding: 0; }
+  .public-brand-mark { width: 2.15rem; height: 2.15rem; font-size: 1.4rem; }
+  .public-brand-name { font-size: 1.05rem; }
+  .public-brand-tagline { font-size: .45rem; }
+  .public-nav { gap: .5rem; }
+  .public-discover-link { display: none; }
+  .public-sign-in, .public-sign-in:hover:not(:disabled) { padding: .58rem .7rem; font-size: .72rem; }
+  .public-hero {
+    min-height: auto;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    padding: 2.5rem 1.25rem 2rem;
+  }
+  .public-hero h1 { font-size: clamp(2.8rem, 15vw, 4rem); }
+  .public-pass-stage { min-height: 12rem; }
+  .public-pass-rings { width: 24rem; }
+  .public-pass { width: min(90%, 18rem); }
+  .public-discovery { padding: 1.5rem .75rem 2.5rem; }
 
   /* Grid and flex children default to min-width:auto, so a long word or a
      max-content column can still overflow at 320px. */
