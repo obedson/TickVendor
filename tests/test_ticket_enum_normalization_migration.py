@@ -15,7 +15,6 @@ from src.config import settings
 from src.database import get_db
 from src.main import create_app
 from src.models import (
-    Community,
     Entitlement,
     EntitlementRedemption,
     Event,
@@ -48,8 +47,8 @@ def _prepare_legacy_database(tmp_path, monkeypatch):
     ids = {name: str(uuid4()) for name in ("unassigned", "invitation", "default", "entitlement", "ticket_entitlement", "redemption", "transfer")}
     with Session(engine, expire_on_commit=False) as db:
         user = db.scalars(sa.select(User)).first()
-        community = db.scalars(sa.select(Community)).first()
-        event = Event(community_id=community.id, organizer_id=user.id, title="Legacy wallet event",
+        community_id = db.execute(sa.text("SELECT id FROM communities ORDER BY id LIMIT 1")).scalar_one()
+        event = Event(community_id=community_id, organizer_id=user.id, title="Legacy wallet event",
                       slug=f"legacy-wallet-{uuid4().hex[:8]}", description="Migration fixture event",
                       category="community", starts_at=now + timedelta(days=1),
                       ends_at=now + timedelta(days=1, hours=2), location_type=LocationType.ONLINE,
@@ -108,7 +107,7 @@ def _prepare_legacy_database(tmp_path, monkeypatch):
 def test_legacy_enum_values_migrate_load_and_wallet_returns_200(tmp_path, monkeypatch):
     config, engine, ids, claimed_id, user_id, event_id, ticket_type_id = _prepare_legacy_database(tmp_path, monkeypatch)
     engine.dispose()
-    command.upgrade(config, "head")
+    command.upgrade(config, "c4d5e6f7a8b9")
     engine = sa.create_engine(settings.database_url)
 
     with engine.connect() as connection:
@@ -117,6 +116,12 @@ def test_legacy_enum_values_migrate_load_and_wallet_returns_200(tmp_path, monkey
         assert stored[claimed_id] == "CLAIMED", stored
         assert stored[ids["unassigned"]] == "UNASSIGNED", stored
         assert stored[ids["invitation"]] == "INVITATION_SENT", stored
+    engine.dispose()
+
+    # The ticket migration's data contract is verified at its own revision. Advance through
+    # subsequent migrations before loading current ORM models and exercising the current API.
+    command.upgrade(config, "head")
+    engine = sa.create_engine(settings.database_url)
 
     with Session(engine) as db:
         assert db.get(Ticket, claimed_id).assignment_state is TicketAssignmentState.CLAIMED
@@ -161,7 +166,7 @@ def test_normalization_preserves_already_canonical_values(tmp_path, monkeypatch)
     with engine.begin() as connection:
         connection.execute(sa.text("UPDATE tickets SET assignment_state='CLAIMED' WHERE id=:id"), {"id": claimed_id})
     engine.dispose()
-    command.upgrade(config, "head")
+    command.upgrade(config, "c4d5e6f7a8b9")
     engine = sa.create_engine(settings.database_url)
     with engine.connect() as connection:
         assert connection.execute(sa.text("SELECT assignment_state FROM tickets WHERE id=:id"), {"id": claimed_id}).scalar_one() == "CLAIMED"
@@ -170,8 +175,9 @@ def test_normalization_preserves_already_canonical_values(tmp_path, monkeypatch)
 
 def test_postgresql_normalization_sql_and_revision_graph(monkeypatch):
     script = ScriptDirectory.from_config(Config("alembic.ini"))
-    assert script.get_heads() == ["c4d5e6f7a8b9"]
+    assert script.get_heads() == ["d5e6f7a8b9c0"]
     assert script.get_revision("c4d5e6f7a8b9").down_revision == "c1d2e3f4a5b6"
+    assert script.get_revision("d5e6f7a8b9c0").down_revision == "c4d5e6f7a8b9"
     output = StringIO()
     monkeypatch.setattr(settings, "database_url", "postgresql://migration-test/unused")
     command.upgrade(Config("alembic.ini", output_buffer=output), "c1d2e3f4a5b6:c4d5e6f7a8b9", sql=True)

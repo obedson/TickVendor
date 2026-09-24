@@ -20,10 +20,10 @@ def test_populated_participation_upgrade(tmp_path, monkeypatch):
         before = {name: connection.execute(sa.text(f'SELECT {columns[name]} FROM {name}')).all() for name in names}
     config = Config('alembic.ini')
     script = ScriptDirectory.from_config(config)
-    assert script.get_heads() == ['e0f1a2b34567']
+    assert script.get_heads() == ['d5e6f7a8b9c0']
     revisions = list(script.walk_revisions())
     assert len({r.revision for r in revisions}) == len(revisions)
-    command.upgrade(config, 'head')
+    command.upgrade(config, 'e0f1a2b34567')
     with engine.connect() as connection:
         for name in names:
             assert connection.execute(sa.text(f'SELECT {columns[name]} FROM {name}')).all() == before[name], name
@@ -34,7 +34,7 @@ def test_populated_participation_upgrade(tmp_path, monkeypatch):
     assert any(i['name'] == 'ix_promotions_delivery' for i in sa.inspect(engine).get_indexes('promotions'))
     assert len(sa.inspect(engine).get_foreign_keys('task_attachments')) == 2
     command.downgrade(config, 'd9e0f1a23456')
-    command.upgrade(config, 'head')
+    command.upgrade(config, 'e0f1a2b34567')
     engine.dispose()
 
 
