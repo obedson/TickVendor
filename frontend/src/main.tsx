@@ -712,16 +712,44 @@ function PageLoader({ label = 'Loading…' }: { label?: string }) {
  * this shell offers no way into those.
  */
 function PublicShell({ children, onSignIn }: { children: ReactNode; onSignIn: () => void }) {
+  const discover = () => document.getElementById('public-discovery')?.scrollIntoView({ behavior: 'smooth' });
+
   return (
     <div className="public-shell">
       <header className="public-header">
-        <div className="auth-brand">
-          <div className="auth-brand-logo" aria-hidden="true">TV</div>
-          <span className="auth-brand-name">TickVendor</span>
+        <div className="public-brand" aria-label="TickVendor — Events that count">
+          <span className="public-brand-mark" aria-hidden="true">✓</span>
+          <span className="public-brand-copy">
+            <span className="public-brand-name"><span>tick</span>vendor</span>
+            <span className="public-brand-tagline">Events that count</span>
+          </span>
         </div>
-        <button className="accent sm" onClick={onSignIn}>Sign in or create an account</button>
+        <nav className="public-nav" aria-label="Public navigation">
+          <button className="public-discover-link" onClick={discover}>Discover</button>
+          <button className="public-sign-in" onClick={onSignIn}>Sign in / Create account</button>
+        </nav>
       </header>
-      <main id="main" className="public-main">{children}</main>
+      <main id="main" className="public-main">
+        <section className="public-hero" aria-labelledby="public-hero-title">
+          <div className="public-hero-copy">
+            <p className="public-kicker"><span aria-hidden="true" />The TickVendor experience</p>
+            <h1 id="public-hero-title">Show up.<br /><em>Make it count.</em></h1>
+            <p>Discover events worth attending. Get your ticket, take part, and see every verified contribution add up.</p>
+            <button className="public-hero-action" onClick={discover}>Explore events <span aria-hidden="true">→</span></button>
+          </div>
+          <div className="public-pass-stage" aria-hidden="true">
+            <div className="public-pass-rings" />
+            <div className="public-pass">
+              <span className="public-pass-number">TV / 001</span>
+              <span className="public-pass-label">Your participation pass</span>
+              <strong><span>✓</span> Every action<br />counts.</strong>
+              <span className="public-pass-divider" />
+              <span className="public-pass-steps">Discover&nbsp;&nbsp;&nbsp; Attend&nbsp;&nbsp;&nbsp; Participate&nbsp;&nbsp;&nbsp; Achieve</span>
+            </div>
+          </div>
+        </section>
+        <section id="public-discovery" className="public-discovery">{children}</section>
+      </main>
     </div>
   );
 }
