@@ -15,8 +15,6 @@ from src.models.base import GUID, TimestampMixin, UUIDPrimaryKeyMixin
 
 class PlatformRole(str, enum.Enum):
     PARTICIPANT = "participant"
-    ORGANIZER = "organizer"
-    COMMUNITY_ADMIN = "community_admin"
     SUPER_ADMIN = "super_admin"
 
 

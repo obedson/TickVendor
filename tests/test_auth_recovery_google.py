@@ -86,7 +86,7 @@ def test_existing_account_requires_password_and_preserves_identity(env, monkeypa
     client, engine, _ = env
     original = register(client)
     with Session(engine) as db:
-        user = db.scalar(select(User)); user.role = PlatformRole.COMMUNITY_ADMIN
+        user = db.scalar(select(User)); user.role = PlatformRole.PARTICIPANT
         org = Organization(owner_id=user.id, name='Original organization', slug='original'); db.add(org); db.flush()
         community = Community(organization_id=org.id, name='Original community', slug='original'); db.add(community); db.flush()
         membership = Membership(user_id=user.id, community_id=community.id, role=MembershipRole.ADMIN); db.add(membership); db.flush()
@@ -97,7 +97,7 @@ def test_existing_account_requires_password_and_preserves_identity(env, monkeypa
     response = client.post('/api/v1/auth/google/complete', json={**payload, 'password': 'initial-password-123'})
     assert response.status_code == 200, response.text
     assert response.json()['user']['id'] == original['user']['id']
-    assert response.json()['user']['role'] == 'community_admin'
+    assert response.json()['user']['role'] == 'participant'
     assert client.post('/api/v1/auth/login', json={'email': 'member@example.com', 'password': 'initial-password-123'}).status_code == 200
     changed = grant(client, monkeypatch, email='changed@example.com')
     assert client.post('/api/v1/auth/google/complete', json=changed).json()['user']['id'] == original['user']['id']

@@ -1,5 +1,7 @@
 """Community and membership management API tests."""
 
+from datetime import UTC, datetime
+
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -23,9 +25,10 @@ def setup(tmp_path):
     engine = create_engine(f"sqlite:///{tmp_path / 'community-api.db'}", connect_args={"check_same_thread": False})
     Base.metadata.create_all(engine); sessions = sessionmaker(bind=engine, expire_on_commit=False)
     with sessions() as db:
-        admin = User(email="admin@example.com", password_hash=hash_password("password-password"))
-        member = User(email="member@example.com", password_hash=hash_password("password-password"))
-        outsider = User(email="outsider@example.com", password_hash=hash_password("password-password"))
+        verified = datetime.now(UTC)
+        admin = User(email="admin@example.com", password_hash=hash_password("password-password"), email_verified_at=verified)
+        member = User(email="member@example.com", password_hash=hash_password("password-password"), email_verified_at=verified)
+        outsider = User(email="outsider@example.com", password_hash=hash_password("password-password"), email_verified_at=verified)
         db.add_all([admin, member, outsider]); db.flush()
         db.add_all([Profile(user_id=admin.id, username="community-admin", display_name="Admin"),
                     Profile(user_id=member.id, username="community-member", display_name="Member"),

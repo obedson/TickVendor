@@ -25,6 +25,14 @@ test('platform workflow includes inspection, administrator assignment and modera
   assert.match(source, /view|section/);
   assert.doesNotMatch(source, /window.confirm|alert\(/);
 });
+test('community creation separates reviewed applications from organization-scoped expansion', () => {
+  const lifecycle = read('CommunityLifecycle.tsx');
+  const creation = read('CreateCommunity.tsx');
+  const platform = read('PlatformGovernance.tsx');
+  for (const text of ['Create or apply for community', 'Save server draft', 'Submit for Platform review', 'pending_review', 'organization_id', 'Platform review']) assert.ok(`${lifecycle}${creation}`.includes(text), text);
+  for (const text of ['Review application', 'Approve application', 'Reject application', 'initial_admin_user_id', 'verified initial Community Admin']) assert.ok(platform.includes(text), text);
+  assert.match(platform, /lifecycle_status === 'pending_review'/);
+});
 test('confirmation uses native modal focus, Escape, reason validation and restoration', () => {
   const source = read('GovernanceConfirm.tsx');
   for (const text of ['showModal()', 'previous?.focus()', 'onCancel', 'aria-labelledby', 'minLength={3}', 'reason.trim().length < 3', 'onConfirm']) assert.ok(source.includes(text), text);

@@ -17,6 +17,7 @@ from src.models.auth import AuthSession, AuthToken, AuthTokenPurpose
 from src.models.badge import Badge, BadgeAward
 from src.models.community import (
     Community,
+    CommunityLifecycleStatus,
     Membership,
     MembershipAccess,
     MembershipRole,
@@ -108,6 +109,7 @@ __all__ = [
     "Badge",
     "BadgeAward",
     "Community",
+    "CommunityLifecycleStatus",
     "Contribution",
     "ContributionBand",
     "ContributionType",

@@ -37,6 +37,14 @@ class MembershipAccess(str, enum.Enum):
     INVITE_ONLY = "invite_only"
 
 
+class CommunityLifecycleStatus(str, enum.Enum):
+    DRAFT = "draft"
+    PENDING_REVIEW = "pending_review"
+    ACTIVE = "active"
+    REJECTED = "rejected"
+    SUSPENDED = "suspended"
+
+
 class Community(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     __tablename__ = "communities"
     __table_args__ = (
@@ -53,6 +61,20 @@ class Community(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     logo_url: Mapped[str | None] = mapped_column(String(2048))
     is_public: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    lifecycle_status: Mapped[CommunityLifecycleStatus] = mapped_column(
+        Enum(CommunityLifecycleStatus, native_enum=False, length=24),
+        default=CommunityLifecycleStatus.ACTIVE,
+        server_default="ACTIVE",
+        nullable=False,
+    )
+    submitted_by_id: Mapped[Any | None] = mapped_column(
+        GUID(), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    reviewed_by_id: Mapped[Any | None] = mapped_column(
+        GUID(), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    review_reason: Mapped[str | None] = mapped_column(Text)
     membership_access: Mapped[MembershipAccess] = mapped_column(
         Enum(MembershipAccess, native_enum=False, length=24),
         default=MembershipAccess.INVITE_ONLY, nullable=False,

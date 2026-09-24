@@ -15,6 +15,7 @@ from src.authorization import require_community_role
 from src.database import get_db
 from src.models import (
     Community,
+    CommunityLifecycleStatus,
     Event,
     Membership,
     MembershipAccess,
@@ -27,7 +28,7 @@ from src.models import (
     User,
 )
 from src.services import governance
-from src.services.notification import audit
+from src.services.notification import audit, notify
 from src.storage import cover_delivery_url
 
 router = APIRouter(prefix="/communities", tags=["communities"])
@@ -40,6 +41,9 @@ class CommunityCreate(BaseModel):
     logo_url: str | None = Field(default=None, max_length=2048)
     is_public: bool = True
     membership_access: MembershipAccess = MembershipAccess.INVITE_ONLY
+    organization_id: UUID | None = None
+    initial_admin_user_id: UUID | None = None
+    submit_for_review: bool = True
 
 
 class CommunityUpdate(BaseModel):
@@ -75,7 +79,11 @@ class MemberStatus(BaseModel):
 def _community(data):
     return {"id": str(data.id), "name": data.name, "slug": data.slug, "description": data.description,
             "logo_url": data.logo_url, "is_public": data.is_public, "is_active": data.is_active,
-            "membership_access": data.membership_access.value}
+            "membership_access": data.membership_access.value,
+            "organization_id": str(data.organization_id),
+            "lifecycle_status": data.lifecycle_status.value,
+            "submitted_by_id": str(data.submitted_by_id) if data.submitted_by_id else None,
+            "reviewed_at": data.reviewed_at}
 
 
 def _member_payload(membership, profile, viewer, email=None):
@@ -130,21 +138,148 @@ def organizer_events(db: Annotated[Session, Depends(get_db)], user: Annotated[Us
 @router.post("", status_code=status.HTTP_201_CREATED)
 def create_community(payload: CommunityCreate, db: Annotated[Session, Depends(get_db)],
                      user: Annotated[User, Depends(get_current_user)]):
-    if user.role != PlatformRole.SUPER_ADMIN and db.scalar(select(Membership.id).join(Community).where(
-        Membership.user_id == user.id, Membership.role == MembershipRole.ADMIN,
-        Membership.status == MembershipStatus.ACTIVE, Community.is_active.is_(True),
-    )) is None:
-        raise HTTPException(403, "Community administrator authority required to create a community")
-    organization = Organization(owner_id=user.id, name=payload.name, slug=f"{payload.slug}-org")
-    db.add(organization); db.flush()
-    community = Community(organization_id=organization.id, **payload.model_dump())
-    db.add(community); db.flush()
-    db.add(Membership(community_id=community.id, user_id=user.id, role=MembershipRole.ORGANIZER, status=MembershipStatus.ACTIVE))
-    audit(db, actor_id=user.id, community_id=community.id, action="community.created", target_type="community", target_id=community.id, commit=False)
+    if user.email_verified_at is None:
+        raise HTTPException(403, "Verify your email before creating or applying for a community")
+    values = payload.model_dump(exclude={"organization_id", "initial_admin_user_id", "submit_for_review"})
+    organization = None
+    initial_admin = user
+    direct_creation = payload.organization_id is not None
+    if direct_creation:
+        organization = db.scalar(select(Organization).where(
+            Organization.id == payload.organization_id,
+            Organization.is_active.is_(True),
+        ))
+        if organization is None:
+            raise HTTPException(404, "Organization not found")
+        if user.role == PlatformRole.SUPER_ADMIN:
+            if payload.initial_admin_user_id is None:
+                raise HTTPException(422, "Select an initial Community Admin")
+            initial_admin = governance.require_verified_admin_candidate(db.get(User, payload.initial_admin_user_id))
+        else:
+            authority_community_id = db.scalar(select(Community.id).join(Membership).where(
+                Membership.user_id == user.id,
+                Membership.role == MembershipRole.ADMIN,
+                Membership.status == MembershipStatus.ACTIVE,
+                Community.organization_id == organization.id,
+                Community.is_active.is_(True),
+                Community.deleted_at.is_(None),
+            ))
+            if authority_community_id is None:
+                raise HTTPException(403, "Organization administrator authority required")
+            # Serialize against role/suspension changes in the source community, then recheck
+            # authority after acquiring the same community lock used by membership governance.
+            governance.community_for_update(db, authority_community_id)
+            authority = db.scalar(select(Membership.id).where(
+                Membership.community_id == authority_community_id,
+                Membership.user_id == user.id,
+                Membership.role == MembershipRole.ADMIN,
+                Membership.status == MembershipStatus.ACTIVE,
+            ))
+            if authority is None:
+                raise HTTPException(403, "Organization administrator authority required")
+            if payload.initial_admin_user_id not in {None, user.id}:
+                raise HTTPException(403, "Only a Super Admin can select another initial administrator")
+    else:
+        organization = Organization(
+            owner_id=user.id,
+            name=payload.name,
+            slug=f"{payload.slug}-org",
+            is_active=False,
+            is_verified=False,
+        )
+        db.add(organization)
+        try:
+            db.flush()
+        except IntegrityError as exc:
+            db.rollback()
+            raise HTTPException(status_code=409, detail="Community or organization slug already exists") from exc
+
+    lifecycle_status = CommunityLifecycleStatus.ACTIVE
+    if not direct_creation:
+        lifecycle_status = (
+            CommunityLifecycleStatus.PENDING_REVIEW
+            if payload.submit_for_review
+            else CommunityLifecycleStatus.DRAFT
+        )
+    community = Community(
+        organization_id=organization.id,
+        submitted_by_id=user.id,
+        lifecycle_status=lifecycle_status,
+        is_active=direct_creation,
+        **values,
+    )
+    db.add(community)
+    try:
+        db.flush()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Community slug already exists") from exc
+    membership = Membership(
+        community_id=community.id,
+        user_id=initial_admin.id if direct_creation else user.id,
+        role=MembershipRole.ADMIN,
+        status=MembershipStatus.ACTIVE if direct_creation else MembershipStatus.PENDING,
+    )
+    db.add(membership)
+    if direct_creation:
+        governance.record_membership(
+            db,
+            membership,
+            user,
+            "admin_assigned",
+            None,
+            "Initial administrator for organization-scoped community creation",
+        )
+    action = "community.created" if direct_creation else (
+        "community.application_submitted" if payload.submit_for_review else "community.draft_created"
+    )
+    audit(db, actor_id=user.id, community_id=community.id, action=action,
+          target_type="community", target_id=community.id,
+          metadata={"organization_id": str(organization.id), "lifecycle_status": community.lifecycle_status.value},
+          commit=False)
+    if not direct_creation and payload.submit_for_review:
+        for super_admin_id in db.scalars(select(User.id).where(
+            User.role == PlatformRole.SUPER_ADMIN,
+            User.is_active.is_(True),
+        )):
+            notify(db, super_admin_id, "community_application_submitted", "Community application submitted",
+                   f"{community.name} is ready for review.", {"community_id": str(community.id)},
+                   community_id=community.id, commit=False)
     try:
         db.commit()
     except IntegrityError as exc:
         db.rollback(); raise HTTPException(status_code=409, detail="Community slug already exists") from exc
+    return _community(community)
+
+
+@router.post("/{community_id}/application/submit")
+def submit_community_application(
+    community_id: UUID,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[User, Depends(get_current_user)],
+):
+    if user.email_verified_at is None:
+        raise HTTPException(403, "Verify your email before submitting a community application")
+    community = governance.community_for_update(db, community_id, active=False)
+    if community.submitted_by_id != user.id:
+        raise HTTPException(404, "Community application not found")
+    if community.lifecycle_status == CommunityLifecycleStatus.PENDING_REVIEW:
+        return _community(community)
+    if community.lifecycle_status != CommunityLifecycleStatus.DRAFT:
+        raise HTTPException(409, "Only draft community applications can be submitted")
+    community.lifecycle_status = CommunityLifecycleStatus.PENDING_REVIEW
+    audit(db, actor_id=user.id, community_id=community.id, action="community.application_submitted",
+          target_type="community", target_id=community.id,
+          metadata={"previous": {"lifecycle_status": "draft"},
+                    "result": {"lifecycle_status": "pending_review"}}, commit=False)
+    for super_admin_id in db.scalars(select(User.id).where(
+        User.role == PlatformRole.SUPER_ADMIN,
+        User.is_active.is_(True),
+    )):
+        notify(db, super_admin_id, "community_application_submitted", "Community application submitted",
+               f"{community.name} is ready for review.", {"community_id": str(community.id)},
+               community_id=community.id, commit=False)
+    db.commit()
     return _community(community)
 
 

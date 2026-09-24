@@ -5,11 +5,11 @@ import { useEffect, useState } from 'react';
 import { apiJson, getLiveToken } from './api';
 import { GovernanceConfirm } from './GovernanceConfirm';
 
-type Community = { id: string; name: string; description?: string; logo_url?: string; is_active: boolean; is_public: boolean; membership_access: 'open' | 'approval_required' | 'invite_only' };
+type Community = { id: string; name: string; description?: string; logo_url?: string; is_active: boolean; is_public: boolean; membership_access: 'open' | 'approval_required' | 'invite_only'; organization_id: string; lifecycle_status: 'draft' | 'pending_review' | 'active' | 'rejected' | 'suspended' };
 type Membership = { id: string; role: string; status: string };
 type Mine = { id: string; community: Community; membership: Membership };
 type Found = Community & { membership?: Membership | null };
-export function CommunityLifecycle({ token, isSuperAdmin = false }: { token: string; isSuperAdmin?: boolean }) {
+export function CommunityLifecycle({ token, isSuperAdmin = false, isEmailVerified = false }: { token: string; isSuperAdmin?: boolean; isEmailVerified?: boolean }) {
   const [opened, setOpened] = useState<Community | null>(null);
   const [creating, setCreating] = useState(false);
   const [message, setMessage] = useState('');
@@ -47,10 +47,13 @@ export function CommunityLifecycle({ token, isSuperAdmin = false }: { token: str
     finally { setBusy(''); }
   };
   const direct = (item: Community, action: string) => { void act(item, action).catch(cause => setError(cause instanceof Error ? cause.message : 'Membership action failed.')); };
+  const submitApplication = async (item: Community) => { setBusy(`${item.id}:submit`); setError(''); try { await apiJson(`communities/${item.id}/application/submit`, { method: 'POST' }, live()); await load(); setMessage(`${item.name}: application submitted for Platform review.`); } catch (cause) { setError(cause instanceof Error ? cause.message : 'Application submission failed.'); } finally { setBusy(''); } };
   const rows: Found[] = view === 'discover' ? found : mine.filter(item => view === 'past' ? ['left', 'declined', 'suspended'].includes(item.membership.status) : item.membership.status === view).map(item => ({ ...item.community, membership: item.membership }));
+  const organizations = Array.from(new Map(mine.filter(item => item.membership.role === 'admin' && item.membership.status === 'active' && item.community.lifecycle_status === 'active').map(item => [item.community.organization_id, { id: item.community.organization_id, name: item.community.name }])).values());
   if (opened) return <CommunityMember token={token} community={opened} onClose={() => setOpened(null)} />;
   return <section className="management-screen"><h1>Communities</h1><p>Find your community, manage invitations and keep your participation history.</p>
-    {(isSuperAdmin || mine.some(item => item.membership.role === 'admin' && item.membership.status === 'active' && item.community.is_active)) && <button onClick={() => setCreating(true)}>Create community</button>}
+    {isSuperAdmin && <p>Independent community applications still require an explicit review and a verified initial Community Admin.</p>}
+    <button onClick={() => setCreating(true)}>Create or apply for community</button>{!isEmailVerified && <p>Verify your email before submitting. If you just verified, the server will recheck your account.</p>}
     {message && <p role="status">{message}</p>}
     <SponsoredPlacement surface="communities" />
     <nav className="section-tabs" aria-label="Community views">{[['active', 'My Communities'], ['discover', 'Discover Communities'], ['pending', 'Pending Requests'], ['invited', 'Invitations'], ['past', 'Past Memberships']].map(([id, label]) => <button className="secondary" aria-pressed={view === id} key={id} onClick={() => setView(id)}>{label}</button>)}</nav>
@@ -63,12 +66,12 @@ export function CommunityLifecycle({ token, isSuperAdmin = false }: { token: str
         {(!item.membership || ['left', 'declined'].includes(item.membership.status)) && (item.membership_access === 'invite_only' ? <p>An invitation is required.</p> : <button disabled={!!busy} onClick={() => direct(item, 'join')}>{working(item.id, 'join') ? (item.membership_access === 'open' ? 'Joining…' : 'Sending request…') : item.membership_access === 'open' ? 'Join Community' : 'Request to Join'}</button>)}
         {item.membership?.status === 'invited' && <><button disabled={!!busy} onClick={() => direct(item, 'accept')}>{working(item.id, 'accept') ? 'Accepting…' : 'Accept invitation'}</button><button className="secondary" disabled={!!busy} onClick={() => direct(item, 'decline')}>{working(item.id, 'decline') ? 'Declining…' : 'Decline invitation'}</button></>}
       </div>}
-      {item.membership?.status === 'pending' && <><p>Awaiting administrator approval — you are not a member yet.</p><button className="secondary" disabled={!!busy} onClick={() => direct(item, 'withdraw')}>{working(item.id, 'withdraw') ? 'Withdrawing…' : 'Withdraw request'}</button></>}
+      {item.membership?.status === 'pending' && (item.lifecycle_status === 'draft' ? <><p>Community application saved as a server draft.</p><button disabled={!!busy} onClick={() => void submitApplication(item)}>{working(item.id, 'submit') ? 'Submitting…' : 'Submit for Platform review'}</button></> : item.lifecycle_status === 'pending_review' ? <p>Community application awaiting Platform review.</p> : <><p>Awaiting administrator approval — you are not a member yet.</p><button className="secondary" disabled={!!busy} onClick={() => direct(item, 'withdraw')}>{working(item.id, 'withdraw') ? 'Withdrawing…' : 'Withdraw request'}</button></>)}
       {item.membership?.status === 'active' && item.is_active && <button onClick={() => setOpened(item)}>Open member space</button>}
       {item.membership?.status === 'active' && (item.membership.role === 'admin' ? <p>A Super Admin must change your administrator role before you can leave.</p> : <button className="secondary" disabled={!!busy} onClick={() => setPending({ item, action: 'leave' })}>Leave Community</button>)}
     </article>)}</div>{!loading && !rows.length && <p>No communities in this view.</p>}
     {view === 'discover' && <div className="form-actions"><button className="secondary" disabled={!offset} onClick={() => setOffset(offset - 50)}>Previous</button><button className="secondary" disabled={found.length < 50} onClick={() => setOffset(offset + 50)}>Next</button></div>}
-    {creating && <CreateCommunity token={token} onClose={() => setCreating(false)} onCreated={() => { void load(); window.dispatchEvent(new Event('tickvendor-memberships-changed')); }} />}
+    {creating && <CreateCommunity token={token} organizations={organizations} onClose={() => setCreating(false)} onCreated={() => { void load(); window.dispatchEvent(new Event('tickvendor-memberships-changed')); }} />}
     {pending && <GovernanceConfirm title={`Leave ${pending.item.name}`} consequence="Community access will end. Tickets, attendance, Impact Points and recognition history remain." requireReason={false} onClose={() => setPending(null)} onConfirm={() => act(pending.item, pending.action)} />}
   </section>;
 }
