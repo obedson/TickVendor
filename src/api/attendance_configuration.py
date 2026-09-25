@@ -25,6 +25,7 @@ CONFIGURATION_FIELDS = (
     "organizer_verification_enabled",
     "geofence_enabled",
     "geofence_radius_meters",
+    "geofence_max_accuracy_meters",
     "max_peer_confirmations",
     "peer_confirmation_deadline",
     "peer_selection_limit",
@@ -45,6 +46,7 @@ class AttendanceConfigurationInput(BaseModel):
     organizer_verification_enabled: bool | None = None
     geofence_enabled: bool | None = None
     geofence_radius_meters: int | None = Field(default=None, ge=10, le=100000)
+    geofence_max_accuracy_meters: int | None = Field(default=None, ge=5, le=10000)
     max_peer_confirmations: int | None = Field(default=None, ge=1, le=100)
     peer_confirmation_deadline: datetime | None = None
     peer_selection_limit: int | None = Field(default=None, ge=1, le=100)

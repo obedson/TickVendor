@@ -1046,3 +1046,11 @@ Verification:
 - frontend production build - passed
 - frontend ESLint - passed
 - `node scripts/test-management-layout.mjs` - 28 passed
+
+## Map-assisted attendance geofence configuration — 2026-09-25
+
+- Added an optional Mapbox venue picker with a draggable/clickable marker and visible geofence radius. Manual latitude/longitude inputs remain available when no public Mapbox token is configured.
+- Separated the allowed venue distance from the maximum device accuracy used for automatic verification. In-range but imprecise readings continue into the existing organizer-review flow without consuming the ticket or awarding points early.
+- Migration `e6f7a8b9c0d1` preserves existing configured events by initializing their new accuracy threshold from their historical radius; new events default to a 50 m automatic-verification threshold. Historical attendance evidence is not rewritten.
+- Mapbox is configuration/visualization only and does not improve device GPS hardware. Staging still requires a domain-restricted `VITE_MAPBOX_ACCESS_TOKEN` and manual map/check-in review.
+- Verification: 15 focused attendance configuration/location tests passed; six browser location sampling cases and the map/configuration integration script passed; production build, ESLint, changed-file Ruff, Python compilation, `git diff --check`, SQLite base-to-head migration, Alembic schema check, and PostgreSQL offline SQL compilation passed. No Playwright or full backend suite was run.

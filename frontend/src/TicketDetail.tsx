@@ -108,8 +108,8 @@ export function TicketDetail({ ticketId, token, onBack, onWalletChanged }: Props
     if (!eventId) return;
     let active = true;
     setLocationRadius(undefined);
-    apiJson<{ geofence_enabled: boolean; geofence_radius_meters?: number }>(`events/${eventId}`, {}, liveToken())
-      .then(event => { if (active) { setGeofenced(event.geofence_enabled); setLocationRadius(event.geofence_enabled ? event.geofence_radius_meters : undefined); } })
+    apiJson<{ geofence_enabled: boolean; geofence_max_accuracy_meters?: number }>(`events/${eventId}`, {}, liveToken())
+      .then(event => { if (active) { setGeofenced(event.geofence_enabled); setLocationRadius(event.geofence_enabled ? (event.geofence_max_accuracy_meters ?? 50) : undefined); } })
       .catch(() => { if (active) setGeofenced(null); });
     return () => { active = false; };
   }, [detail?.ticket.event_id, token]);

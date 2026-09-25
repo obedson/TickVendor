@@ -32,7 +32,8 @@ def test_admin_can_update_attendance_configuration_and_member_is_denied(tmp_path
         venue = Venue(name="Configured venue", address="Test venue", latitude=6.5, longitude=3.3)
         db.add(venue); db.flush(); db.get(Event, event).venue_id = venue.id; db.commit()
     payload = {"qr_attendance_enabled": True, "peer_confirmation_enabled": True, "confirmations_required": 1, "organizer_verification_enabled": True,
-               "geofence_enabled": True, "geofence_radius_meters": 250, "max_peer_confirmations": 3,
+               "geofence_enabled": True, "geofence_radius_meters": 250, "geofence_max_accuracy_meters": 40,
+               "max_peer_confirmations": 3,
                "peer_selection_limit": 4, "required_verification_methods": ["qr", "peer"]}
     response = client.patch(f"/api/v1/communities/{community}/events/{event}/attendance-config", headers={"Authorization": f"Bearer {create_access_token(admin, 'participant')}"}, json=payload)
     assert response.status_code == 200, response.text
@@ -40,6 +41,8 @@ def test_admin_can_update_attendance_configuration_and_member_is_denied(tmp_path
     assert loaded.status_code == 200
     assert loaded.json()["required_verification_methods"] == ["qr", "peer"]
     assert loaded.json()["geofence_enabled"] is True
+    assert loaded.json()["geofence_radius_meters"] == 250
+    assert loaded.json()["geofence_max_accuracy_meters"] == 40
     denied = client.patch(f"/api/v1/communities/{community}/events/{event}/attendance-config", headers={"Authorization": f"Bearer {create_access_token(member, 'participant')}"}, json=payload)
     assert denied.status_code == 403
     engine.dispose()

@@ -220,6 +220,8 @@ def attendance_roster(
                     "latitude": float(signal.latitude), "longitude": float(signal.longitude),
                     "accuracy_meters": float(signal.accuracy_meters) if signal.accuracy_meters is not None else None,
                     "distance_meters": distance, "operation": signal.method.value,
+                    "radius_meters": event.geofence_radius_meters,
+                    "max_accuracy_meters": event.geofence_max_accuracy_meters,
                     "outcome": "verified" if signal.is_valid else "unverified",
                     "recorded_at": signal.verified_at.isoformat(),
                 })

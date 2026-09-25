@@ -15,6 +15,7 @@ def location_evidence(event, payload):
     if venue is not None and venue.latitude is not None and venue.longitude is not None:
         distance = haversine_meters(payload.latitude, payload.longitude, venue.latitude, venue.longitude)
     radius = event.geofence_radius_meters
+    max_accuracy = event.geofence_max_accuracy_meters
     accuracy = payload.accuracy_meters
     outcome = "location_recorded"
     if event.geofence_enabled:
@@ -23,13 +24,14 @@ def location_evidence(event, payload):
         outcome = (
             "outside_geofence" if distance > radius else
             "accuracy_missing" if accuracy is None else
-            "low_accuracy" if accuracy > radius else "verified"
+            "low_accuracy" if accuracy > max_accuracy else "verified"
         )
     return {
         "latitude": float(payload.latitude), "longitude": float(payload.longitude),
         "accuracy_meters": float(accuracy) if accuracy is not None else None,
         "distance_meters": round(distance, 2) if distance is not None else None,
         "radius_meters": radius,
+        "max_accuracy_meters": max_accuracy,
         "venue_latitude": float(venue.latitude) if venue and venue.latitude is not None else None,
         "venue_longitude": float(venue.longitude) if venue and venue.longitude is not None else None,
         "outcome": outcome,
@@ -44,7 +46,8 @@ def location_guidance(evidence):
         accuracy = evidence['accuracy_meters']
         reading = f"{accuracy:.1f} m" if accuracy is not None else "not supplied"
         return prefix + (
-            f"Device-reported accuracy: {reading}. This reading cannot verify your location, "
+            f"Device-reported accuracy: {reading}; automatic verification requires "
+            f"{evidence['max_accuracy_meters']} m or better. This reading cannot verify your location, "
             "even if you are at the venue. Retry with precise location enabled on a GPS-capable phone, "
             "or ask event staff for an allowed verification method. Moving outdoors may not improve this device's reading."
         )
