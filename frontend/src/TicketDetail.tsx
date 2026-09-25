@@ -134,7 +134,7 @@ export function TicketDetail({ ticketId, token, onBack, onWalletChanged }: Props
    */
   const readLocation = async (): Promise<{ latitude: number; longitude: number; accuracy_meters: number } | null> => {
     try {
-      return await currentPosition({ timeout: 10000, targetAccuracy: locationRadius });
+      return await currentPosition({ timeout: 15000, targetAccuracy: locationRadius });
     } catch (failure) {
       setError(failure instanceof LocationFailure
         ? `${failure.message} Ask event staff to record this for you.`
@@ -156,12 +156,14 @@ export function TicketDetail({ ticketId, token, onBack, onWalletChanged }: Props
       point = read;
     }
     try {
-      await apiJson(`events/${detail.ticket.event_id}/tickets/${ticketId}/check-in`, {
+      const state = await apiJson<{ pending_review?: boolean }>(`events/${detail.ticket.event_id}/tickets/${ticketId}/check-in`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(point ?? {}),
       }, liveToken());
-      setNotice('You are checked in. Your attendance is recorded.');
+      setNotice(state.pending_review
+        ? 'Your location was recorded and sent to the organizer for manual verification.'
+        : 'You are checked in. Your attendance is recorded.');
       await load();
       onWalletChanged();
     } catch (cause) {

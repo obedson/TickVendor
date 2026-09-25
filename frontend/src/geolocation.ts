@@ -46,18 +46,20 @@ export async function currentPosition(
   if (options.targetAccuracy !== undefined) {
     // Short, user-initiated sampling only. Keep the best reading, never invent precision.
     let best: Position | undefined;
+    let lastFailure: unknown;
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
-        const point = await currentPosition({ timeout: 6000, maximumAge: 0 });
+        const point = await currentPosition({ timeout: options.timeout ?? 15000, maximumAge: 0 });
         if (!best || point.accuracy_meters < best.accuracy_meters) best = point;
         if (best.accuracy_meters <= options.targetAccuracy) break;
       } catch (error) {
         if (error instanceof LocationFailure && error.kind === 'denied') throw error;
-        if (!best) throw error;
-        break;
+        lastFailure = error;
+        if (attempt < 2) await new Promise(resolve => window.setTimeout(resolve, 1000));
       }
     }
-    return best!;
+    if (best) return best;
+    throw lastFailure;
   }
   if (typeof navigator === 'undefined' || !navigator.geolocation) {
     throw new LocationFailure('unsupported', 'Location is not supported by this browser.');

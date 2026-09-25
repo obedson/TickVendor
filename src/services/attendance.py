@@ -64,7 +64,10 @@ def calculate_attendance_confidence(db: Session, attendance: Attendance) -> Atte
                   (VerificationMethod.GPS, AttendanceStatus.GPS_VERIFIED),
                   (VerificationMethod.PEER, AttendanceStatus.PEER_VERIFIED))
     attendance.status = next((status for method, status in precedence if method in valid), AttendanceStatus.CHECKED_IN)
-    if required and not required.issubset(valid):
+    # An explicit organizer approval is the configured human fallback for uncertain device GPS.
+    if VerificationMethod.ORGANIZER in valid:
+        attendance.status = AttendanceStatus.ORGANIZER_VERIFIED
+    elif required and not required.issubset(valid):
         attendance.status = AttendanceStatus.CHECKED_IN
     elif not required and valid:
         attendance.status = next((status for method, status in precedence if method in valid), AttendanceStatus.CHECKED_IN)
@@ -79,7 +82,8 @@ def award_qualified_attendance(db: Session, attendance: Attendance) -> None:
         AttendanceVerification.is_valid.is_(True),
     ))}
     required = {VerificationMethod(method) for method in event.required_verification_methods}
-    if attendance.status == AttendanceStatus.REJECTED or not required.issubset(valid):
+    organizer_override = VerificationMethod.ORGANIZER in valid
+    if attendance.status == AttendanceStatus.REJECTED or (not organizer_override and not required.issubset(valid)):
         return
     if db.scalar(select(PointRule.id).where(
         PointRule.source_type == "attendance", PointRule.is_active.is_(True),
@@ -350,12 +354,25 @@ def organizer_verify(db: Session, attendance: Attendance, organizer: User, appro
         reason=reason,
     )
     db.add(signal)
+    ticket_was_activated = False
+    if approve and attendance.ticket_id:
+        ticket = db.get(Ticket, attendance.ticket_id)
+        if ticket and ticket.status == TicketStatus.ACTIVE:
+            ticket.status = TicketStatus.USED
+            ticket.used_at = signal.verified_at
+            ticket.validated_by_id = organizer.id
+            ticket_was_activated = True
+    attendance.flagged_for_review = False
     db.commit()
     calculate_attendance_confidence(db, attendance)
     award_qualified_attendance(db, attendance)
     audit(db, actor_id=organizer.id, community_id=event.community_id,
           action="attendance.override", target_type="attendance", target_id=attendance.id,
           metadata={"approved": approve, "reason": reason})
+    if ticket_was_activated:
+        audit(db, actor_id=organizer.id, community_id=event.community_id,
+              action="ticket.used", target_type="ticket", target_id=attendance.ticket_id,
+              metadata={"event_id": str(event.id), "method": "organizer"})
     return attendance
 
 

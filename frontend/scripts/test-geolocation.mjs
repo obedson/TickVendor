@@ -15,7 +15,7 @@ function load(readings) {
       const next = readings[calls++];
       if (typeof next === 'number') success({ coords: { latitude: 6.44, longitude: 7.49, accuracy: next } });
       else failure(next);
-    } } },
+    } } }, window: { setTimeout: callback => { callback(); return 1; } },
   };
   vm.runInNewContext(javascript, context);
   return { currentPosition: context.exports.currentPosition, calls: () => calls };

@@ -264,6 +264,8 @@ def resolve_review(
     if attendance is None or attendance.event_id != event_id:
         raise HTTPException(status_code=404, detail="Attendance not found")
     target = AttendanceReviewStatus(payload.outcome)
+    if target in {AttendanceReviewStatus.CONFIRMED, AttendanceReviewStatus.REJECTED}:
+        organizer_verify(db, attendance, user, target == AttendanceReviewStatus.CONFIRMED, payload.reason)
     if attendance.review_status != target or attendance.review_resolution != payload.reason:
         attendance.review_status = target
         attendance.reviewed_by_id = user.id

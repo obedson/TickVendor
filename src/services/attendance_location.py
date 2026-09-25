@@ -21,9 +21,9 @@ def location_evidence(event, payload):
         if radius is None or distance is None:
             raise HTTPException(409, "This event's geofence is not fully configured; ask the organizer to check it")
         outcome = (
+            "outside_geofence" if distance > radius else
             "accuracy_missing" if accuracy is None else
-            "low_accuracy" if accuracy > radius else
-            "outside_geofence" if distance > radius else "verified"
+            "low_accuracy" if accuracy > radius else "verified"
         )
     return {
         "latitude": float(payload.latitude), "longitude": float(payload.longitude),

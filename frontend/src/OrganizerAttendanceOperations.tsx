@@ -26,8 +26,10 @@ type LocationEvidence = {
 };
 
 function LocationReading({ value }: { value: LocationEvidence }) {
+  const color = value.outcome === 'verified' ? 'chip-green'
+    : value.outcome === 'outside_geofence' ? 'chip-red' : 'chip-yellow';
   return <div className="text-sm">
-    <strong>{value.operation}: {value.outcome.replaceAll('_', ' ')}</strong><br />
+    <span className={`chip ${color}`}>{value.operation}: {value.outcome.replaceAll('_', ' ')}</span><br />
     Coordinates: {value.latitude.toFixed(6)}, {value.longitude.toFixed(6)}<br />
     Distance from venue: {value.distance_meters == null ? 'Not available' : `${value.distance_meters.toFixed(1)} m`}<br />
     Device accuracy: {value.accuracy_meters == null ? 'Not supplied' : `±${value.accuracy_meters.toFixed(1)} m`}
