@@ -57,7 +57,6 @@ class EventCreate(BaseModel):
     confirmations_required: int = Field(default=0, ge=0, le=20)
     organizer_verification_enabled: bool = True
     qr_attendance_enabled: bool = True
-    max_peer_confirmations: int | None = Field(default=None, ge=1, le=100)
     peer_confirmation_deadline: datetime | None = None
     required_verification_methods: list[str] = Field(default_factory=list, max_length=4)
     peer_selection_limit: int = Field(default=5, ge=1, le=20)

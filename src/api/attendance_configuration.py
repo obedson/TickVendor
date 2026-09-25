@@ -26,7 +26,6 @@ CONFIGURATION_FIELDS = (
     "geofence_enabled",
     "geofence_radius_meters",
     "geofence_max_accuracy_meters",
-    "max_peer_confirmations",
     "peer_confirmation_deadline",
     "peer_selection_limit",
     "peer_eligibility_statuses",
@@ -47,7 +46,6 @@ class AttendanceConfigurationInput(BaseModel):
     geofence_enabled: bool | None = None
     geofence_radius_meters: int | None = Field(default=None, ge=10, le=100000)
     geofence_max_accuracy_meters: int | None = Field(default=None, ge=5, le=10000)
-    max_peer_confirmations: int | None = Field(default=None, ge=1, le=100)
     peer_confirmation_deadline: datetime | None = None
     peer_selection_limit: int | None = Field(default=None, ge=1, le=100)
     peer_eligibility_statuses: list[str] | None = Field(default=None, max_length=20)
@@ -122,11 +120,6 @@ def update_attendance_config(community_id: UUID, event_id: UUID, payload: Attend
         raise HTTPException(status_code=422, detail="Peer verification requires peer confirmation")
     if peer_enabled and "peer" in required_methods and confirmations_required < 1:
         raise HTTPException(status_code=422, detail="At least one peer confirmation is required")
-    max_peer_confirmations = values.get("max_peer_confirmations", event.max_peer_confirmations)
-    if "peer" in required_methods and max_peer_confirmations is not None and max_peer_confirmations < confirmations_required:
-        raise HTTPException(status_code=422, detail="Peer confirmation limit cannot be below required confirmations")
-    if values.get("peer_confirmation_enabled") and values.get("max_peer_confirmations") == 0:
-        raise HTTPException(status_code=422, detail="Peer confirmation limit must be positive")
     if values.get("peer_confirmation_enabled") and values.get("peer_selection_limit") == 0:
         raise HTTPException(status_code=422, detail="Peer selection limit must be positive")
     # Self-service depends on the merged state, not on the payload alone: a partial PATCH that names

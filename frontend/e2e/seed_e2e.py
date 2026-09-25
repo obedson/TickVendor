@@ -84,7 +84,7 @@ def main() -> None:
             slug="e2e-community-meetup", description="A deterministic participant event.", category="community",
             starts_at=now + timedelta(hours=1), ends_at=now + timedelta(hours=3),
             location_type=LocationType.ONLINE, status=EventStatus.PUBLISHED, published_at=now,
-            peer_confirmation_enabled=True, confirmations_required=1, max_peer_confirmations=3,
+            peer_confirmation_enabled=True, confirmations_required=1,
             peer_selection_limit=5, required_verification_methods=["peer"],
         )
         db.add(event); db.flush()

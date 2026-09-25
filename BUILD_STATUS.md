@@ -1054,3 +1054,10 @@ Verification:
 - Migration `e6f7a8b9c0d1` preserves existing configured events by initializing their new accuracy threshold from their historical radius; new events default to a 50 m automatic-verification threshold. Historical attendance evidence is not rewritten.
 - Mapbox is configuration/visualization only and does not improve device GPS hardware. Staging still requires a domain-restricted `VITE_MAPBOX_ACCESS_TOKEN` and manual map/check-in review.
 - Verification: 15 focused attendance configuration/location tests passed; six browser location sampling cases and the map/configuration integration script passed; production build, ESLint, changed-file Ruff, Python compilation, `git diff --check`, SQLite base-to-head migration, Alembic schema check, and PostgreSQL offline SQL compilation passed. No Playwright or full backend suite was run.
+## Distinct-peer attendance confirmation semantics — 2026-09-25
+
+- Corrected the peer confirmation policy to match the approved product rule: `confirmations_required` is the minimum number of distinct eligible peers an attendee must receive before peer verification qualifies.
+- Removed the unrelated global cap on how many different attendees one user can confirm. The existing database uniqueness constraint and service duplicate guard continue to allow only one decision per event/confirmer/attendee pair.
+- Removed the misleading organizer field and the obsolete `events.max_peer_confirmations` column through migration `f7a8b9c0d1e2`. Existing peer-confirmation records and attendance awards are not modified.
+- Reciprocal confirmation and repeated-volume signals remain flagged for organizer review; self-confirmation, duplicate pairs, cross-event access and ineligible peers remain blocked.
+- Verification: 16 focused attendance configuration/abuse tests passed; frontend production build and ESLint passed; changed-file Ruff, Python compilation, SQLite base-to-head migration, Alembic schema check, PostgreSQL offline SQL compilation, and `git diff --check` passed. No Playwright or full backend suite was run.

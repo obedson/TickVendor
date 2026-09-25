@@ -276,12 +276,6 @@ def confirm_peer(db: Session, event: Event, confirmer: User, subject_id, confirm
     ))
     if duplicate is not None:
         raise HTTPException(status_code=409, detail="Peer confirmation already submitted")
-    submitted_count = db.scalar(select(func.count()).select_from(PeerConfirmation).where(
-        PeerConfirmation.event_id == event.id,
-        PeerConfirmation.confirmer_id == confirmer.id,
-    )) or 0
-    if event.max_peer_confirmations is not None and submitted_count >= event.max_peer_confirmations:
-        raise HTTPException(status_code=409, detail="Peer confirmation limit reached")
     confirmation = PeerConfirmation(
         event_id=event.id, confirmer_id=confirmer.id, subject_id=subject_id,
         decision=PeerConfirmationDecision.CONFIRMED if confirmed else PeerConfirmationDecision.CANNOT_CONFIRM,
