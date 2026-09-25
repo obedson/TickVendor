@@ -106,6 +106,7 @@ class CheckInStateResponse(BaseModel):
     checked_out_at: datetime | None = None
     duration_seconds: int | None = None
     viable_methods: list[str] = Field(default_factory=list)
+    pending_review: bool = False
 
 
 class TransferCreateInput(BaseModel):

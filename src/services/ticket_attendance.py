@@ -84,13 +84,13 @@ def _geofence_point(db, user, event: Event, payload: AttendanceCheckIn | None, *
             status_code=409, detail="This event has no venue coordinates; ask the organizer to set them"
         )
     evidence = location_evidence(event, payload)
-    rejected = evidence["outcome"] != "verified"
-    # Persist rejected evidence before returning 422; no admission or reward is created.
-    record_location(db, event, user, evidence, operation=label, commit=rejected)
-    if rejected:
+    outside = evidence["outcome"] == "outside_geofence"
+    # Persist an outside attempt before returning 422; no admission or reward is created.
+    record_location(db, event, user, evidence, operation=label, commit=outside)
+    if outside:
         raise HTTPException(status_code=422, detail=location_guidance(evidence))
     distance = evidence["distance_meters"]
-    return payload.latitude, payload.longitude, payload.accuracy_meters, distance
+    return payload.latitude, payload.longitude, payload.accuracy_meters, distance, evidence["outcome"]
 
 
 def redemption_limit_reached(db: Session, ticket: Ticket, holder_id) -> bool:
@@ -167,17 +167,23 @@ def self_check_in(
         if attendance.status in {AttendanceStatus.NOT_CHECKED_IN, AttendanceStatus.REJECTED}:
             attendance.status = AttendanceStatus.CHECKED_IN
     if point is not None:
-        latitude, longitude, accuracy, distance = point
+        latitude, longitude, accuracy, distance, outcome = point
+        pending_review = outcome != "verified"
         db.add(AttendanceVerification(
-            attendance_id=attendance.id, method=VerificationMethod.GPS, is_valid=True,
+            attendance_id=attendance.id, method=VerificationMethod.GPS, is_valid=not pending_review,
             verified_at=now, verifier_id=user.id, latitude=latitude, longitude=longitude,
             accuracy_meters=accuracy, reason=f"distance_meters={distance:.2f}",
         ))
-        attendance.status = AttendanceStatus.GPS_VERIFIED
+        if pending_review:
+            attendance.flagged_for_review = True
+            attendance.review_reason = location_guidance(location_evidence(event, payload))
+        else:
+            attendance.status = AttendanceStatus.GPS_VERIFIED
     db.flush()
-    ticket.status = TicketStatus.USED
-    ticket.used_at = now
-    ticket.validated_by_id = user.id
+    if not attendance.flagged_for_review:
+        ticket.status = TicketStatus.USED
+        ticket.used_at = now
+        ticket.validated_by_id = user.id
     db.commit()
     if point is not None:
         calculate_attendance_confidence(db, attendance)
@@ -186,8 +192,10 @@ def self_check_in(
           metadata={"event_id": str(event_id), "ticket_id": str(ticket.id), "method": "self",
                     "gps_submitted": point is not None})
     award_qualified_attendance(db, attendance)
-    notify(db, user.id, "check_in_confirmed", "Check-in successful",
-           f"You are checked in to {event.title}.",
+    notify(db, user.id, "check_in_pending" if attendance.flagged_for_review else "check_in_confirmed",
+           "Check-in awaiting review" if attendance.flagged_for_review else "Check-in successful",
+           (f"Your location for {event.title} was sent to the organizer for verification."
+            if attendance.flagged_for_review else f"You are checked in to {event.title}."),
            {"event_id": str(event_id), "ticket_id": str(ticket.id)},
            community_id=event.community_id, deduplication_key=f"checkin:{attendance.id}", commit=False)
     db.commit()
@@ -217,7 +225,9 @@ def self_check_out(
         raise HTTPException(status_code=409, detail="Checkout is not open yet")
     point = _geofence_point(db, user, event, payload, label="checkout")
     if point is not None:
-        latitude, longitude, accuracy, distance = point
+        latitude, longitude, accuracy, distance, outcome = point
+        if outcome != "verified":
+            raise HTTPException(status_code=422, detail=location_guidance(location_evidence(event, payload)))
         db.add(AttendanceVerification(
             attendance_id=attendance.id, method=VerificationMethod.GPS_CHECKOUT, is_valid=True,
             verified_at=now, verifier_id=user.id, latitude=latitude, longitude=longitude,
@@ -254,4 +264,5 @@ def check_in_state(db: Session, attendance: Attendance) -> dict:
         "checked_out_at": attendance.checked_out_at,
         "duration_seconds": attendance.duration_seconds,
         "viable_methods": sorted({m.value if hasattr(m, "value") else str(m) for m in methods}),
+        "pending_review": attendance.flagged_for_review,
     }
