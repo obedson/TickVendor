@@ -16,8 +16,7 @@ assert.match(locationErrorMessage({code: 99}), /could not be verified/i);
 
 const app = await readFile(new URL('../src/Attendance.tsx', import.meta.url), 'utf8');
 assert.match(app, /Location is requested only for GPS-verified events/);
-assert.match(app, /enableHighAccuracy:\s*true/);
-assert.match(app, /timeout:\s*8000/);
-assert.match(app, /locationErrorMessage/);
+assert.match(app, /currentPosition\(/);
+assert.match(app, /targetAccuracy: settings.geofence_radius_meters/);
 
 console.log('Location permission and fallback handling passed');

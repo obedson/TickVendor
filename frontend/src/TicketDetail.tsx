@@ -65,6 +65,7 @@ export function TicketDetail({ ticketId, token, onBack, onWalletChanged }: Props
   const [detail, setDetail] = useState<TicketDetailData | null>(null);
   const [walletTicket, setWalletTicket] = useState<OfflineTicket | null>(null);
   const [geofenced, setGeofenced] = useState<boolean | null>(null);
+  const [locationRadius, setLocationRadius] = useState<number | undefined>();
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [error, setError] = useState('');
@@ -106,8 +107,9 @@ export function TicketDetail({ ticketId, token, onBack, onWalletChanged }: Props
     const eventId = detail?.ticket.event_id;
     if (!eventId) return;
     let active = true;
-    apiJson<{ geofence_enabled: boolean }>(`events/${eventId}`, {}, liveToken())
-      .then(event => { if (active) setGeofenced(event.geofence_enabled); })
+    setLocationRadius(undefined);
+    apiJson<{ geofence_enabled: boolean; geofence_radius_meters?: number }>(`events/${eventId}`, {}, liveToken())
+      .then(event => { if (active) { setGeofenced(event.geofence_enabled); setLocationRadius(event.geofence_enabled ? event.geofence_radius_meters : undefined); } })
       .catch(() => { if (active) setGeofenced(null); });
     return () => { active = false; };
   }, [detail?.ticket.event_id, token]);
@@ -132,7 +134,7 @@ export function TicketDetail({ ticketId, token, onBack, onWalletChanged }: Props
    */
   const readLocation = async (): Promise<{ latitude: number; longitude: number; accuracy_meters: number } | null> => {
     try {
-      return await currentPosition({ timeout: 10000 });
+      return await currentPosition({ timeout: 10000, targetAccuracy: locationRadius });
     } catch (failure) {
       setError(failure instanceof LocationFailure
         ? `${failure.message} Ask event staff to record this for you.`

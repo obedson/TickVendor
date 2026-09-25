@@ -5,7 +5,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from src.api.auth import get_current_user
@@ -16,6 +16,7 @@ from src.models import (
     AttendanceReviewStatus,
     AttendanceStatus,
     AttendanceVerification,
+    AuditLog,
     Event,
     PeerConfirmation,
     Profile,
@@ -199,13 +200,40 @@ def attendance_roster(
     for ticket in tickets:
         ticket_statuses.setdefault(ticket.attendee_id, []).append(ticket.status.value)
     verification_methods: dict[UUID, list[str]] = {}
+    locations: dict[UUID, list[dict]] = {}
     attendance_ids = [item.id for item in attendances]
     if attendance_ids:
         for signal in db.scalars(select(AttendanceVerification).where(
             AttendanceVerification.attendance_id.in_(attendance_ids),
-            AttendanceVerification.is_valid.is_(True),
         )):
-            verification_methods.setdefault(signal.attendance_id, []).append(signal.method.value)
+            if signal.is_valid:
+                verification_methods.setdefault(signal.attendance_id, []).append(signal.method.value)
+            if signal.latitude is not None and signal.longitude is not None:
+                # Legacy signals retain their original server-calculated distance in reason.
+                distance = None
+                if (signal.reason or "").startswith("distance_meters="):
+                    try:
+                        distance = float(signal.reason.split("=", 1)[1])
+                    except ValueError:
+                        pass
+                locations.setdefault(signal.attendance_id, []).append({
+                    "latitude": float(signal.latitude), "longitude": float(signal.longitude),
+                    "accuracy_meters": float(signal.accuracy_meters) if signal.accuracy_meters is not None else None,
+                    "distance_meters": distance, "operation": signal.method.value,
+                    "outcome": "verified" if signal.is_valid else "unverified",
+                    "recorded_at": signal.verified_at.isoformat(),
+                })
+    # Bound returned attempts to the latest per participant on this authorized event/page.
+    ranked = select(
+        AuditLog.id,
+        func.row_number().over(partition_by=AuditLog.actor_id,
+                               order_by=(AuditLog.occurred_at.desc(), AuditLog.id.desc())).label("rank"),
+    ).where(AuditLog.target_type == "event", AuditLog.target_id == event_id,
+            AuditLog.action == "attendance.location_submitted", AuditLog.actor_id.in_(user_ids)).subquery()
+    attempts = {
+        entry.actor_id: {**entry.metadata_json, "recorded_at": entry.occurred_at.isoformat()}
+        for entry in db.scalars(select(AuditLog).join(ranked, ranked.c.id == AuditLog.id).where(ranked.c.rank == 1))
+    } if user_ids else {}
     return [
         {
             "participant_id": str(participant.id),
@@ -217,6 +245,8 @@ def attendance_roster(
             "checked_in_at": attendance.checked_in_at.isoformat() if attendance and attendance.checked_in_at else None,
             "verification_methods": sorted(verification_methods.get(attendance.id, [])) if attendance else [],
             "flagged_for_review": attendance.flagged_for_review if attendance else False,
+            "location_evidence": locations.get(attendance.id, []) if attendance else [],
+            "latest_location_attempt": attempts.get(participant.id),
         }
         for participant, profile in participants
         for attendance in [attendance_by_user.get(participant.id)]

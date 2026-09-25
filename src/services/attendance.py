@@ -29,6 +29,7 @@ from src.models import (
 )
 from src.monitoring import emit
 from src.schemas.attendance import AttendanceCheckIn
+from src.services.attendance_location import location_evidence, location_guidance, record_location
 from src.services.event import as_utc
 from src.services.impact import award_points
 from src.services.notification import audit
@@ -207,6 +208,7 @@ def check_in(db: Session, event: Event, user: User, payload: AttendanceCheckIn) 
     ticket = db.get(Ticket, payload.ticket_id) if payload.ticket_id else None
     if ticket and (ticket.event_id != event.id or ticket.attendee_id != user.id or ticket.status not in {TicketStatus.ACTIVE, TicketStatus.USED}):
         raise HTTPException(status_code=403, detail="Ticket is not valid for this attendee and event")
+    evidence = location_evidence(event, payload)
     attendance = Attendance(event_id=event.id, user_id=user.id, ticket_id=ticket.id if ticket else None,
                             status=AttendanceStatus.CHECKED_IN, checked_in_at=now)
     db.add(attendance); db.flush()
@@ -217,12 +219,8 @@ def check_in(db: Session, event: Event, user: User, payload: AttendanceCheckIn) 
             raise HTTPException(status_code=409, detail="This event's geofence is not fully configured; ask the organizer to set a check-in radius")
         if payload.latitude is None or payload.longitude is None or event.venue is None:
             raise HTTPException(status_code=422, detail="Location is required for geofence verification")
-        distance = haversine_meters(payload.latitude, payload.longitude, event.venue.latitude, event.venue.longitude)
-        low_accuracy = (
-            payload.accuracy_meters is not None
-            and payload.accuracy_meters > event.geofence_radius_meters
-        )
-        valid = distance <= event.geofence_radius_meters and not low_accuracy
+        distance = evidence["distance_meters"]
+        valid = evidence["outcome"] == "verified"
         db.add(AttendanceVerification(
             attendance_id=attendance.id, method=VerificationMethod.GPS, is_valid=valid,
             verified_at=now, latitude=payload.latitude, longitude=payload.longitude,
@@ -232,11 +230,8 @@ def check_in(db: Session, event: Event, user: User, payload: AttendanceCheckIn) 
             attendance.status = AttendanceStatus.GPS_VERIFIED
         else:
             attendance.flagged_for_review = True
-            attendance.review_reason = (
-                "Location accuracy is too low for automatic verification"
-                if low_accuracy
-                else "Location outside event geofence"
-            )
+            attendance.review_reason = location_guidance(evidence)
+    record_location(db, event, user, evidence, operation="attendance check-in")
     db.commit()
     if event.geofence_enabled:
         calculate_attendance_confidence(db, attendance)

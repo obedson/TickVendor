@@ -28,8 +28,8 @@ from src.schemas.attendance import AttendanceCheckIn
 from src.services.attendance import (
     award_qualified_attendance,
     calculate_attendance_confidence,
-    haversine_meters,
 )
+from src.services.attendance_location import location_evidence, location_guidance, record_location
 from src.services.availability import require_available
 from src.services.event import as_utc
 from src.services.notification import audit, notify
@@ -67,9 +67,10 @@ def require_event_staff(db: Session, event: Event, user: User, *, staff_roles=No
     require_event_staff_authority(db, event, user, staff_roles=staff_roles)
 
 
-def _geofence_point(event: Event, payload: AttendanceCheckIn | None, *, label: str) -> tuple | None:
+def _geofence_point(db, user, event: Event, payload: AttendanceCheckIn | None, *, label: str) -> tuple | None:
     """Return validated coordinates, or None when the event has no geofence."""
     if not event.geofence_enabled:
+        record_location(db, event, user, location_evidence(event, payload), operation=label)
         return None
     if event.geofence_radius_meters is None:
         raise HTTPException(
@@ -82,16 +83,13 @@ def _geofence_point(event: Event, payload: AttendanceCheckIn | None, *, label: s
         raise HTTPException(
             status_code=409, detail="This event has no venue coordinates; ask the organizer to set them"
         )
-    if payload.accuracy_meters is not None and payload.accuracy_meters > event.geofence_radius_meters:
-        raise HTTPException(
-            status_code=422,
-            detail="Your reported location accuracy is too low; move outdoors and try again",
-        )
-    distance = haversine_meters(
-        payload.latitude, payload.longitude, event.venue.latitude, event.venue.longitude
-    )
-    if distance > event.geofence_radius_meters:
-        raise HTTPException(status_code=422, detail="You are outside the event's permitted location")
+    evidence = location_evidence(event, payload)
+    rejected = evidence["outcome"] != "verified"
+    # Persist rejected evidence before returning 422; no admission or reward is created.
+    record_location(db, event, user, evidence, operation=label, commit=rejected)
+    if rejected:
+        raise HTTPException(status_code=422, detail=location_guidance(evidence))
+    distance = evidence["distance_meters"]
     return payload.latitude, payload.longitude, payload.accuracy_meters, distance
 
 
@@ -153,8 +151,8 @@ def self_check_in(
             raise HTTPException(status_code=409, detail="You have already checked in to this event")
         return check_in_state(db, attendance)
 
-    point = _geofence_point(event, payload, label="self check-in")
     enforce_redemption_limit(db, ticket, user.id)
+    point = _geofence_point(db, user, event, payload, label="self check-in")
 
     if attendance is None:
         attendance = Attendance(
@@ -217,7 +215,7 @@ def self_check_out(
     now = datetime.now(UTC)
     if event.checkout_opens_at and now < as_utc(event.checkout_opens_at):
         raise HTTPException(status_code=409, detail="Checkout is not open yet")
-    point = _geofence_point(event, payload, label="checkout")
+    point = _geofence_point(db, user, event, payload, label="checkout")
     if point is not None:
         latitude, longitude, accuracy, distance = point
         db.add(AttendanceVerification(

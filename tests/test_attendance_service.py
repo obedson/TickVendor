@@ -40,7 +40,7 @@ def test_haversine_and_idempotent_geofence_checkin(tmp_path):
         event.check_in_opens_at = datetime.now(UTC) - timedelta(minutes=5)
         event.check_in_closes_at = datetime.now(UTC) + timedelta(minutes=5)
         db.commit()
-        payload = AttendanceCheckIn(latitude=Decimal("9.0"), longitude=Decimal("7.0"))
+        payload = AttendanceCheckIn(latitude=Decimal("9.0"), longitude=Decimal("7.0"), accuracy_meters=12)
         first = check_in(db, event, attendee, payload)
         second = check_in(db, event, attendee, payload)
         assert first.id == second.id

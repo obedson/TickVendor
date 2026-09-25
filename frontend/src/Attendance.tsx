@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
 import { apiJson, ApiError, getLiveToken } from './api';
 import { EmptyState } from './AppShell';
-import { locationErrorMessage } from './location';
+import { currentPosition } from './geolocation';
 import type { OfflineTicket } from './offlineTickets';
 
 type AttendanceProps = { token: string; tickets: OfflineTicket[] };
 type Candidate = { participant_id: string; display_name?: string };
 type CheckInResult = { status: string; message?: string };
-type EventAttendanceSettings = { geofence_enabled: boolean; required_verification_methods: string[] };
+type EventAttendanceSettings = { geofence_enabled: boolean; geofence_radius_meters?: number; required_verification_methods: string[] };
 
 export function Attendance({ token, tickets }: AttendanceProps) {
   const [ticket, setTicket] = useState<OfflineTicket | null>(tickets[0] ?? null);
@@ -89,21 +89,12 @@ export function Attendance({ token, tickets }: AttendanceProps) {
 
     setGeoStatus('requesting');
     try {
-      navigator.geolocation.getCurrentPosition(
-        position => {
-          setGeoStatus('granted');
-          submit(position.coords.latitude, position.coords.longitude, position.coords.accuracy);
-        },
-        geolocationError => {
-          setGeoStatus('failed');
-          setGeoMessage(locationErrorMessage(geolocationError));
-          setBusy(false);
-        },
-        { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 },
-      );
-    } catch {
+      const position = await currentPosition({ targetAccuracy: settings.geofence_radius_meters });
+      setGeoStatus('granted');
+      submit(position.latitude, position.longitude, position.accuracy_meters);
+    } catch (failure) {
       setGeoStatus('failed');
-      setGeoMessage('Location could not be requested. Use event QR or organizer verification.');
+      setGeoMessage(`${failure instanceof Error ? failure.message : 'Location could not be requested.'} Ask event staff for an allowed verification method.`);
       setBusy(false);
     }
   };
