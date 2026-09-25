@@ -101,6 +101,9 @@ class Event(UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin, Base):
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     geofence_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     geofence_radius_meters: Mapped[int | None] = mapped_column(Integer)
+    geofence_max_accuracy_meters: Mapped[int] = mapped_column(
+        Integer, default=50, nullable=False, server_default="50"
+    )
     check_in_opens_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     check_in_closes_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     self_check_in_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)

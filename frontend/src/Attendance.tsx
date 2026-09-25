@@ -7,7 +7,7 @@ import type { OfflineTicket } from './offlineTickets';
 type AttendanceProps = { token: string; tickets: OfflineTicket[] };
 type Candidate = { participant_id: string; display_name?: string };
 type CheckInResult = { status: string; message?: string };
-type EventAttendanceSettings = { geofence_enabled: boolean; geofence_radius_meters?: number; required_verification_methods: string[] };
+type EventAttendanceSettings = { geofence_enabled: boolean; geofence_radius_meters?: number; geofence_max_accuracy_meters?: number; required_verification_methods: string[] };
 
 export function Attendance({ token, tickets }: AttendanceProps) {
   const [ticket, setTicket] = useState<OfflineTicket | null>(tickets[0] ?? null);
@@ -89,7 +89,7 @@ export function Attendance({ token, tickets }: AttendanceProps) {
 
     setGeoStatus('requesting');
     try {
-      const position = await currentPosition({ targetAccuracy: settings.geofence_radius_meters });
+      const position = await currentPosition({ targetAccuracy: settings.geofence_max_accuracy_meters ?? 50 });
       setGeoStatus('granted');
       submit(position.latitude, position.longitude, position.accuracy_meters);
     } catch (failure) {

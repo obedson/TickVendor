@@ -98,6 +98,7 @@ def create_event(db: Session, payload: EventCreate, user: User) -> Event:
         online_url=str(payload.online_url) if payload.online_url else None,
         geofence_enabled=payload.geofence_enabled,
         geofence_radius_meters=payload.geofence_radius_meters,
+        geofence_max_accuracy_meters=payload.geofence_max_accuracy_meters,
         check_in_opens_at=payload.check_in_opens_at,
         check_in_closes_at=payload.check_in_closes_at,
         peer_confirmation_enabled=payload.peer_confirmation_enabled,

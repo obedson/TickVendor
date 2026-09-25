@@ -26,4 +26,7 @@ Scope: the reported ticket self-check-in accuracy rejection and organizer visibi
 
 ## External verification outstanding (B)
 
-On staging, compare a precise GPS-capable phone with a laptop reporting coarse accuracy at the same venue. Confirm numeric errors, denied/timeout guidance, a saved failed attempt in the authorized roster, improved retry success, coordinates/distance/accuracy, checkout evidence, and responsive keyboard use of the roster/refresh. Confirm another community's staff cannot obtain the evidence. Rehearse deployment as usual; no migration is required. No deployed/manual behavior is claimed from these local tests.
+On staging, compare a precise GPS-capable phone with a laptop reporting coarse accuracy at the same venue. Confirm numeric errors, denied/timeout guidance, a saved failed attempt in the authorized roster, improved retry success, coordinates/distance/accuracy, checkout evidence, and responsive keyboard use of the roster/refresh. Confirm another community's staff cannot obtain the evidence. Rehearse migration `e6f7a8b9c0d1` against a staging backup, configure a domain-restricted public Mapbox token, and verify map mouse, touch, and keyboard fallback behavior. No deployed/manual behavior is claimed from these local tests.
+## Map-assisted configuration and independent thresholds
+
+The organizer configuration supports an optional Mapbox venue picker. The selected pin remains the venue coordinate source of truth; the map does not manufacture or improve participant GPS accuracy. The allowed distance from the venue and the maximum device-reported accuracy for automatic verification are separate server-enforced settings. An in-range reading that misses the accuracy threshold is retained for organizer review.

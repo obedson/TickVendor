@@ -144,3 +144,23 @@ def test_radius_boundary_does_not_round_outside_point_into_geofence(tmp_path):
         assert distance > 100
         assert location_evidence(event, point)['outcome'] == 'outside_geofence'
     engine.dispose()
+
+
+def test_accuracy_threshold_is_independent_from_allowed_radius(tmp_path):
+    from src.services.attendance_location import location_evidence
+
+    engine = make_db(tmp_path)
+    with Session(engine) as db:
+        *_, event = setup(db)
+        event.geofence_radius_meters = 500
+        event.geofence_max_accuracy_meters = 50
+        db.commit()
+        uncertain = AttendanceCheckIn(latitude='6.44', longitude='7.49', accuracy_meters=178)
+        precise = AttendanceCheckIn(latitude='6.44', longitude='7.49', accuracy_meters=25)
+        uncertain_evidence = location_evidence(event, uncertain)
+        assert uncertain_evidence['distance_meters'] == 0
+        assert uncertain_evidence['radius_meters'] == 500
+        assert uncertain_evidence['max_accuracy_meters'] == 50
+        assert uncertain_evidence['outcome'] == 'low_accuracy'
+        assert location_evidence(event, precise)['outcome'] == 'verified'
+    engine.dispose()

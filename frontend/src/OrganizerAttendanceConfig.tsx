@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import './management.css';
 import { apiJson, ApiError, getLiveToken } from './api';
 import { resolveSelfServiceToggle, toCheckoutInput, toCheckoutInstant } from './attendanceConfigForm';
+
+const MapboxVenuePicker = lazy(() => import('./MapboxVenuePicker'));
 
 type Config = {
   latitude: string | number | null;
@@ -11,6 +13,7 @@ type Config = {
   organizer_verification_enabled: boolean;
   peer_confirmation_enabled: boolean;
   geofence_radius_meters: number;
+  geofence_max_accuracy_meters: number;
   max_peer_confirmations: number;
   confirmations_required: number;
   peer_selection_limit: number;
@@ -28,6 +31,7 @@ const initial: Config = {
   organizer_verification_enabled: true,
   peer_confirmation_enabled: false,
   geofence_radius_meters: 100,
+  geofence_max_accuracy_meters: 50,
   max_peer_confirmations: 3,
   confirmations_required: 0,
   peer_selection_limit: 5,
@@ -161,7 +165,18 @@ export function OrganizerAttendanceConfig({ token, communityId, eventId }: { tok
         )}
       </fieldset>
 
-      {config.geofence_enabled && <fieldset><legend>Attendance location</legend><p>Use the actual venue coordinates. Addresses are not automatically geocoded.</p><div className="form-row"><label>Latitude<input type="number" required min={-90} max={90} step="any" value={config.latitude ?? ''} onChange={e => setConfig({ ...config, latitude: e.target.value })} /></label><label>Longitude<input type="number" required min={-180} max={180} step="any" value={config.longitude ?? ''} onChange={e => setConfig({ ...config, longitude: e.target.value })} /></label></div></fieldset>}
+      {config.geofence_enabled && <fieldset><legend>Attendance location</legend>
+        <p>Click the map or drag its marker to the exact venue. The shaded circle is the permitted check-in area.</p>
+        <Suspense fallback={<p className="info-msg">Loading venue map…</p>}>
+          <MapboxVenuePicker
+            latitude={config.latitude === '' || config.latitude == null ? null : Number(config.latitude)}
+            longitude={config.longitude === '' || config.longitude == null ? null : Number(config.longitude)}
+            radiusMeters={config.geofence_radius_meters}
+            onChange={(latitude, longitude) => setConfig(current => ({ ...current, latitude: latitude.toFixed(6), longitude: longitude.toFixed(6) }))}
+          />
+        </Suspense>
+        <div className="form-row"><label>Latitude<input type="number" required min={-90} max={90} step="any" value={config.latitude ?? ''} onChange={e => setConfig({ ...config, latitude: e.target.value })} /></label><label>Longitude<input type="number" required min={-180} max={180} step="any" value={config.longitude ?? ''} onChange={e => setConfig({ ...config, longitude: e.target.value })} /></label></div>
+      </fieldset>}
       <fieldset style={{ marginBottom: '1rem' }}>
         <legend>Required to qualify for attendance</legend>
         <p className="text-muted text-sm" style={{ marginBottom: '.5rem' }}>
@@ -186,10 +201,19 @@ export function OrganizerAttendanceConfig({ token, communityId, eventId }: { tok
       </fieldset>
 
       {config.geofence_enabled && (
-        <label style={{ marginBottom: '1rem' }}>
-          <span className="label-text">Geofence radius (meters)</span>
-          <input type="number" min="10" max="10000" value={config.geofence_radius_meters} onChange={e => setConfig({ ...config, geofence_radius_meters: Number(e.target.value) })} />
-        </label>
+        <fieldset style={{ marginBottom: '1rem' }}>
+          <legend>Location verification thresholds</legend>
+          <div className="form-row">
+            <label><span className="label-text">Allowed distance from venue (meters)</span>
+              <input type="number" min="10" max="10000" value={config.geofence_radius_meters} onChange={e => setConfig({ ...config, geofence_radius_meters: Number(e.target.value) })} />
+              <small>Participants outside this radius cannot self-check in.</small>
+            </label>
+            <label><span className="label-text">Maximum device accuracy for automatic verification (meters)</span>
+              <input type="number" min="5" max="10000" value={config.geofence_max_accuracy_meters} onChange={e => setConfig({ ...config, geofence_max_accuracy_meters: Number(e.target.value) })} />
+              <small>In-range readings less precise than this go to organizer review.</small>
+            </label>
+          </div>
+        </fieldset>
       )}
 
       {config.peer_confirmation_enabled && (

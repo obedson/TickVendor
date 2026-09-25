@@ -17,6 +17,15 @@ assert.match(locationErrorMessage({code: 99}), /could not be verified/i);
 const app = await readFile(new URL('../src/Attendance.tsx', import.meta.url), 'utf8');
 assert.match(app, /Location is requested only for GPS-verified events/);
 assert.match(app, /currentPosition\(/);
-assert.match(app, /targetAccuracy: settings.geofence_radius_meters/);
+assert.match(app, /targetAccuracy: settings.geofence_max_accuracy_meters/);
+
+const config = await readFile(new URL('../src/OrganizerAttendanceConfig.tsx', import.meta.url), 'utf8');
+const picker = await readFile(new URL('../src/MapboxVenuePicker.tsx', import.meta.url), 'utf8');
+assert.match(config, /Allowed distance from venue/);
+assert.match(config, /Maximum device accuracy for automatic verification/);
+assert.match(config, /MapboxVenuePicker/);
+assert.match(picker, /VITE_MAPBOX_ACCESS_TOKEN/);
+assert.match(picker, /draggable: true/);
+assert.match(picker, /instance\.on\('click'/);
 
 console.log('Location permission and fallback handling passed');

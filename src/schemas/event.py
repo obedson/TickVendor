@@ -50,6 +50,7 @@ class EventCreate(BaseModel):
     venue: VenueInput | None = None
     geofence_enabled: bool = False
     geofence_radius_meters: int | None = Field(default=None, ge=10, le=10000)
+    geofence_max_accuracy_meters: int = Field(default=50, ge=5, le=10000)
     check_in_opens_at: datetime | None = None
     check_in_closes_at: datetime | None = None
     peer_confirmation_enabled: bool = False
@@ -74,8 +75,8 @@ class EventCreate(BaseModel):
             self.venue is None or self.venue.latitude is None or self.venue.longitude is None
         ):
             raise ValueError("geofencing requires venue coordinates")
-        # Server-side check-in compares distance/accuracy against the radius, so a NULL radius
-        # would raise at enforcement time. PATCH /attendance-config already refuses this; creation must too.
+        # Server-side check-in compares venue distance against the radius, so a NULL radius would
+        # raise at enforcement time. Device accuracy is governed by its independent threshold.
         if self.geofence_enabled and self.geofence_radius_meters is None:
             raise ValueError("geofence radius is required when enabling geofence")
         if self.check_in_opens_at and self.check_in_closes_at and self.check_in_closes_at <= self.check_in_opens_at:
@@ -131,6 +132,8 @@ class EventResponse(BaseModel):
     published_at: datetime | None
     venue: VenueResponse | None
     geofence_enabled: bool
+    geofence_radius_meters: int | None
+    geofence_max_accuracy_meters: int
     required_verification_methods: list[str]
 
     @field_serializer("cover_image_url")

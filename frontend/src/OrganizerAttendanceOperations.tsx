@@ -21,7 +21,7 @@ type RosterItem = {
 
 type LocationEvidence = {
   latitude: number; longitude: number; accuracy_meters: number | null;
-  distance_meters: number | null; radius_meters?: number | null;
+  distance_meters: number | null; radius_meters?: number | null; max_accuracy_meters?: number | null;
   outcome: string; operation: string; recorded_at: string;
 };
 
@@ -34,6 +34,7 @@ function LocationReading({ value }: { value: LocationEvidence }) {
     Distance from venue: {value.distance_meters == null ? 'Not available' : `${value.distance_meters.toFixed(1)} m`}<br />
     Device accuracy: {value.accuracy_meters == null ? 'Not supplied' : `±${value.accuracy_meters.toFixed(1)} m`}
     {value.radius_meters != null && <> · Allowed radius: {value.radius_meters} m</>}<br />
+    {value.max_accuracy_meters != null && <>Automatic accuracy threshold: ±{value.max_accuracy_meters} m<br /></>}
     <time dateTime={value.recorded_at}>{new Date(value.recorded_at).toLocaleString()}</time>
   </div>;
 }
