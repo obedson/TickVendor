@@ -133,8 +133,8 @@ def test_attendance_recognition_flow_is_idempotent(tmp_path):
                                reward_definition={"impact_points": 7, "badge": "first-attendance-flow"})
         db.add_all([badge, milestone, rule, PointRule(source_type="attendance", points=10)])
         db.flush(); db.add(MilestoneRequirement(milestone_id=milestone.id, metric="attendance_count", operator=">=", threshold=1)); db.commit()
-        attendance = check_in(db, event, user, AttendanceCheckIn(latitude=9, longitude=7))
-        replay = check_in(db, event, user, AttendanceCheckIn(latitude=9, longitude=7))
+        attendance = check_in(db, event, user, AttendanceCheckIn(latitude=9, longitude=7, accuracy_meters=12))
+        replay = check_in(db, event, user, AttendanceCheckIn(latitude=9, longitude=7, accuracy_meters=12))
         assert attendance.id == replay.id and attendance.status == AttendanceStatus.GPS_VERIFIED
         assert db.query(ImpactTransaction).filter_by(source_type="attendance").count() == 1
         assert db.query(MilestoneAward).filter_by(milestone_id=milestone.id).count() == 1

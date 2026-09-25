@@ -2,6 +2,8 @@
 
 ## Attendance geofence evidence and accuracy guidance — 2026-09-25
 
+- Publication follow-up: user authorized commit/push/merge. PR #4 initial CI passed 417 tests and failed the recognition positive-GPS fixture because it omitted accuracy. Supplied 12 m accuracy to its original/replay inputs without changing assertions. Focused `tests/test_recognition_awards.py::test_attendance_recognition_flow_is_idempotent`: 1 passed; changed-file Ruff and whitespace checks passed. CI rerun required before merge.
+
 - Reviewed the staging screenshot against specification sections 14/15/47 and the actual ticket/attendance services. Accuracy uncertainty was compared to radius before distance calculation, and rejected ticket coordinates were discarded. Physical presence does not imply an accurate browser reading; no numerical staging values were available from the screenshot.
 - Added shared assessment and durable event-scoped audit snapshots of submitted location, distance in metres, accuracy, venue/radius, operation and outcome. The authorized attendance roster now displays latest rejected attempts and existing GPS/check-out evidence. Failed ticket attempts do not consume tickets or award points. Missing accuracy is not verified. No schema/migration or historical data rewrite.
 - Added bounded fresh-location refinement to both participant check-in screens and replaced the misleading outdoor-only advice with measured distance/accuracy/radius and allowed fallback guidance. Fixed ticket check-in/checkout routes that double-serialized their service response.
