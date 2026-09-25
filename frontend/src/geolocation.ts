@@ -1,7 +1,7 @@
 /** The one browser-location engine for the whole product.
  *
  * Physical-task evidence, ticket self check-in, self check-out and geofenced benefit redemption
- * all need the same thing: a single `getCurrentPosition` call whose failures are classified so
+ * all need fresh `getCurrentPosition` readings whose failures are classified so
  * the participant is told which failure actually happened. Duplicating that call per surface is
  * how those surfaces drift apart, so every caller goes through `currentPosition` and only the
  * wording differs.
@@ -35,14 +35,30 @@ export class LocationFailure extends Error {
 }
 
 /**
- * Ask the browser for one high-accuracy fix.
+ * Ask for a high-accuracy fix, with bounded refinement when a target accuracy is supplied.
  *
  * Rejects with `LocationFailure`; never resolves with a partial or stale reading, because a
  * geofence decision made on a stale coordinate is worse than no decision.
  */
 export async function currentPosition(
-  options: { timeout?: number; maximumAge?: number } = {},
+  options: { timeout?: number; maximumAge?: number; targetAccuracy?: number } = {},
 ): Promise<Position> {
+  if (options.targetAccuracy !== undefined) {
+    // Short, user-initiated sampling only. Keep the best reading, never invent precision.
+    let best: Position | undefined;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const point = await currentPosition({ timeout: 6000, maximumAge: 0 });
+        if (!best || point.accuracy_meters < best.accuracy_meters) best = point;
+        if (best.accuracy_meters <= options.targetAccuracy) break;
+      } catch (error) {
+        if (error instanceof LocationFailure && error.kind === 'denied') throw error;
+        if (!best) throw error;
+        break;
+      }
+    }
+    return best!;
+  }
   if (typeof navigator === 'undefined' || !navigator.geolocation) {
     throw new LocationFailure('unsupported', 'Location is not supported by this browser.');
   }

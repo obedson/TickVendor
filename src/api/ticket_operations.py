@@ -126,7 +126,7 @@ def ticket_self_check_in(
     db: Annotated[Session, Depends(get_db)],
     user: Annotated[User, Depends(get_current_user)],
 ):
-    return check_in_state(db, self_check_in(db, event_id, ticket_id, user, payload))
+    return self_check_in(db, event_id, ticket_id, user, payload)
 
 
 @router.post("/events/{event_id}/tickets/{ticket_id}/check-out", response_model=CheckInStateResponse)
@@ -137,7 +137,7 @@ def ticket_self_check_out(
     user: Annotated[User, Depends(get_current_user)],
     payload: AttendanceCheckIn | None = None,
 ):
-    return check_in_state(db, self_check_out(db, event_id, ticket_id, user, payload))
+    return self_check_out(db, event_id, ticket_id, user, payload)
 
 
 # ── Transfer / claim ─────────────────────────────────────────────────────────

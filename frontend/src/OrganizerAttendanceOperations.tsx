@@ -15,7 +15,26 @@ type RosterItem = {
   attendance_status: string;
   verification_methods: string[];
   flagged_for_review: boolean;
+  location_evidence: LocationEvidence[];
+  latest_location_attempt: LocationEvidence | null;
 };
+
+type LocationEvidence = {
+  latitude: number; longitude: number; accuracy_meters: number | null;
+  distance_meters: number | null; radius_meters?: number | null;
+  outcome: string; operation: string; recorded_at: string;
+};
+
+function LocationReading({ value }: { value: LocationEvidence }) {
+  return <div className="text-sm">
+    <strong>{value.operation}: {value.outcome.replaceAll('_', ' ')}</strong><br />
+    Coordinates: {value.latitude.toFixed(6)}, {value.longitude.toFixed(6)}<br />
+    Distance from venue: {value.distance_meters == null ? 'Not available' : `${value.distance_meters.toFixed(1)} m`}<br />
+    Device accuracy: {value.accuracy_meters == null ? 'Not supplied' : `±${value.accuracy_meters.toFixed(1)} m`}
+    {value.radius_meters != null && <> · Allowed radius: {value.radius_meters} m</>}<br />
+    <time dateTime={value.recorded_at}>{new Date(value.recorded_at).toLocaleString()}</time>
+  </div>;
+}
 
 export function OrganizerAttendanceOperations({ token, eventId }: { token: string; eventId: string }) {
   const [qr, setQr] = useState('');
@@ -198,16 +217,23 @@ export function OrganizerAttendanceOperations({ token, eventId }: { token: strin
       <div className="panel" style={{ marginTop: '1.25rem' }}>
         <h2 style={{ fontSize: '1.1rem', marginBottom: '.25rem' }}>Attendance roster</h2>
         <p className="text-muted text-sm" style={{ marginBottom: '1rem' }}>Ticket holders and attendance-only participants for this event.</p>
+        <p className="text-muted text-sm">Coordinates are reported by the participant's device. Distance is measured from the configured venue; accuracy describes uncertainty, not distance. Failed location attempts do not grant admission.</p>
+        <button className="secondary" onClick={loadRoster} disabled={rosterLoading || !eventId}>Refresh roster</button>
         {rosterLoading ? <p role="status" className="text-muted">Loading attendance roster…</p> : !roster.length ? <p className="empty">No attendees or ticket holders yet.</p> : (
           <div className="table-wrap"><table className="management-table">
 <caption>Event attendance roster</caption>
-            <thead><tr><th>Participant</th><th>Ticket</th><th>Attendance</th><th>Verification</th></tr></thead>
+            <thead><tr><th>Participant</th><th>Ticket</th><th>Attendance</th><th>Verification</th><th>Location evidence</th></tr></thead>
             <tbody>{roster.map(item => (
               <tr key={item.participant_id}>
                 <td data-label="Participant"><strong>{item.display_name}</strong><br /><span className="text-muted text-sm">{item.email}</span></td>
                 <td data-label="Ticket">{item.ticket_statuses.length ? item.ticket_statuses.join(', ') : 'No ticket'}</td>
                 <td data-label="Attendance">{item.attendance_status}{item.flagged_for_review ? ' ⚠' : ''}</td>
                 <td data-label="Verification">{item.verification_methods.length ? item.verification_methods.join(', ') : 'None'}</td>
+                <td data-label="Location evidence">
+                  {item.latest_location_attempt && <><p>Latest submitted location</p><LocationReading value={item.latest_location_attempt} /></>}
+                  {item.location_evidence?.map((value, index) => <LocationReading key={index} value={value} />)}
+                  {!item.latest_location_attempt && !item.location_evidence?.length && 'No location submitted'}
+                </td>
               </tr>
             ))}</tbody>
           </table></div>

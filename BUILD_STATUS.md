@@ -1,5 +1,13 @@
 # TickVendor Build Status
 
+## Attendance geofence evidence and accuracy guidance — 2026-09-25
+
+- Reviewed the staging screenshot against specification sections 14/15/47 and the actual ticket/attendance services. Accuracy uncertainty was compared to radius before distance calculation, and rejected ticket coordinates were discarded. Physical presence does not imply an accurate browser reading; no numerical staging values were available from the screenshot.
+- Added shared assessment and durable event-scoped audit snapshots of submitted location, distance in metres, accuracy, venue/radius, operation and outcome. The authorized attendance roster now displays latest rejected attempts and existing GPS/check-out evidence. Failed ticket attempts do not consume tickets or award points. Missing accuracy is not verified. No schema/migration or historical data rewrite.
+- Added bounded fresh-location refinement to both participant check-in screens and replaced the misleading outdoor-only advice with measured distance/accuracy/radius and allowed fallback guidance. Fixed ticket check-in/checkout routes that double-serialized their service response.
+- Verification: initial focused backend run 36 passed / 1 failed (positive GPS fixture lacked accuracy). Corrected fixture supplies accuracy, with a new missing-accuracy rejection test. Corrected run of `tests/test_attendance_location_evidence.py` and `tests/test_attendance_service.py`: **9 passed**. Ticket holder/entitlement and organizer operations tests from initial run: **29 passed**. Six behavioral frontend location cases and location error/integration script passed. `npm run build`, `npm run lint`, changed-file Ruff and compile checks passed. No full backend or Playwright suite.
+- Design, evidence limitations and staging checklist: `docs/ATTENDANCE_LOCATION_2026_09_25.md`. Browser/device and deployed PostgreSQL verification remains outstanding (B). No global traceability counts changed. Changes remain local; no commit, push, deployment or provider/environment changes in this task.
+
 > **How to use this file.** Entries are newest-first. Read the newest entry relevant to your task and consult older sections only when they are relevant. Append or update evidence without rewriting historical verification. Record the exact checks that were actually executed, and keep implementation status separate from verification status.
 
 ## Community application / administrator governance — 2026-09-22
