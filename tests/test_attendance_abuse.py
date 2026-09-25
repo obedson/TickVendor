@@ -3,6 +3,8 @@
 from datetime import UTC, datetime
 from decimal import Decimal
 
+import pytest
+from fastapi import HTTPException
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
@@ -199,4 +201,39 @@ def test_repeated_peer_confirmations_are_flagged_for_review(tmp_path):
         assert reviewed.flagged_for_review
         assert "repeated" in reviewed.review_reason.lower()
         assert reviewed.status == AttendanceStatus.PEER_VERIFIED
+    engine.dispose()
+
+
+def test_peer_verification_requires_distinct_confirmers_and_each_pair_is_single_use(tmp_path):
+    engine = create_engine(f"sqlite:///{tmp_path / 'distinct-peer-confirmations.db'}")
+    Base.metadata.create_all(engine)
+    with Session(engine, expire_on_commit=False) as session:
+        _owner, _community, event = create_event_context(session)
+        event.peer_confirmation_enabled = True
+        event.confirmations_required = 2
+        first = User(email="distinct-first@example.com", password_hash="hash")
+        second = User(email="distinct-second@example.com", password_hash="hash")
+        subject = User(email="distinct-subject@example.com", password_hash="hash")
+        session.add_all([first, second, subject]); session.flush()
+        session.add_all(
+            Attendance(event_id=event.id, user_id=user.id, status=AttendanceStatus.CHECKED_IN)
+            for user in (first, second, subject)
+        )
+        session.commit()
+
+        confirm_peer(session, event, first, subject.id, True)
+        subject_attendance = session.query(Attendance).filter_by(user_id=subject.id).one()
+        assert subject_attendance.status == AttendanceStatus.CHECKED_IN
+        with pytest.raises(HTTPException) as duplicate:
+            confirm_peer(session, event, first, subject.id, True)
+        assert duplicate.value.status_code == 409
+
+        confirm_peer(session, event, second, subject.id, True)
+        session.refresh(subject_attendance)
+        assert subject_attendance.status == AttendanceStatus.PEER_VERIFIED
+        confirmations = session.query(PeerConfirmation).filter_by(
+            event_id=event.id, subject_id=subject.id,
+            decision=PeerConfirmationDecision.CONFIRMED,
+        ).all()
+        assert {item.confirmer_id for item in confirmations} == {first.id, second.id}
     engine.dispose()

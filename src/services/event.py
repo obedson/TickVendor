@@ -105,7 +105,6 @@ def create_event(db: Session, payload: EventCreate, user: User) -> Event:
         confirmations_required=payload.confirmations_required,
         organizer_verification_enabled=payload.organizer_verification_enabled,
         qr_attendance_enabled=payload.qr_attendance_enabled,
-        max_peer_confirmations=payload.max_peer_confirmations,
         peer_confirmation_deadline=payload.peer_confirmation_deadline,
         required_verification_methods=payload.required_verification_methods,
         peer_selection_limit=payload.peer_selection_limit,

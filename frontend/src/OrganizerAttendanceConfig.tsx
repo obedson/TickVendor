@@ -14,7 +14,6 @@ type Config = {
   peer_confirmation_enabled: boolean;
   geofence_radius_meters: number;
   geofence_max_accuracy_meters: number;
-  max_peer_confirmations: number;
   confirmations_required: number;
   peer_selection_limit: number;
   required_verification_methods: string[];
@@ -32,7 +31,6 @@ const initial: Config = {
   peer_confirmation_enabled: false,
   geofence_radius_meters: 100,
   geofence_max_accuracy_meters: 50,
-  max_peer_confirmations: 3,
   confirmations_required: 0,
   peer_selection_limit: 5,
   required_verification_methods: [],
@@ -217,14 +215,11 @@ export function OrganizerAttendanceConfig({ token, communityId, eventId }: { tok
       )}
 
       {config.peer_confirmation_enabled && (
-        <div className="form-row" style={{ marginBottom: '1rem' }}>
+        <div style={{ marginBottom: '1rem' }}>
           <label>
-            <span className="label-text">Required peer confirmations</span>
+            <span className="label-text">Minimum confirmations each attendee must receive</span>
             <input type="number" min="0" max="100" value={config.confirmations_required} onChange={e => setConfig({ ...config, confirmations_required: Number(e.target.value) })} />
-          </label>
-          <label>
-            <span className="label-text">Max confirmations per user</span>
-            <input type="number" min="1" max="100" value={config.max_peer_confirmations} onChange={e => setConfig({ ...config, max_peer_confirmations: Number(e.target.value) })} />
+            <small>Confirmations must come from distinct eligible peers. Each peer can confirm a particular attendee only once.</small>
           </label>
         </div>
       )}

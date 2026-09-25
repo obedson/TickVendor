@@ -33,7 +33,6 @@ def test_admin_can_update_attendance_configuration_and_member_is_denied(tmp_path
         db.add(venue); db.flush(); db.get(Event, event).venue_id = venue.id; db.commit()
     payload = {"qr_attendance_enabled": True, "peer_confirmation_enabled": True, "confirmations_required": 1, "organizer_verification_enabled": True,
                "geofence_enabled": True, "geofence_radius_meters": 250, "geofence_max_accuracy_meters": 40,
-               "max_peer_confirmations": 3,
                "peer_selection_limit": 4, "required_verification_methods": ["qr", "peer"]}
     response = client.patch(f"/api/v1/communities/{community}/events/{event}/attendance-config", headers={"Authorization": f"Bearer {create_access_token(admin, 'participant')}"}, json=payload)
     assert response.status_code == 200, response.text
@@ -81,9 +80,9 @@ def test_peer_policy_requires_enabled_peer_and_sufficient_confirmations(tmp_path
         f"/api/v1/communities/{community}/events/{event}/attendance-config",
         headers=headers,
         json={"peer_confirmation_enabled": True, "required_verification_methods": ["peer"],
-              "confirmations_required": 3, "max_peer_confirmations": 2},
+              "confirmations_required": 3},
     )
-    assert response.status_code == 422
+    assert response.status_code == 200
     engine.dispose()
 
 
