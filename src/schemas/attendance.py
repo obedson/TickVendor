@@ -9,7 +9,9 @@ from pydantic import BaseModel, Field
 class AttendanceCheckIn(BaseModel):
     latitude: Decimal | None = Field(default=None, ge=-90, le=90)
     longitude: Decimal | None = Field(default=None, ge=-180, le=180)
-    accuracy_meters: Decimal | None = Field(default=None, ge=0, le=10000)
+    # Browsers can legitimately report very coarse network-derived readings (for example 50 km).
+    # Preserve them as review evidence instead of rejecting before attendance policy runs.
+    accuracy_meters: Decimal | None = Field(default=None, ge=0, le=999999)
     ticket_id: UUID | None = None
 
 

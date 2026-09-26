@@ -66,6 +66,7 @@ export function TicketDetail({ ticketId, token, onBack, onWalletChanged }: Props
   const [walletTicket, setWalletTicket] = useState<OfflineTicket | null>(null);
   const [geofenced, setGeofenced] = useState<boolean | null>(null);
   const [locationRadius, setLocationRadius] = useState<number | undefined>();
+  const [peerConfirmationEnabled, setPeerConfirmationEnabled] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [error, setError] = useState('');
@@ -108,8 +109,8 @@ export function TicketDetail({ ticketId, token, onBack, onWalletChanged }: Props
     if (!eventId) return;
     let active = true;
     setLocationRadius(undefined);
-    apiJson<{ geofence_enabled: boolean; geofence_max_accuracy_meters?: number }>(`events/${eventId}`, {}, liveToken())
-      .then(event => { if (active) { setGeofenced(event.geofence_enabled); setLocationRadius(event.geofence_enabled ? (event.geofence_max_accuracy_meters ?? 50) : undefined); } })
+    apiJson<{ geofence_enabled: boolean; geofence_max_accuracy_meters?: number; peer_confirmation_enabled?: boolean }>(`events/${eventId}`, {}, liveToken())
+      .then(event => { if (active) { setGeofenced(event.geofence_enabled); setPeerConfirmationEnabled(Boolean(event.peer_confirmation_enabled)); setLocationRadius(event.geofence_enabled ? (event.geofence_max_accuracy_meters ?? 50) : undefined); } })
       .catch(() => { if (active) setGeofenced(null); });
     return () => { active = false; };
   }, [detail?.ticket.event_id, token]);
@@ -187,13 +188,15 @@ export function TicketDetail({ ticketId, token, onBack, onWalletChanged }: Props
       point = read;
     }
     try {
-      const state = await apiJson<{ duration_seconds?: number | null }>(
+      const state = await apiJson<{ duration_seconds?: number | null; pending_review?: boolean }>(
         `events/${detail.ticket.event_id}/tickets/${ticketId}/check-out`,
         { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(point ?? {}) },
         liveToken(),
       );
       const spent = formatDuration(state.duration_seconds);
-      setNotice(spent ? `Checkout recorded. You spent ${spent} at this event.` : 'Checkout recorded. Your attendance is finalised.');
+      setNotice(state.pending_review
+        ? 'Checkout recorded. Your location was sent to the organizer for manual verification.'
+        : spent ? `Checkout recorded. You spent ${spent} at this event.` : 'Checkout recorded. Your attendance is finalised.');
       await load();
       onWalletChanged();
     } catch (cause) {
@@ -452,6 +455,9 @@ export function TicketDetail({ ticketId, token, onBack, onWalletChanged }: Props
           )}
           {detail.self_check_in_enabled && geofenced !== false && !checkedIn && (
             <p className="text-sm text-muted">Your location is read once, at check-in, to confirm you are at the venue. It is not tracked.</p>
+          )}
+          {peerConfirmationEnabled && checkedIn && (
+            <p className="info-msg">Peer confirmation is available under <strong>My Space → Attendance</strong>. There you can confirm eligible attendees and receive confirmations from distinct peers.</p>
           )}
         </section>
 

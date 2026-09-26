@@ -8,6 +8,7 @@ type DetectedBarcode = { rawValue: string };
 type BarcodeDetectorInstance = { detect: (source: HTMLVideoElement) => Promise<DetectedBarcode[]> };
 type BarcodeDetectorConstructor = new (options: { formats: string[] }) => BarcodeDetectorInstance;
 type RosterItem = {
+  attendance_id: string | null;
   participant_id: string;
   display_name: string;
   email: string;
@@ -48,6 +49,8 @@ export function OrganizerAttendanceOperations({ token, eventId }: { token: strin
   const [scanning, setScanning] = useState(false);
   const [roster, setRoster] = useState<RosterItem[]>([]);
   const [rosterLoading, setRosterLoading] = useState(false);
+  const [reviewReasons, setReviewReasons] = useState<Record<string, string>>({});
+  const [organizerVerificationEnabled, setOrganizerVerificationEnabled] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const controlsRef = useRef<ScannerControls | null>(null);
   const acceptingScanRef = useRef(false);
@@ -68,6 +71,11 @@ export function OrganizerAttendanceOperations({ token, eventId }: { token: strin
 
   useEffect(() => {
     loadRoster();
+    if (eventId) {
+      apiJson<{ organizer_verification_enabled: boolean }>(`events/${eventId}`, {}, liveToken())
+        .then(event => setOrganizerVerificationEnabled(event.organizer_verification_enabled))
+        .catch(() => setOrganizerVerificationEnabled(false));
+    }
     return () => controlsRef.current?.stop();
   }, [eventId, token]);
 
@@ -163,6 +171,22 @@ export function OrganizerAttendanceOperations({ token, eventId }: { token: strin
 
   const resultColor = result?.result === 'valid' ? 'chip-green' : result?.result === 'already_used' ? 'chip-yellow' : result ? 'chip-red' : '';
 
+  const verifyAttendance = async (item: RosterItem, approve: boolean) => {
+    if (!item.attendance_id) return;
+    const reason = reviewReasons[item.attendance_id]?.trim()
+      || (approve ? 'Organizer verified from attendance roster' : 'Organizer rejected from attendance roster');
+    setBusy(true); setError('');
+    try {
+      await apiJson(`events/${eventId}/attendance/${item.attendance_id}/organizer-review`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ approve, reason }),
+      }, liveToken());
+      await loadRoster();
+    } catch (cause) {
+      setError(cause instanceof ApiError ? cause.message : 'Unable to update attendance verification');
+    } finally { setBusy(false); }
+  };
+
   return (
     <div className="management-screen">
       <div className="page-header">
@@ -225,7 +249,7 @@ export function OrganizerAttendanceOperations({ token, eventId }: { token: strin
         {rosterLoading ? <p role="status" className="text-muted">Loading attendance roster…</p> : !roster.length ? <p className="empty">No attendees or ticket holders yet.</p> : (
           <div className="table-wrap"><table className="management-table">
 <caption>Event attendance roster</caption>
-            <thead><tr><th>Participant</th><th>Ticket</th><th>Attendance</th><th>Verification</th><th>Location evidence</th></tr></thead>
+            <thead><tr><th>Participant</th><th>Ticket</th><th>Attendance</th><th>Verification</th><th>Location evidence</th><th>Organizer action</th></tr></thead>
             <tbody>{roster.map(item => (
               <tr key={item.participant_id}>
                 <td data-label="Participant"><strong>{item.display_name}</strong><br /><span className="text-muted text-sm">{item.email}</span></td>
@@ -236,6 +260,13 @@ export function OrganizerAttendanceOperations({ token, eventId }: { token: strin
                   {item.latest_location_attempt && <><p>Latest submitted location</p><LocationReading value={item.latest_location_attempt} /></>}
                   {item.location_evidence?.map((value, index) => <LocationReading key={index} value={value} />)}
                   {!item.latest_location_attempt && !item.location_evidence?.length && 'No location submitted'}
+                </td>
+                <td data-label="Organizer action">
+                  {!organizerVerificationEnabled ? 'Organizer verification disabled' : !item.attendance_id ? 'Not checked in' : item.verification_methods.includes('organizer') || item.attendance_status === 'rejected'
+                    ? 'Organizer decision recorded' : <div className="stack">
+                    <label><span className="sr-only">Reason for {item.display_name}</span><input value={reviewReasons[item.attendance_id] ?? ''} onChange={event => setReviewReasons(current => ({ ...current, [item.attendance_id!]: event.target.value }))} placeholder="Reason (optional)" maxLength={500} /></label>
+                    <div className="form-actions"><button className="accent sm" disabled={busy} onClick={() => verifyAttendance(item, true)}>Verify</button><button className="danger sm" disabled={busy} onClick={() => verifyAttendance(item, false)}>Reject</button></div>
+                  </div>}
                 </td>
               </tr>
             ))}</tbody>

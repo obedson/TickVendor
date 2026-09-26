@@ -133,6 +133,8 @@ class EventResponse(BaseModel):
     geofence_enabled: bool
     geofence_radius_meters: int | None
     geofence_max_accuracy_meters: int
+    peer_confirmation_enabled: bool
+    organizer_verification_enabled: bool
     required_verification_methods: list[str]
 
     @field_serializer("cover_image_url")
