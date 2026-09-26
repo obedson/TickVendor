@@ -373,6 +373,11 @@ def test_self_check_in_enforces_geofence_and_is_idempotent(tmp_path):
         assert "organizer" in rejected.value.detail.lower()
         assert db.query(Attendance).count() == 1
         assert db.query(AttendanceVerification).count() == 1
+        with pytest.raises(HTTPException) as checkout_rejected:
+            self_check_out(db, event.id, ticket.id, buyer, INSIDE)
+        assert checkout_rejected.value.status_code == 409
+        assert "reconsider" in checkout_rejected.value.detail.lower()
+        assert attendance.checked_out_at is None
 
     engine.dispose()
 
