@@ -262,10 +262,10 @@ export function OrganizerAttendanceOperations({ token, eventId }: { token: strin
                   {!item.latest_location_attempt && !item.location_evidence?.length && 'No location submitted'}
                 </td>
                 <td data-label="Organizer action">
-                  {!organizerVerificationEnabled ? 'Organizer verification disabled' : !item.attendance_id ? 'Not checked in' : item.verification_methods.includes('organizer') || item.attendance_status === 'rejected'
-                    ? 'Organizer decision recorded' : <div className="stack">
+                  {!organizerVerificationEnabled ? 'Organizer verification disabled' : !item.attendance_id ? 'Not checked in' : <div className="stack">
+                    {(item.verification_methods.includes('organizer') || item.attendance_status === 'rejected') && <strong>Organizer decision recorded — you may reconsider it.</strong>}
                     <label><span className="sr-only">Reason for {item.display_name}</span><input value={reviewReasons[item.attendance_id] ?? ''} onChange={event => setReviewReasons(current => ({ ...current, [item.attendance_id!]: event.target.value }))} placeholder="Reason (optional)" maxLength={500} /></label>
-                    <div className="form-actions"><button className="accent sm" disabled={busy} onClick={() => verifyAttendance(item, true)}>Verify</button><button className="danger sm" disabled={busy} onClick={() => verifyAttendance(item, false)}>Reject</button></div>
+                    <div className="form-actions"><button className="accent sm" disabled={busy} onClick={() => verifyAttendance(item, true)}>{item.attendance_status === 'rejected' ? 'Reconsider and verify' : 'Verify'}</button><button className="danger sm" disabled={busy} onClick={() => verifyAttendance(item, false)}>Reject</button></div>
                   </div>}
                 </td>
               </tr>
