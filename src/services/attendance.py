@@ -336,6 +336,13 @@ def organizer_verify(db: Session, attendance: Attendance, organizer: User, appro
         AttendanceVerification.method == VerificationMethod.ORGANIZER,
     ))
     if signal is not None and signal.is_valid == approve and signal.reason == reason:
+        # A replay is also a reconciliation opportunity. Older deployments could retain a
+        # valid organizer signal while the denormalized attendance status was still CHECKED_IN,
+        # which made organizer analytics undercount verified attendance. Both downstream
+        # operations are idempotent: confidence derives from stored signals and point/recognition
+        # awards use stable unique keys.
+        calculate_attendance_confidence(db, attendance)
+        award_qualified_attendance(db, attendance)
         return attendance
     if signal is not None:
         raise HTTPException(status_code=409, detail="Organizer verification already recorded")

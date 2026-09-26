@@ -34,11 +34,19 @@ def test_organizer_can_verify_attendance(tmp_path):
                                 status=AttendanceStatus.CHECKED_IN, checked_in_at=datetime.now(UTC))
         db.add(attendance); db.commit()
         organizer_verify(db, attendance, organizer, True, "Confirmed at venue")
+
+        # Recreate the historical contradiction observed on staging: the authoritative
+        # organizer signal exists, but the denormalized status is stale. An idempotent replay
+        # must repair it rather than returning early.
+        attendance.status = AttendanceStatus.CHECKED_IN
+        attendance.confidence_score = 0
+        db.commit()
         organizer_verify(db, attendance, organizer, True, "Confirmed at venue")
         with pytest.raises(HTTPException) as conflict:
             organizer_verify(db, attendance, organizer, False, "Changed decision")
         assert conflict.value.status_code == 409
         assert attendance.status == AttendanceStatus.ORGANIZER_VERIFIED
+        assert attendance.confidence_score == 100
         assert db.query(AttendanceVerification).filter_by(
             attendance_id=attendance.id,
             method=VerificationMethod.ORGANIZER,
