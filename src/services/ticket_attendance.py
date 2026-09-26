@@ -149,6 +149,11 @@ def self_check_in(
         # verification signals or Impact.
         if attendance.ticket_id not in (None, ticket.id):
             raise HTTPException(status_code=409, detail="You have already checked in to this event")
+        if attendance.status == AttendanceStatus.REJECTED:
+            raise HTTPException(
+                status_code=409,
+                detail="Your attendance was rejected by the organizer. Ask the organizer to reconsider the decision.",
+            )
         return check_in_state(db, attendance)
 
     enforce_redemption_limit(db, ticket, user.id)

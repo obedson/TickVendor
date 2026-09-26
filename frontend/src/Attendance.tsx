@@ -19,6 +19,7 @@ export function Attendance({ token, tickets }: AttendanceProps) {
   const [error, setError] = useState('');
   const [geoStatus, setGeoStatus] = useState<'idle' | 'requesting' | 'granted' | 'failed'>('idle');
   const [geoMessage, setGeoMessage] = useState('');
+  const [attendanceStatus, setAttendanceStatus] = useState(ticket?.attendance_status ?? '');
 
   const liveToken = () => getLiveToken() ?? token;
 
@@ -41,6 +42,7 @@ export function Attendance({ token, tickets }: AttendanceProps) {
     setCheckInStatus('');
     setError('');
     setConfirmedIds(new Set());
+    setAttendanceStatus(ticket?.attendance_status ?? '');
     loadCandidates();
   }, [ticket, token]);
 
@@ -58,6 +60,7 @@ export function Attendance({ token, tickets }: AttendanceProps) {
         body: JSON.stringify({ ticket_id: ticket.id!, latitude, longitude, accuracy_meters: accuracy }),
       }, liveToken())
         .then(data => {
+          setAttendanceStatus(data.status);
           setCheckInStatus(`Check-in recorded. Status: ${data.status}`);
           loadCandidates();
         })
@@ -185,14 +188,22 @@ export function Attendance({ token, tickets }: AttendanceProps) {
           {checkInStatus && <p role="status" className="success-msg" style={{ marginBottom: '1rem' }}>{checkInStatus}</p>}
           {error && <p role="alert" className="error" style={{ marginBottom: '1rem' }}>{error}</p>}
 
-          <button
+          {attendanceStatus === 'rejected' ? (
+            <div role="status" className="error" style={{ marginBottom: '1rem' }}>
+              <strong>Attendance rejected by the organizer.</strong>
+              {ticket?.attendance_decision_reason && <p>{ticket.attendance_decision_reason}</p>}
+              <p>Another self check-in cannot override this decision. Ask the organizer to reconsider it.</p>
+            </div>
+          ) : ticket?.checked_in_at || attendanceStatus ? (
+            <p role="status" className="info-msg">Attendance already recorded. Status: {attendanceStatus || 'checked in'}.</p>
+          ) : <button
             className="accent"
             disabled={busy || !ticket}
             onClick={checkIn}
             style={{ width: '100%' }}
           >
             {busy ? 'Checking in…' : 'Check in now'}
-          </button>
+          </button>}
 
           <p style={{ fontSize: '.8rem', color: 'var(--tv-muted)', marginTop: '.75rem', textAlign: 'center' }}>
             Location is requested only for GPS-verified events and is not stored continuously.

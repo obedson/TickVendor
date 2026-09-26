@@ -19,6 +19,8 @@ from src.models import (
     AttendanceStatus,
     AttendanceVerification,
     Event,
+    ImpactTransaction,
+    ImpactTransactionStatus,
     PeerConfirmation,
     PeerConfirmationDecision,
     PointRule,
@@ -32,7 +34,7 @@ from src.schemas.attendance import AttendanceCheckIn
 from src.services.attendance_location import location_evidence, location_guidance, record_location
 from src.services.event import as_utc
 from src.services.impact import award_points
-from src.services.notification import audit
+from src.services.notification import audit, notify
 from src.services.recognition import evaluate_recognition
 
 
@@ -94,6 +96,49 @@ def award_qualified_attendance(db: Session, attendance: Attendance) -> None:
                      idempotency_key=f"attendance:{attendance.id}:verified",
                      reason=f"Attendance verified: {event.title}", event_id=event.id)
     evaluate_recognition(db, attendance.user_id, event.community_id)
+
+
+def _compensate_attendance_points(
+    db: Session, attendance: Attendance, *, approve: bool, decision_key: str
+) -> None:
+    """Net attendance points without deleting or rewriting historical transactions."""
+    posted = list(db.scalars(select(ImpactTransaction).where(
+        ImpactTransaction.source_type == "attendance",
+        ImpactTransaction.source_id == attendance.id,
+        ImpactTransaction.status == ImpactTransactionStatus.POSTED,
+    )))
+    net = sum(item.points for item in posted)
+    if approve:
+        if net <= 0:
+            original = next((item for item in posted if item.points > 0), None)
+            if original is not None:
+                db.add(ImpactTransaction(
+                    idempotency_key=f"attendance:{attendance.id}:decision:{decision_key}:restore",
+                    user_id=attendance.user_id,
+                    community_id=original.community_id,
+                    points=original.points,
+                    source_type="attendance",
+                    source_id=attendance.id,
+                    event_id=attendance.event_id,
+                    reason="Attendance points restored after organizer reconsideration",
+                    status=ImpactTransactionStatus.POSTED,
+                    reversed_transaction_id=original.id,
+                ))
+        return
+    if net > 0:
+        original = next((item for item in posted if item.points > 0), None)
+        db.add(ImpactTransaction(
+            idempotency_key=f"attendance:{attendance.id}:decision:{decision_key}:reversal",
+            user_id=attendance.user_id,
+            community_id=original.community_id,
+            points=-net,
+            source_type="attendance",
+            source_id=attendance.id,
+            event_id=attendance.event_id,
+            reason="Attendance points reversed after organizer rejection",
+            status=ImpactTransactionStatus.POSTED,
+            reversed_transaction_id=original.id,
+        ))
 
 
 def record_qr_attendance(
@@ -344,17 +389,20 @@ def organizer_verify(db: Session, attendance: Attendance, organizer: User, appro
         calculate_attendance_confidence(db, attendance)
         award_qualified_attendance(db, attendance)
         return attendance
-    if signal is not None:
-        raise HTTPException(status_code=409, detail="Organizer verification already recorded")
-    signal = AttendanceVerification(
-        attendance_id=attendance.id,
-        method=VerificationMethod.ORGANIZER,
-        is_valid=approve,
-        verified_at=datetime.now(UTC),
-        verifier_id=organizer.id,
-        reason=reason,
-    )
-    db.add(signal)
+    prior_decision = signal.is_valid if signal is not None else None
+    prior_reason = signal.reason if signal is not None else None
+    decided_at = datetime.now(UTC)
+    if signal is None:
+        signal = AttendanceVerification(
+            attendance_id=attendance.id, method=VerificationMethod.ORGANIZER,
+            is_valid=approve, verified_at=decided_at, verifier_id=organizer.id, reason=reason,
+        )
+        db.add(signal)
+    else:
+        signal.is_valid = approve
+        signal.verified_at = decided_at
+        signal.verifier_id = organizer.id
+        signal.reason = reason
     ticket_was_activated = False
     if approve and attendance.ticket_id:
         ticket = db.get(Ticket, attendance.ticket_id)
@@ -366,10 +414,29 @@ def organizer_verify(db: Session, attendance: Attendance, organizer: User, appro
     attendance.flagged_for_review = False
     db.commit()
     calculate_attendance_confidence(db, attendance)
-    award_qualified_attendance(db, attendance)
-    audit(db, actor_id=organizer.id, community_id=event.community_id,
+    decision = audit(db, actor_id=organizer.id, community_id=event.community_id,
           action="attendance.override", target_type="attendance", target_id=attendance.id,
-          metadata={"approved": approve, "reason": reason})
+          metadata={"approved": approve, "reason": reason,
+                    "previous_approved": prior_decision, "previous_reason": prior_reason},
+          commit=False)
+    db.flush()
+    if approve:
+        award_qualified_attendance(db, attendance)
+    _compensate_attendance_points(db, attendance, approve=approve, decision_key=str(decision.id))
+    if not approve:
+        # Recompute recognition inputs after the attendance count and point balance changed.
+        # Recognition awards remain append-only history; this prevents new awards from being
+        # granted from the rejected attendance while preserving prior audited achievements.
+        evaluate_recognition(db, attendance.user_id, event.community_id)
+    notify(db, attendance.user_id,
+           "attendance_approved" if approve else "attendance_rejected",
+           "Attendance verified" if approve else "Attendance rejected",
+           (f"Your attendance at {event.title} was verified by the organizer."
+            if approve else f"Your attendance at {event.title} was rejected: {reason}"),
+           {"event_id": str(event.id), "attendance_id": str(attendance.id), "reason": reason},
+           community_id=event.community_id,
+           deduplication_key=f"attendance-decision:{decision.id}", commit=False)
+    db.commit()
     if ticket_was_activated:
         audit(db, actor_id=organizer.id, community_id=event.community_id,
               action="ticket.used", target_type="ticket", target_id=attendance.ticket_id,

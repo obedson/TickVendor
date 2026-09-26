@@ -4,7 +4,7 @@ export type OfflineTicket={id?:string;public_id:string;qr_token:string;status:st
 // itself with no signal. `order_id` is not new data: `TicketWalletResponse` inherits it from
 // `TicketResponse` and `GET /tickets/me` copies it onto every row, so the encrypted snapshot has
 // always stored it. Declaring it here is what lets a caller read it at all.
-group?:string;purchaser_id?:string|null;order_id?:string|null;assignment_state?:string;transfer_state?:string;self_check_in_enabled?:boolean;self_checkout_enabled?:boolean;checked_in_at?:string|null;checked_out_at?:string|null;duration_seconds?:number|null};
+group?:string;purchaser_id?:string|null;order_id?:string|null;assignment_state?:string;transfer_state?:string;self_check_in_enabled?:boolean;self_checkout_enabled?:boolean;checked_in_at?:string|null;checked_out_at?:string|null;duration_seconds?:number|null;attendance_status?:string|null;attendance_decision_reason?:string|null};
 export type EncryptedTickets={iv:ArrayBuffer;ciphertext:ArrayBuffer};
 type CryptoProvider=Pick<Crypto,'getRandomValues'|'subtle'>;
 

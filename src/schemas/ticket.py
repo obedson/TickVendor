@@ -82,6 +82,8 @@ class TicketWalletResponse(TicketResponse):
     checked_in_at: datetime | None = None
     checked_out_at: datetime | None = None
     duration_seconds: int | None = None
+    attendance_status: str | None = None
+    attendance_decision_reason: str | None = None
 
 
 class TicketTypeUpdate(BaseModel):

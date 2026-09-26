@@ -21,6 +21,7 @@ import src.models  # noqa: F401
 from src.database import Base
 from src.models import (
     Attendance,
+    AttendanceStatus,
     AttendanceVerification,
     Community,
     EntitlementRedemption,
@@ -363,6 +364,15 @@ def test_self_check_in_enforces_geofence_and_is_idempotent(tmp_path):
             attendance_id=state["attendance_id"], method=VerificationMethod.GPS
         ).count()
         assert verifications == 1
+        attendance = db.query(Attendance).one()
+        attendance.status = AttendanceStatus.REJECTED
+        db.commit()
+        with pytest.raises(HTTPException) as rejected:
+            self_check_in(db, event.id, ticket.id, buyer, INSIDE)
+        assert rejected.value.status_code == 409
+        assert "organizer" in rejected.value.detail.lower()
+        assert db.query(Attendance).count() == 1
+        assert db.query(AttendanceVerification).count() == 1
 
     engine.dispose()
 

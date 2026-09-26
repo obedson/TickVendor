@@ -62,10 +62,10 @@ def ticket_wallet(
     expire_pending_orders(db, user_id=current_user.id)
     from sqlalchemy import and_
 
-    from src.models import Attendance
+    from src.models import Attendance, AttendanceVerification, VerificationMethod
     from src.services.ticket_transfer import transfer_state
 
-    rows = db.execute(select(Ticket, Event, TicketType, Attendance)
+    rows = list(db.execute(select(Ticket, Event, TicketType, Attendance)
                       .join(Event, Event.id == Ticket.event_id)
                       .join(TicketType, TicketType.id == Ticket.ticket_type_id)
                       .outerjoin(Order, Order.id == Ticket.order_id)
@@ -81,9 +81,18 @@ def ticket_wallet(
                               Order.status.in_([OrderStatus.CONFIRMED, OrderStatus.REFUNDED]),
                           ),
                       )
-                      .order_by(Ticket.created_at.desc()))
+                      .order_by(Ticket.created_at.desc())))
+    attendance_ids = [attendance.id for _ticket, _event, _type, attendance in rows if attendance]
+    organizer_decisions = {
+        signal.attendance_id: signal
+        for signal in db.scalars(select(AttendanceVerification).where(
+            AttendanceVerification.attendance_id.in_(attendance_ids),
+            AttendanceVerification.method == VerificationMethod.ORGANIZER,
+        ))
+    } if attendance_ids else {}
     result = []
     for ticket, event, ticket_type, attendance in rows:
+        organizer_decision = organizer_decisions.get(attendance.id) if attendance else None
         group = "cancelled" if ticket.status in {
             TicketStatus.CANCELLED, TicketStatus.REFUNDED, TicketStatus.EXPIRED,
         } else "used" if ticket.status == TicketStatus.USED else "upcoming"
@@ -100,6 +109,8 @@ def ticket_wallet(
             "checked_in_at": attendance.checked_in_at if attendance else None,
             "checked_out_at": attendance.checked_out_at if attendance else None,
             "duration_seconds": attendance.duration_seconds if attendance else None,
+            "attendance_status": attendance.status.value if attendance else None,
+            "attendance_decision_reason": organizer_decision.reason if organizer_decision else None,
         }))
     return result
 

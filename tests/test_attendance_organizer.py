@@ -13,8 +13,12 @@ from src.models import (
     Attendance,
     AttendanceStatus,
     AttendanceVerification,
+    AuditLog,
+    ImpactTransaction,
     Membership,
     MembershipRole,
+    Notification,
+    PointRule,
     User,
     VerificationMethod,
 )
@@ -32,7 +36,7 @@ def test_organizer_can_verify_attendance(tmp_path):
         db.add(Membership(community_id=community.id, user_id=organizer.id, role=MembershipRole.ORGANIZER))
         attendance = Attendance(event_id=event.id, user_id=attendee.id,
                                 status=AttendanceStatus.CHECKED_IN, checked_in_at=datetime.now(UTC))
-        db.add(attendance); db.commit()
+        db.add_all([attendance, PointRule(source_type="attendance", points=10)]); db.commit()
         organizer_verify(db, attendance, organizer, True, "Confirmed at venue")
 
         # Recreate the historical contradiction observed on staging: the authoritative
@@ -42,15 +46,27 @@ def test_organizer_can_verify_attendance(tmp_path):
         attendance.confidence_score = 0
         db.commit()
         organizer_verify(db, attendance, organizer, True, "Confirmed at venue")
-        with pytest.raises(HTTPException) as conflict:
-            organizer_verify(db, attendance, organizer, False, "Changed decision")
-        assert conflict.value.status_code == 409
+        organizer_verify(db, attendance, organizer, False, "Location could not be confirmed")
+        organizer_verify(db, attendance, organizer, False, "Location could not be confirmed")
+        assert attendance.status == AttendanceStatus.REJECTED
+        assert sum(item.points for item in db.query(ImpactTransaction).all()) == 0
+        assert db.query(Notification).filter_by(
+            user_id=attendee.id, notification_type="attendance_rejected"
+        ).count() == 1
+
+        organizer_verify(db, attendance, organizer, True, "Reconsidered with door staff")
         assert attendance.status == AttendanceStatus.ORGANIZER_VERIFIED
         assert attendance.confidence_score == 100
+        assert sum(item.points for item in db.query(ImpactTransaction).all()) == 10
         assert db.query(AttendanceVerification).filter_by(
             attendance_id=attendance.id,
             method=VerificationMethod.ORGANIZER,
         ).count() == 1
+        decisions = db.query(AuditLog).filter_by(
+            target_type="attendance", target_id=attendance.id, action="attendance.override"
+        ).all()
+        assert len(decisions) == 3
+        assert decisions[-1].metadata_json["previous_approved"] is False
     engine.dispose()
 
 
