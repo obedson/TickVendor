@@ -1061,6 +1061,13 @@ Verification:
 - Removed the misleading organizer field and the obsolete `events.max_peer_confirmations` column through migration `f7a8b9c0d1e2`. Existing peer-confirmation records and attendance awards are not modified.
 - Reciprocal confirmation and repeated-volume signals remain flagged for organizer review; self-confirmation, duplicate pairs, cross-event access and ineligible peers remain blocked.
 - Verification: 16 focused attendance configuration/abuse tests passed; frontend production build and ESLint passed; changed-file Ruff, Python compilation, SQLite base-to-head migration, Alembic schema check, PostgreSQL offline SQL compilation, and `git diff --check` passed. No Playwright or full backend suite was run.
+## Mobile layout repair — 2026-09-26
+
+- Fixed shared mobile action height caused by a 10rem flex basis on vertically stacked actions; retained 44px touch targets and compact wrapping roster actions.
+- Aligned management phone breakpoint with 650px shared styles, repaired block-table captions, removed empty cell line-break rows, and added the missing screen-reader label utility.
+- Kept latest location evidence visible with keyboard-accessible disclosure for verification history. Details and manual acceptance: `docs/MOBILE_LAYOUT_2026_09_26.md`.
+- Local verification: frontend ESLint passed; `npm run build` passed; `node scripts/test-management-layout.mjs` 28 passed; `git diff --check` passed. Browser/staging visual acceptance across pages remains outstanding. No full backend or Playwright suite run.
+
 ## Attendance verification workflow accessibility — 2026-09-26
 
 - Root cause of the staging checkout 422: the browser legitimately reported a coarse `accuracy_meters=50000`, while request validation rejected values above 10000 before location evidence/review logic ran. Attendance inputs now accept bounded coarse readings up to the attendance evidence column's safe range; outside-geofence readings remain rejected, while in-range low-accuracy checkout is recorded and flagged for organizer review.

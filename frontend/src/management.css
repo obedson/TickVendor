@@ -1,4 +1,5 @@
 /* Shared width and form contracts for participant and management screens. */
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
 .governance-dialog { width: min(36rem, calc(100% - 2rem)); max-height: calc(100dvh - 2rem); margin: auto; overflow: auto; border: 1px solid var(--tv-border); }
 .governance-dialog::backdrop { background: rgb(15 23 42 / .6); }
 .app-main, .app-main > *, .management-screen, .panel, .card,
@@ -45,14 +46,21 @@
   .workspace-selector-mobile .space-menu { left: 1rem; width: calc(100% - 2rem); }
 }
 @media (max-width: 1024px) { .content-with-aside { grid-template-columns: minmax(0, 1fr); } }
-@media (max-width: 640px) {
+@media (max-width: 650px) {
   .management-screen .page-header-actions, .form-actions { flex-wrap: wrap; }
-  .management-screen .page-header-actions > *, .form-actions > * { flex: 1 1 10rem; }
+  .management-screen .page-header-actions > * { flex: 1 1 auto; }
+  /* Actions stack vertically on phones: a width-like flex basis becomes height. */
+  .form-actions > * { flex: 0 1 auto; min-width: 0; }
+  .form-actions button { min-height: 44px; height: auto; white-space: normal; }
+  .management-table .form-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 7rem), 1fr)); gap: .5rem; margin-top: .5rem; }
   .management-table, .management-table tbody { display: block; }
+  .management-table caption { display: block; width: 100%; white-space: normal; overflow-wrap: normal; }
   .management-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
   .management-table tr { display: grid; margin-bottom: 1rem; border: 1px solid var(--tv-border); border-radius: var(--tv-radius-md); }
   .management-table td { display: grid; grid-template-columns: minmax(0, 1fr); gap: .3rem; white-space: normal; }
   .management-table td::before { content: attr(data-label); font-size: .75rem; font-weight: 700; color: var(--tv-muted); }
+  .management-table td > br { display: none; }
+  .management-table td { padding: .75rem; }
   .ticket-wallet { grid-template-columns: minmax(0, 1fr); }
   .home-metrics { grid-template-columns: minmax(0, 1fr); }
   .event-cover { aspect-ratio: 16 / 9; }
@@ -60,3 +68,7 @@
   .chip { white-space: normal; }
   .mobile-bottom-nav button { min-height: 44px; }
 }
+.location-history { margin-top: .75rem; }
+.location-history summary { cursor: pointer; padding-block: .65rem; color: var(--tv-accent); font-weight: 600; }
+.location-history summary:focus-visible { outline: 2px solid var(--tv-accent); outline-offset: 2px; }
+.location-history > div { margin-top: .75rem; }

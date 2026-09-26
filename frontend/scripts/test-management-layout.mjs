@@ -32,7 +32,7 @@ test('responsive management CSS stacks cards without clipping controls', () => {
   const css = read('management.css');
   assert.match(css, /min-width:\s*0/);
   assert.match(css, /overflow-wrap:\s*anywhere/);
-  assert.match(css, /@media\s*\(max-width:\s*640px\)/);
+  assert.match(css, /@media\s*\(max-width:\s*650px\)/);
   assert.match(css, /content:\s*attr\(data-label\)/);
   assert.match(css, /overflow-x:\s*auto/);
   assert.match(css, /minmax\(min\(100%,\s*12rem\),\s*1fr\)/);

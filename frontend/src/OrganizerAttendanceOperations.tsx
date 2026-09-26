@@ -258,7 +258,10 @@ export function OrganizerAttendanceOperations({ token, eventId }: { token: strin
                 <td data-label="Verification">{item.verification_methods.length ? item.verification_methods.join(', ') : 'None'}</td>
                 <td data-label="Location evidence">
                   {item.latest_location_attempt && <><p>Latest submitted location</p><LocationReading value={item.latest_location_attempt} /></>}
-                  {item.location_evidence?.map((value, index) => <LocationReading key={index} value={value} />)}
+                  {!!item.location_evidence?.length && <details className="location-history">
+                    <summary>Verification evidence ({item.location_evidence.length})</summary>
+                    {item.location_evidence.map((value, index) => <LocationReading key={index} value={value} />)}
+                  </details>}
                   {!item.latest_location_attempt && !item.location_evidence?.length && 'No location submitted'}
                 </td>
                 <td data-label="Organizer action">
