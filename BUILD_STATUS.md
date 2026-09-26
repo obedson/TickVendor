@@ -2,6 +2,8 @@
 
 ## App icon branding — 2026-09-26
 
+- PR #13 CI follow-up (user approved): initial CI had 6 migration-test failures / 417 passes. Updated obsolete head expectations to the actual single head and asserted each newer parent link. Historical wallet fixture now inserts an event using the reflected historical schema, explicitly proving the newer accuracy column is absent; current ORM/API checks still run after upgrade. No production code or migrations changed. `.venv/Scripts/python.exe -m pytest -q tests/test_community_lifecycle_migration.py tests/test_participation_migration.py tests/test_ticket_enum_normalization_migration.py`: 9 passed, two upstream deprecation warnings. Changed-file Ruff and diff check passed. Full CI rerun required before merge.
+
 - Publication follow-up authorized: final corrected artwork is byte-identical to the user's supplied PNG (SHA256 comparison). Re-ran focused PWA test and production build successfully before publication; existing Mapbox size warning only. Device installation remains outstanding.
 
 - Connected user-approved ticket/checkmark artwork to the PWA manifest, browser favicon and Apple touch icon. User rejected the initially generated variant; final files use the exact supplied PNG, aspect-preserving resizing and background padding. Versioned filenames and shell cache v6 replace old cached references.

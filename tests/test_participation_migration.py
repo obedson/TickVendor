@@ -20,7 +20,7 @@ def test_populated_participation_upgrade(tmp_path, monkeypatch):
         before = {name: connection.execute(sa.text(f'SELECT {columns[name]} FROM {name}')).all() for name in names}
     config = Config('alembic.ini')
     script = ScriptDirectory.from_config(config)
-    assert script.get_heads() == ['d5e6f7a8b9c0']
+    assert script.get_heads() == ['0a1b2c3d4e5f']
     revisions = list(script.walk_revisions())
     assert len({r.revision for r in revisions}) == len(revisions)
     command.upgrade(config, 'e0f1a2b34567')

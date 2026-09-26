@@ -17,9 +17,6 @@ from src.main import create_app
 from src.models import (
     Entitlement,
     EntitlementRedemption,
-    Event,
-    EventStatus,
-    LocationType,
     RedemptionMode,
     RedemptionStatus,
     Ticket,
@@ -45,24 +42,36 @@ def _prepare_legacy_database(tmp_path, monkeypatch):
     engine = sa.create_engine(settings.database_url)
     now = datetime.now(UTC)
     ids = {name: str(uuid4()) for name in ("unassigned", "invitation", "default", "entitlement", "ticket_entitlement", "redemption", "transfer")}
+    # Seed the schema under test, not today's Event mapper: this revision predates
+    # geofence_max_accuracy_meters. Current ORM/API checks run after upgrade to head.
+    legacy_events = sa.Table("events", sa.MetaData(), autoload_with=engine)
+    assert "geofence_max_accuracy_meters" not in legacy_events.c
     with Session(engine, expire_on_commit=False) as db:
         user = db.scalars(sa.select(User)).first()
         community_id = db.execute(sa.text("SELECT id FROM communities ORDER BY id LIMIT 1")).scalar_one()
-        event = Event(community_id=community_id, organizer_id=user.id, title="Legacy wallet event",
-                      slug=f"legacy-wallet-{uuid4().hex[:8]}", description="Migration fixture event",
-                      category="community", starts_at=now + timedelta(days=1),
-                      ends_at=now + timedelta(days=1, hours=2), location_type=LocationType.ONLINE,
-                      online_url="https://example.test/event", status=EventStatus.PUBLISHED)
-        db.add(event); db.flush()
-        ticket_type = TicketType(event_id=event.id, name="Legacy ticket", price=0, quantity=10,
+        event_id = str(uuid4())
+        db.execute(legacy_events.insert().values(
+            id=event_id, community_id=community_id, organizer_id=str(user.id),
+            title="Legacy wallet event", slug=f"legacy-wallet-{uuid4().hex[:8]}",
+            description="Migration fixture event", category="community", tags=[],
+            starts_at=now + timedelta(days=1), ends_at=now + timedelta(days=1, hours=2),
+            timezone="Africa/Lagos", location_type="ONLINE",
+            online_url="https://example.test/event", status="PUBLISHED",
+            is_suspended=False, geofence_enabled=False, self_check_in_enabled=False,
+            self_checkout_enabled=False, peer_confirmation_enabled=False,
+            confirmations_required=0, organizer_verification_enabled=True,
+            qr_attendance_enabled=True, required_verification_methods=[],
+            peer_selection_limit=5, peer_eligibility_statuses=[], created_at=now, updated_at=now,
+        ))
+        ticket_type = TicketType(event_id=event_id, name="Legacy ticket", price=0, quantity=10,
                                  max_per_user=1, max_per_order=1)
         db.add(ticket_type); db.flush()
         ticket_model = Ticket(public_id=f"legacy-{uuid4().hex[:10]}", qr_token=f"legacy-qr-{uuid4()}",
-                              event_id=event.id, ticket_type_id=ticket_type.id, attendee_id=user.id,
+                              event_id=event_id, ticket_type_id=ticket_type.id, attendee_id=user.id,
                               purchaser_id=user.id, assignment_state=TicketAssignmentState.CLAIMED,
                               status=TicketStatus.ACTIVE)
         db.add(ticket_model); db.commit()
-        ticket = {"id": str(ticket_model.id), "attendee_id": str(user.id), "event_id": str(event.id),
+        ticket = {"id": str(ticket_model.id), "attendee_id": str(user.id), "event_id": event_id,
                   "ticket_type_id": str(ticket_type.id)}
     with engine.begin() as connection:
         user_id = ticket["attendee_id"]
@@ -175,7 +184,10 @@ def test_normalization_preserves_already_canonical_values(tmp_path, monkeypatch)
 
 def test_postgresql_normalization_sql_and_revision_graph(monkeypatch):
     script = ScriptDirectory.from_config(Config("alembic.ini"))
-    assert script.get_heads() == ["d5e6f7a8b9c0"]
+    assert script.get_heads() == ["0a1b2c3d4e5f"]
+    assert script.get_revision("0a1b2c3d4e5f").down_revision == "f7a8b9c0d1e2"
+    assert script.get_revision("f7a8b9c0d1e2").down_revision == "e6f7a8b9c0d1"
+    assert script.get_revision("e6f7a8b9c0d1").down_revision == "d5e6f7a8b9c0"
     assert script.get_revision("c4d5e6f7a8b9").down_revision == "c1d2e3f4a5b6"
     assert script.get_revision("d5e6f7a8b9c0").down_revision == "c4d5e6f7a8b9"
     output = StringIO()

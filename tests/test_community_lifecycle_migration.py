@@ -32,7 +32,7 @@ def test_populated_upgrade_adds_lifecycle_without_rewriting_memberships(tmp_path
     command.upgrade(config, "head")
     engine = sa.create_engine(settings.database_url)
     with engine.connect() as connection:
-        assert connection.execute(sa.text("SELECT version_num FROM alembic_version")).scalar_one() == "d5e6f7a8b9c0"
+        assert connection.execute(sa.text("SELECT version_num FROM alembic_version")).scalar_one() == "0a1b2c3d4e5f"
         lifecycle, submitted_by = connection.execute(
             sa.text("SELECT lifecycle_status, submitted_by_id FROM communities WHERE id=:id"),
             {"id": community_id},
@@ -57,7 +57,7 @@ def test_populated_upgrade_adds_lifecycle_without_rewriting_memberships(tmp_path
 def test_community_lifecycle_revision_and_postgresql_sql(monkeypatch):
     config = Config("alembic.ini")
     script = ScriptDirectory.from_config(config)
-    assert script.get_heads() == ["d5e6f7a8b9c0"]
+    assert script.get_heads() == ["0a1b2c3d4e5f"]
     assert script.get_revision("d5e6f7a8b9c0").down_revision == "c4d5e6f7a8b9"
     output = StringIO()
     monkeypatch.setattr(settings, "database_url", "postgresql://migration-test/unused")
