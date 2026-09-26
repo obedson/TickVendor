@@ -1,4 +1,4 @@
-const CACHE = 'tickvendor-shell-v5';
+const CACHE = 'tickvendor-shell-v6';
 const CACHE_PREFIX = 'tickvendor-shell-';
 const LEGACY_CACHE_PREFIX = 'tickeven-shell-';
 const SAFE_API = ['/api/v1/events'];
