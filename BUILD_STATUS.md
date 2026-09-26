@@ -1,5 +1,13 @@
 # TickVendor Build Status
 
+## App icon branding — 2026-09-26
+
+- Publication follow-up authorized: final corrected artwork is byte-identical to the user's supplied PNG (SHA256 comparison). Re-ran focused PWA test and production build successfully before publication; existing Mapbox size warning only. Device installation remains outstanding.
+
+- Connected user-approved ticket/checkmark artwork to the PWA manifest, browser favicon and Apple touch icon. User rejected the initially generated variant; final files use the exact supplied PNG, aspect-preserving resizing and background padding. Versioned filenames and shell cache v6 replace old cached references.
+- Local verification: `node frontend/scripts/generate-icons.mjs`, `node frontend/scripts/test-pwa-install.mjs`, frontend `npm run lint`, frontend `npm run build`, and `git diff --check` passed. Build has existing large Mapbox chunk warning. Final corrected 192px icon visually inspected; corrected assets passed the focused icon test. Build ran while the source artwork was being corrected; deployed asset/device acceptance remains outstanding (B).
+- No commit, push or deployment. Details: `docs/PWA_ICONS_2026_09_26.md`.
+
 ## Attendance geofence evidence and accuracy guidance — 2026-09-25
 
 - Post-deployment follow-up from a real timeout and comparison with the NIPOST enum form: location acquisition now retries temporary timeout/unavailable failures up to three times with 15 seconds per request. Confident in-radius readings remain automatic GPS verification (green in the attendance roster); uncertain in-radius readings enter organizer review without consuming the ticket or awarding recognition; outside-radius readings remain rejected. Attendance Review confirmation now invokes real organizer verification rather than only closing the queue item, and organizer approval consumes the linked active ticket exactly once. Focused backend verification: **12 passed**; frontend location scripts and changed-file Ruff passed. Production build/lint results recorded after final frontend check below.
