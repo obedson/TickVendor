@@ -5,9 +5,16 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from src.api.attendance import attendance_roster
-from src.models import Attendance, AttendanceVerification, AuditLog, ImpactTransaction, TicketStatus
+from src.models import (
+    Attendance,
+    AttendanceVerification,
+    AuditLog,
+    ImpactTransaction,
+    TicketStatus,
+    VerificationMethod,
+)
 from src.schemas.attendance import AttendanceCheckIn
-from src.services.ticket_attendance import self_check_in
+from src.services.ticket_attendance import self_check_in, self_check_out
 from tests.test_ticket_holders_and_entitlements import INSIDE, OUTSIDE, issue, make_db, setup
 
 
@@ -163,4 +170,26 @@ def test_accuracy_threshold_is_independent_from_allowed_radius(tmp_path):
         assert uncertain_evidence['max_accuracy_meters'] == 50
         assert uncertain_evidence['outcome'] == 'low_accuracy'
         assert location_evidence(event, precise)['outcome'] == 'verified'
+    engine.dispose()
+
+
+def test_coarse_browser_checkout_is_retained_for_organizer_review(tmp_path):
+    engine = make_db(tmp_path)
+    with Session(engine, expire_on_commit=False) as db:
+        _organizer, buyer, _, _, _, event = setup(db)
+        _, _, ticket = issue(db, event, buyer)
+        self_check_in(db, event.id, ticket.id, buyer, INSIDE)
+        coarse = AttendanceCheckIn(latitude='6.44', longitude='7.49', accuracy_meters=50000)
+        state = self_check_out(db, event.id, ticket.id, buyer, coarse)
+        assert state['checked_out_at'] is not None
+        assert state['pending_review'] is True
+        attendance = db.query(Attendance).one()
+        assert attendance.flagged_for_review is True
+        checkout = db.query(AttendanceVerification).filter_by(method=VerificationMethod.GPS_CHECKOUT).one()
+        assert checkout.is_valid is False
+        assert checkout.accuracy_meters == Decimal(50000)
+        attempt = db.query(AuditLog).filter_by(action='attendance.location_submitted').order_by(
+            AuditLog.occurred_at.desc()).first()
+        assert attempt.metadata_json['operation'] == 'checkout'
+        assert attempt.metadata_json['outcome'] == 'low_accuracy'
     engine.dispose()

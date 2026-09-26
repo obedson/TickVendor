@@ -15,6 +15,7 @@ from src.models import (
     AttendanceStatus,
     PeerConfirmation,
     PeerConfirmationDecision,
+    Profile,
     User,
 )
 from src.schemas.attendance import AttendanceCheckIn
@@ -215,11 +216,20 @@ def test_peer_verification_requires_distinct_confirmers_and_each_pair_is_single_
         second = User(email="distinct-second@example.com", password_hash="hash")
         subject = User(email="distinct-subject@example.com", password_hash="hash")
         session.add_all([first, second, subject]); session.flush()
+        session.add_all([
+            Profile(user_id=first.id, username="distinct-first", display_name="First Peer"),
+            Profile(user_id=second.id, username="distinct-second", display_name="Second Peer"),
+            Profile(user_id=subject.id, username="distinct-subject", display_name="Attendee Name"),
+        ])
         session.add_all(
             Attendance(event_id=event.id, user_id=user.id, status=AttendanceStatus.CHECKED_IN)
             for user in (first, second, subject)
         )
         session.commit()
+
+        from src.api.attendance import peer_candidates
+        candidates = peer_candidates(event.id, session, first)
+        assert {item['display_name'] for item in candidates} == {'Second Peer', 'Attendee Name'}
 
         confirm_peer(session, event, first, subject.id, True)
         subject_attendance = session.query(Attendance).filter_by(user_id=subject.id).one()

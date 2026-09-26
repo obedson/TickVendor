@@ -226,13 +226,16 @@ def self_check_out(
     point = _geofence_point(db, user, event, payload, label="checkout")
     if point is not None:
         latitude, longitude, accuracy, distance, outcome = point
-        if outcome != "verified":
-            raise HTTPException(status_code=422, detail=location_guidance(location_evidence(event, payload)))
+        pending_review = outcome != "verified"
         db.add(AttendanceVerification(
-            attendance_id=attendance.id, method=VerificationMethod.GPS_CHECKOUT, is_valid=True,
+            attendance_id=attendance.id, method=VerificationMethod.GPS_CHECKOUT,
+            is_valid=not pending_review,
             verified_at=now, verifier_id=user.id, latitude=latitude, longitude=longitude,
             accuracy_meters=accuracy, reason=f"distance_meters={distance:.2f}",
         ))
+        if pending_review:
+            attendance.flagged_for_review = True
+            attendance.review_reason = location_guidance(location_evidence(event, payload))
     checked_in = as_utc(attendance.checked_in_at)
     attendance.checked_out_at = now
     attendance.duration_seconds = max(0, int((now - checked_in).total_seconds()))
@@ -242,8 +245,10 @@ def self_check_out(
           metadata={"event_id": str(event_id), "ticket_id": str(ticket.id),
                     "duration_seconds": attendance.duration_seconds,
                     "gps_submitted": point is not None})
-    notify(db, user.id, "check_out_confirmed", "Checkout recorded",
-           f"Your attendance at {event.title} was finalized.",
+    notify(db, user.id, "check_out_pending" if attendance.flagged_for_review else "check_out_confirmed",
+           "Checkout awaiting review" if attendance.flagged_for_review else "Checkout recorded",
+           (f"Your checkout location for {event.title} was sent to the organizer for verification."
+            if attendance.flagged_for_review else f"Your attendance at {event.title} was finalized."),
            {"event_id": str(event_id), "ticket_id": str(ticket.id)},
            community_id=event.community_id, deduplication_key=f"checkout:{attendance.id}", commit=False)
     db.commit()

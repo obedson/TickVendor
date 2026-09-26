@@ -89,11 +89,14 @@ def peer_candidates(
     submitted = select(PeerConfirmation.subject_id).where(
         PeerConfirmation.event_id == event_id, PeerConfirmation.confirmer_id == user.id,
     )
-    candidates = db.scalars(select(Attendance).where(
+    candidates = db.execute(select(Attendance, Profile).join(
+        Profile, Profile.user_id == Attendance.user_id,
+    ).where(
         Attendance.event_id == event_id, Attendance.user_id != user.id,
         Attendance.status.in_(eligibility), ~Attendance.user_id.in_(submitted),
-    ).order_by(Attendance.user_id).limit(event.peer_selection_limit))
-    return [{"participant_id": str(item.user_id)} for item in candidates]
+    ).order_by(Profile.display_name, Attendance.user_id).limit(event.peer_selection_limit)).all()
+    return [{"participant_id": str(item.user_id), "display_name": profile.display_name}
+            for item, profile in candidates]
 
 
 @router.post("/qr-verify")
