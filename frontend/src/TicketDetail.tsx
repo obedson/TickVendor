@@ -332,9 +332,10 @@ export function TicketDetail({ ticketId, token, onBack, onWalletChanged }: Props
   const attendance = detail.attendance;
   const checkedIn = Boolean(attendance?.checked_in_at);
   const checkedOut = Boolean(attendance?.checked_out_at);
+  const attendanceRejected = attendance?.status === 'rejected';
   const holdsTicket = state === null || ['claimed', 'checked_in', 'checked_out'].includes(state);
   const canCheckIn = detail.self_check_in_enabled && !checkedIn && holdsTicket;
-  const canCheckOut = detail.self_checkout_enabled && checkedIn && !checkedOut;
+  const canCheckOut = detail.self_checkout_enabled && checkedIn && !checkedOut && !attendanceRejected;
   const canTransfer = state === null || ['claimed', 'unassigned', 'invitation_sent'].includes(state);
   const duration = formatDuration(attendance?.duration_seconds);
   const geofenceLocked = detail.entitlements.some(item => item.requires_geofence && item.status === 'locked');
@@ -439,6 +440,14 @@ export function TicketDetail({ ticketId, token, onBack, onWalletChanged }: Props
             <p className="info-msg">Claim or transfer this ticket to an attendee before check-in.</p>
           )}
 
+          {attendanceRejected && (
+            <div role="status" className="error" style={{ marginBottom: '1rem' }}>
+              <strong>Attendance rejected by the organizer.</strong>
+              {attendance?.decision_reason && <p>{attendance.decision_reason}</p>}
+              <p>Checkout is unavailable unless the organizer reconsiders and verifies your attendance.</p>
+            </div>
+          )}
+
           {locationRetry === 'check-out' && (
             <div className="form-actions">
               <button className="accent" onClick={() => submitCheckOut(true)} disabled={busyAny}>
@@ -456,7 +465,7 @@ export function TicketDetail({ ticketId, token, onBack, onWalletChanged }: Props
           {detail.self_check_in_enabled && geofenced !== false && !checkedIn && (
             <p className="text-sm text-muted">Your location is read once, at check-in, to confirm you are at the venue. It is not tracked.</p>
           )}
-          {peerConfirmationEnabled && checkedIn && (
+          {peerConfirmationEnabled && checkedIn && !attendanceRejected && (
             <p className="info-msg">Peer confirmation is available under <strong>My Space → Attendance</strong>. There you can confirm eligible attendees and receive confirmations from distinct peers.</p>
           )}
         </section>

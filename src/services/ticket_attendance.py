@@ -223,6 +223,11 @@ def self_check_out(
     attendance = _attendance_for(db, event_id, user.id)
     if attendance is None or attendance.checked_in_at is None:
         raise HTTPException(status_code=409, detail="You must check in before checking out")
+    if attendance.status == AttendanceStatus.REJECTED:
+        raise HTTPException(
+            status_code=409,
+            detail="Your attendance was rejected by the organizer. Ask the organizer to reconsider the decision before checkout.",
+        )
     if attendance.checked_out_at is not None:
         return check_in_state(db, attendance)
     now = datetime.now(UTC)
@@ -265,6 +270,10 @@ def check_in_state(db: Session, attendance: Attendance) -> dict:
         AttendanceVerification.attendance_id == attendance.id,
         AttendanceVerification.is_valid.is_(True),
     ))]
+    organizer_decision = db.scalar(select(AttendanceVerification).where(
+        AttendanceVerification.attendance_id == attendance.id,
+        AttendanceVerification.method == VerificationMethod.ORGANIZER,
+    ))
     return {
         "attendance_id": str(attendance.id),
         "event_id": str(attendance.event_id),
@@ -275,4 +284,5 @@ def check_in_state(db: Session, attendance: Attendance) -> dict:
         "duration_seconds": attendance.duration_seconds,
         "viable_methods": sorted({m.value if hasattr(m, "value") else str(m) for m in methods}),
         "pending_review": attendance.flagged_for_review,
+        "decision_reason": organizer_decision.reason if organizer_decision else None,
     }

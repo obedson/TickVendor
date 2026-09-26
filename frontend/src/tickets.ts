@@ -99,6 +99,7 @@ export type AttendanceState = {
   checked_out_at?: string | null;
   duration_seconds?: number | null;
   viable_methods: string[];
+  decision_reason?: string | null;
 };
 
 export type TicketDetail = {

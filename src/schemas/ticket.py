@@ -109,6 +109,7 @@ class CheckInStateResponse(BaseModel):
     duration_seconds: int | None = None
     viable_methods: list[str] = Field(default_factory=list)
     pending_review: bool = False
+    decision_reason: str | None = None
 
 
 class TransferCreateInput(BaseModel):
